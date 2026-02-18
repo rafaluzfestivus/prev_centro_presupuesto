@@ -30,10 +30,16 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 };
 
 export const generateProposalPDF = async (data: ProposalData) => {
-    // Landscape orientation
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const width = 297; // A4 landscape width in mm
-    const height = 210; // A4 landscape height in mm
+    // Landscape orientation with custom 16:9 aspect ratio
+    // Width: 297mm (A4 width), Height: 167.1mm (to match 16:9 ratio of images)
+    const width = 297;
+    const height = 167.1;
+
+    const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [width, height]
+    });
 
     try {
         // Load all images first
@@ -49,46 +55,46 @@ export const generateProposalPDF = async (data: ProposalData) => {
         doc.addImage(img1, 'JPEG', 0, 0, width, height);
 
         // --- Page 2 ---
-        doc.addPage();
+        doc.addPage([width, height]);
         doc.addImage(img2, 'JPEG', 0, 0, width, height);
 
         // --- Page 3 ---
-        doc.addPage();
+        doc.addPage([width, height]);
         doc.addImage(img3, 'JPEG', 0, 0, width, height);
 
         // --- Page 4 (Measurements & Mockup) ---
-        doc.addPage();
+        doc.addPage([width, height]);
         doc.addImage(img4, 'JPEG', 0, 0, width, height);
 
         // Page 4: Left Side (Measurements) - White Background
         doc.setTextColor(0, 0, 0); // Black text
 
         // Lowered Y position to avoid overlap with background text (e.g. "Basado en...")
-        let yPos = 115; // Set to 115 as requested (higher than 130)
+        let yPos = 95; // Adjusted for new height (was 115)
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
+        doc.setFontSize(12); // Slightly smaller font to fit more items
 
         data.items.forEach(item => {
             // [Confirmação de medidas]
             const text = `• ${item.name}: ${item.width.toFixed(2)}x${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`;
-            doc.text(text, 20, yPos);
-            yPos += 10;
+            doc.text(text, 15, yPos);
+            yPos += 8; // Reduced spacing
         });
 
         // Page 4: Right Side (Mockups) - Dark Background
         // Starting higher to allow vertical stacking
         const rightColX = 160;
-        let rightColY = 60;
+        let rightColY = 50; // Adjusted for new height (was 60)
 
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
         doc.text("Mockups:", rightColX, rightColY);
 
-        rightColY += 10;
+        rightColY += 8;
         doc.setFont("courier", "normal");
-        doc.setFontSize(12); // Increased monospace size to 12
+        doc.setFontSize(10); // Reduced monospace size to fit 16:9
 
         // Split mockup text to fit the right column (~130mm wide)
         const splitMockup = doc.splitTextToSize(data.mockup, 130);
@@ -96,44 +102,45 @@ export const generateProposalPDF = async (data: ProposalData) => {
 
 
         // --- Page 5 (Price) ---
-        doc.addPage();
+        doc.addPage([width, height]);
         doc.addImage(img5, 'JPEG', 0, 0, width, height);
 
         // Page 5: Left Side (Items & Price) - White Background
 
         doc.setTextColor(0, 0, 0); // Default Black for items
 
-        yPos = 80; // Raised slightly from 90 to 80
+        yPos = 60; // Adjusted for new height (was 80)
 
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
+        doc.setFontSize(12);
 
         data.items.forEach(item => {
             // [item - medidas - calculo da area m2]
             const text = `• ${item.name} - ${item.width.toFixed(2)}x${item.height.toFixed(2)}m = ${item.area.toFixed(2)}m²`;
-            doc.text(text, 20, yPos);
-            yPos += 10;
+            doc.text(text, 15, yPos);
+            yPos += 8;
         });
 
         // Total Price at Bottom Left
-        const totalY = 160;
+        const totalY = 135; // Moved up significantly (was 160)
 
         // Label
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
         doc.setTextColor(77, 42, 54); // Brand Wine Color
-        doc.text("Inversión Total:", 20, totalY);
+        doc.text("Inversión Total:", 15, totalY);
 
         // Value
-        doc.setFontSize(22); // Decreased slightly to 22
+        doc.setFontSize(22);
         doc.setTextColor(77, 42, 54); // Brand Wine Color (Standard)
-        doc.text(`€ ${data.total.toFixed(2)} + IVA`, 70, totalY);
+        doc.text(`€ ${data.total.toFixed(2)} + IVA`, 65, totalY);
 
         // Footer Contact Info
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
-        doc.text("contacto@preventivacentro.es", 20, 190);
-        doc.text("Móvil: 637 003 793  |  Fijo: 91 209 61 17", 20, 195);
+        const footerY = 158; // Moved up to valid range (max 167)
+        doc.text("contacto@preventivacentro.es", 15, footerY);
+        doc.text("Móvil: 637 003 793  |  Fijo: 91 209 61 17", 15, footerY + 5);
 
 
         // Save

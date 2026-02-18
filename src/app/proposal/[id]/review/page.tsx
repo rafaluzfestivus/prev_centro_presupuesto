@@ -87,7 +87,26 @@ export default function ReviewPage() {
     }
 
     const handleConfirm = () => {
-        // Logic to save to DB and generate PDF
+        // Save current state to localStorage so SuccessPage picks up manual edits
+        if (data) {
+            const storedResult = {
+                items: data.items,
+                ascii_mockup: data.mockup,
+                pricing_logic: data.logic,
+                total: data.total
+            }
+            localStorage.setItem(`proposal_${id}_result`, JSON.stringify(storedResult))
+
+            // Also update input if client info changed
+            const storedInput = localStorage.getItem(`proposal_${id}_input`)
+            if (storedInput) {
+                const input = JSON.parse(storedInput)
+                input.clientName = data.clientName
+                input.city = data.city
+                localStorage.setItem(`proposal_${id}_input`, JSON.stringify(input))
+            }
+        }
+
         router.push(`/proposal/${id}/success`)
     }
 
