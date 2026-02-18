@@ -1,28 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
-// Type definition for Proposal (Mock)
-type Proposal = {
-    id: string
-    clientName: string
-    city: string
-    date: string
-    total: string
-    status: 'Rascunho' | 'Processada' | 'Confirmada'
-}
+import { createProposalAction, getProposalsAction } from '@/actions/proposal'
+import { Proposal } from '@/lib/types'
+import { Loader2 } from 'lucide-react'
 
 export default function DashboardPage() {
     const router = useRouter()
-    // Mock history data
-    const [proposals, setProposals] = useState<Proposal[]>([
-        { id: '1', clientName: 'Maria Silva', city: 'Madrid', date: '2023-10-25', total: '€ 450,00', status: 'Confirmada' },
-        { id: '2', clientName: 'Juan Perez', city: 'Móstoles', date: '2023-10-26', total: '€ 280,00', status: 'Rascunho' },
-    ])
+
+    // History data
+    const [proposals, setProposals] = useState<Proposal[]>([])
+    const [loadingHistory, setLoadingHistory] = useState(true)
 
     // New Proposal Form State
     const [clientName, setClientName] = useState('')
@@ -31,32 +23,42 @@ export default function DashboardPage() {
     const [observations, setObservations] = useState('')
     const [loading, setLoading] = useState(false)
 
+    useEffect(() => {
+        loadProposals()
+    }, [])
+
+    const loadProposals = async () => {
+        setLoadingHistory(true)
+        const result = await getProposalsAction()
+        if (result.success && result.data) {
+            setProposals(result.data)
+        }
+        setLoadingHistory(false)
+    }
+
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
 
-        // In a real app, we would create a "Draft" proposal in DB first to get an ID.
-        // For this MVP, we will pass the data via localStorage or Context to the processing page,
-        // or just simulate the ID since we are focusing on the AI flow.
-        // Let's create a temporary ID.
-        const tempId = crypto.randomUUID()
+        try {
+            const result = await createProposalAction({
+                clientName,
+                city,
+                measurements,
+                observations
+            })
 
-        // Save input to localStorage to retrieve it in the processing/review steps if needed, 
-        // or ideally we should save to DB here. 
-        // For now, let's assume we redirect to processing and the processing page handles the API call.
-        // But wait, the processing page needs the INPUT data to send to the API.
-        // So we should probably call the API *here* or pass the data.
-
-        // Better flow for MVP: 
-        // 1. Create Draft in DB (Proposta table) - skipping for speed, we'll use localStorage
-        localStorage.setItem(`proposal_${tempId}_input`, JSON.stringify({
-            clientName,
-            city,
-            measurements,
-            observations
-        }))
-
-        router.push(`/proposal/${tempId}/processing`)
+            if (result.success && result.id) {
+                router.push(`/proposal/${result.id}/processing`)
+            } else {
+                alert('Erro ao criar proposta: ' + (result.error || 'Erro desconhecido'))
+            }
+        } catch (error) {
+            console.error(error)
+            alert('Erro ao criar proposta')
+        } finally {
+            setLoading(false)
+        }
     }
 
     const handleLogout = () => {
@@ -71,7 +73,7 @@ export default function DashboardPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="h-8 w-8 bg-[var(--color-primary)] rounded-full flex items-center justify-center text-white font-bold">P</div>
-                        <h1 className="text-xl font-bold text-[var(--color-secondary)]">Preventiva Propuestas</h1>
+                        <h1 className="text-xl font-bold text-[var(--color-secondary)]">Preventiva Propuestas - Histórico</h1>
                     </div>
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" onClick={handleLogout} className="text-gray-500 hover:text-gray-700">
@@ -136,6 +138,7 @@ export default function DashboardPage() {
                         </div>
 
                         <Button type="submit" className="w-full" disabled={loading}>
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {loading ? 'Procesando...' : 'Generar Propuesta con IA'}
                         </Button>
                     </form>
@@ -143,37 +146,55 @@ export default function DashboardPage() {
 
                 {/* Right Column: History */}
                 <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col h-[600px]">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 border-b pb-2">Historial</h2>
+                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Historial</h2>
+                        <Button variant="ghost" size="sm" onClick={loadProposals} disabled={loadingHistory}>
+                            <Loader2 className={`h-4 w-4 ${loadingHistory ? 'animate-spin' : ''}`} />
+                        </Button>
+                    </div>
+
                     <div className="mb-4">
                         <Input placeholder="Buscar por cliente..." className="w-full" />
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                        {proposals.length === 0 ? (
+                        {loadingHistory ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                            </div>
+                        ) : proposals.length === 0 ? (
                             <div className="text-center text-gray-500 py-8">
                                 No hay propuestas generadas.
                             </div>
                         ) : (
                             proposals.map((proposal) => (
-                                <div key={proposal.id} className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 hover:border-[var(--color-primary)] transition-colors cursor-pointer group">
+                                <div
+                                    key={proposal.id}
+                                    className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 hover:border-[var(--color-primary)] transition-colors cursor-pointer group"
+                                    onClick={() => router.push(proposal.status === 'Rascunho' ? `/proposal/${proposal.id}/processing` : `/proposal/${proposal.id}/review`)}
+                                >
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
-                                            <h3 className="font-medium text-gray-900 dark:text-gray-100">{proposal.clientName}</h3>
-                                            <p className="text-sm text-gray-500">{proposal.city}</p>
+                                            <h3 className="font-medium text-gray-900 dark:text-gray-100">{proposal.cliente_nome}</h3>
+                                            <p className="text-sm text-gray-500">{proposal.cidade}</p>
                                         </div>
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${proposal.status === 'Confirmada' ? 'bg-green-100 text-green-700' :
                                                 proposal.status === 'Processada' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-gray-100 text-gray-700'
+                                                    'bg-yellow-100 text-yellow-700'
                                             }`}>
                                             {proposal.status}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm">
-                                        <span className="text-gray-500">{proposal.date}</span>
-                                        <span className="font-bold text-gray-900 dark:text-white">{proposal.total}</span>
+                                        <span className="text-gray-500">{new Date(proposal.data_criacao).toLocaleDateString()}</span>
+                                        <span className="font-bold text-gray-900 dark:text-white">
+                                            {proposal.total_geral ? `€ ${Number(proposal.total_geral).toFixed(2)}` : '-'}
+                                        </span>
                                     </div>
                                     <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity flex justify-end">
-                                        <Button variant="ghost" size="sm" className="h-8 text-[var(--color-primary)]">Ver Detalhes</Button>
+                                        <Button variant="ghost" size="sm" className="h-8 text-[var(--color-primary)]">
+                                            {proposal.status === 'Rascunho' ? 'Continuar' : 'Ver Detalles'}
+                                        </Button>
                                     </div>
                                 </div>
                             ))
@@ -185,3 +206,4 @@ export default function DashboardPage() {
         </div>
     )
 }
+

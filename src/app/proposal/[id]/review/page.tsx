@@ -5,9 +5,11 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, RefreshCw, Save, Send } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Save, Send, Loader2 } from 'lucide-react'
+import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction } from '@/actions/proposal'
+import { ProposalItem as DBProposalItem } from '@/lib/types'
 
-// Mock Data Structure
+// Frontend Data Structure
 type ProposalItem = {
     id: string
     name: string
@@ -35,26 +37,41 @@ export default function ReviewPage() {
     const [data, setData] = useState<ProposalData | null>(null)
     const [isEditing, setIsEditing] = useState(false)
     const [isReprocessing, setIsReprocessing] = useState(false)
+    const [isConfirming, setIsConfirming] = useState(false)
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        // Load data from localStorage
-        const storedInput = localStorage.getItem(`proposal_${id}_input`)
-        const storedResult = localStorage.getItem(`proposal_${id}_result`)
+        loadData()
+    }, [id])
 
-        if (storedInput && storedResult) {
-            const input = JSON.parse(storedInput)
-            const result = JSON.parse(storedResult)
+    const loadData = async () => {
+        setLoading(true)
+        const result = await getProposalDetailsAction(id)
+        if (result.success && result.data) {
+            const { proposal, items, processing } = result.data
+
+            // Map DB items to frontend structure
+            const mappedItems: ProposalItem[] = items.map(item => ({
+                id: item.id,
+                name: item.nome_ambiente,
+                width: item.largura,
+                height: item.altura,
+                area: item.area_m2,
+                price: item.valor_total,
+                price_rule: 'Calculado' // Default/Unknown from DB
+            }))
 
             setData({
-                clientName: input.clientName,
-                city: input.city,
-                items: result.items.map((item: any, idx: number) => ({ ...item, id: idx.toString() })),
-                mockup: result.ascii_mockup,
-                logic: result.pricing_logic,
-                total: result.total
+                clientName: proposal.cliente_nome,
+                city: proposal.cidade,
+                items: mappedItems,
+                mockup: processing?.mockup_ascii || '',
+                logic: processing?.logica_calculo || '',
+                total: Number(proposal.total_geral || processing?.total_calculado || 0)
             })
         }
-    }, [id])
+        setLoading(false)
+    }
 
     // Handlers for manual edits
     const handleUpdateItem = (id: string, field: keyof ProposalItem, value: string | number) => {
@@ -86,28 +103,22 @@ export default function ReviewPage() {
         setData(prev => prev ? ({ ...prev, items: newItems, total: newTotal }) : null)
     }
 
-    const handleConfirm = () => {
-        // Save current state to localStorage so SuccessPage picks up manual edits
-        if (data) {
-            const storedResult = {
-                items: data.items,
-                ascii_mockup: data.mockup,
-                pricing_logic: data.logic,
-                total: data.total
+    const handleConfirm = async () => {
+        if (!data) return
+        setIsConfirming(true)
+        try {
+            const result = await confirmProposalAction(id, data.total, data.items)
+            if (result.success) {
+                router.push(`/proposal/${id}/success`)
+            } else {
+                alert('Erro ao confirmar: ' + result.error)
             }
-            localStorage.setItem(`proposal_${id}_result`, JSON.stringify(storedResult))
-
-            // Also update input if client info changed
-            const storedInput = localStorage.getItem(`proposal_${id}_input`)
-            if (storedInput) {
-                const input = JSON.parse(storedInput)
-                input.clientName = data.clientName
-                input.city = data.city
-                localStorage.setItem(`proposal_${id}_input`, JSON.stringify(input))
-            }
+        } catch (error) {
+            console.error(error)
+            alert('Erro ao confirmar proposta')
+        } finally {
+            setIsConfirming(false)
         }
-
-        router.push(`/proposal/${id}/success`)
     }
 
     const [aiInstruction, setAiInstruction] = useState('')
@@ -117,20 +128,16 @@ export default function ReviewPage() {
         setIsReprocessing(true)
 
         try {
-            const response = await fetch('/api/ai/process', {
-                method: 'POST',
-                body: JSON.stringify({
-                    message: aiInstruction,
-                    current_data: data // Send current state for context
-                }),
-                headers: { 'Content-Type': 'application/json' }
-            })
+            // Need to pass current context in a format AI expects (frontend format is fine as it converts to JSON)
+            const result = await processProposalWithAIAction(id, aiInstruction, data)
 
-            if (!response.ok) throw new Error('Failed to reprocess')
+            if (!result.success || !result.data) {
+                throw new Error(result.error || 'Falha ao reprocessar')
+            }
 
-            const newData = await response.json()
+            const newData = result.data
 
-            // Merge or replace data. For now, we replace items/mockup/logic but keep client info if missing
+            // Merge or replace data
             setData(prev => ({
                 ...prev!,
                 items: newData.items.map((item: any, idx: number) => ({ ...item, id: idx.toString() })),
@@ -148,7 +155,15 @@ export default function ReviewPage() {
         }
     }
 
-    if (!data) return <div className="p-8">Cargando datos...</div>
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
+            </div>
+        )
+    }
+
+    if (!data) return <div className="p-8 text-center">Nenhum dado encontrado para esta proposta.</div>
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
@@ -165,7 +180,8 @@ export default function ReviewPage() {
                         <Button variant="outline" onClick={() => setIsEditing(!isEditing)}>
                             {isEditing ? 'Cancelar Edición' : 'Editar Manualmente'}
                         </Button>
-                        <Button onClick={handleConfirm}>
+                        <Button onClick={handleConfirm} disabled={isConfirming}>
+                            {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Confirmar y Generar
                         </Button>
                     </div>
@@ -315,3 +331,4 @@ export default function ReviewPage() {
         </div>
     )
 }
+

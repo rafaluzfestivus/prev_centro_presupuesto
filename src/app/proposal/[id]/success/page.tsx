@@ -3,32 +3,47 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Download, MessageCircle, Home } from 'lucide-react'
-import { generateProposalPDF, ProposalData } from '@/services/pdfGenerator'
+import { CheckCircle2, Download, MessageCircle, Home, Loader2 } from 'lucide-react'
+import { generateProposalPDF, ProposalData, ProposalItem } from '@/services/pdfGenerator'
+import { getProposalDetailsAction } from '@/actions/proposal'
 
 export default function SuccessPage() {
     const router = useRouter()
     const params = useParams()
     const id = params.id as string
     const [data, setData] = useState<ProposalData | null>(null)
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        const storedInput = localStorage.getItem(`proposal_${id}_input`)
-        const storedResult = localStorage.getItem(`proposal_${id}_result`)
+        const loadData = async () => {
+            setLoading(true)
+            const result = await getProposalDetailsAction(id)
 
-        if (storedInput && storedResult) {
-            const input = JSON.parse(storedInput)
-            const result = JSON.parse(storedResult)
+            if (result.success && result.data) {
+                const { proposal, items, processing } = result.data
 
-            // Combine data for PDF
-            setData({
-                clientName: input.clientName,
-                city: input.city,
-                items: result.items,
-                total: result.total,
-                mockup: result.ascii_mockup
-            })
+                // Map DB items to PDF structure
+                const mappedItems: ProposalItem[] = items.map(item => ({
+                    name: item.nome_ambiente,
+                    width: item.largura,
+                    height: item.altura,
+                    area: item.area_m2,
+                    price: item.valor_total,
+                    price_rule: 'Calculado'
+                }))
+
+                setData({
+                    clientName: proposal.cliente_nome,
+                    city: proposal.cidade,
+                    items: mappedItems,
+                    total: Number(proposal.total_geral || 0),
+                    mockup: processing?.mockup_ascii || ''
+                })
+            }
+            setLoading(false)
         }
+
+        loadData()
     }, [id])
 
     const handleDownload = async () => {
@@ -45,7 +60,13 @@ export default function SuccessPage() {
         window.open(`https://wa.me/?text=${encoded}`, '_blank')
     }
 
-    if (!data) return <div className="p-8">Gerando proposta...</div>
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        </div>
+    )
+
+    if (!data) return <div className="p-8 text-center">Dados da proposta não encontrados.</div>
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
