@@ -4,11 +4,14 @@ import { NextResponse } from 'next/server'
 import { SYSTEM_PROMPT } from '@/services/ai/prompt'
 
 // Initialize OpenAI client
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
 
 export async function POST(req: Request) {
+    // Initialize OpenAI client inside the handler to prevent build-time errors if env var is missing
+    const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+    })
+
+
     try {
         const { message, current_data } = await req.json()
 
