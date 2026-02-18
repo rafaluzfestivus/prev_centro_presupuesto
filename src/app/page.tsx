@@ -10,7 +10,7 @@ export default function Home() {
         Sistema de geração de propostas comerciais.
       </p>
       <Link
-        href="/dashboard"
+        href="/painel"
         className="px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 transition-opacity"
       >
         Acessar Sistema
