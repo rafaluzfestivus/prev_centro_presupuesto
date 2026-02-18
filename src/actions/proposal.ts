@@ -18,9 +18,9 @@ export async function createProposalAction(data: CreateProposalInput) {
         const proposal = await createProposal(data)
         revalidatePath('/painel')
         return { success: true, id: proposal.id }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to create proposal:', error)
-        return { success: false, error: 'Failed to create proposal' }
+        return { success: false, error: error.message || String(error) }
     }
 }
 
