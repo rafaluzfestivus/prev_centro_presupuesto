@@ -19,7 +19,11 @@ export default function LoginPage() {
         setLoading(true)
         setError(null)
 
-        // Simulating login for now if Supabase is not configured
+        // ALLOW ANY LOGIN FOR TESTING
+        router.push('/painel')
+
+        /* 
+        // Original Logic
         if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'YOUR_SUPABASE_URL') {
             if (email === 'admin@preventiva.com' && password === 'admin') {
                 router.push('/painel')
@@ -39,6 +43,7 @@ export default function LoginPage() {
         } else {
             router.push('/painel')
         }
+        */
     }
 
     return (

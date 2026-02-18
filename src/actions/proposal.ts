@@ -110,3 +110,14 @@ export async function confirmProposalAction(id: string, total: number, items: an
         return { success: false, error: 'Failed to confirm' }
     }
 }
+
+export async function updateProposalAction(id: string, updates: any) {
+    try {
+        await updateProposal(id, updates)
+        revalidatePath(`/proposal/${id}`)
+        return { success: true }
+    } catch (error) {
+        console.error('Failed to update proposal:', error)
+        return { success: false, error: 'Failed to update proposal' }
+    }
+}

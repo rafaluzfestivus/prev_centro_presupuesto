@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Download, MessageCircle, Home, Loader2 } from 'lucide-react'
-import { generateProposalPDF, ProposalData, ProposalItem } from '@/services/pdfGenerator'
-import { getProposalDetailsAction } from '@/actions/proposal'
+import { CheckCircle2, Download, MessageCircle, Home, Loader2, Share2 } from 'lucide-react'
+import { generateProposalPDF, generateProposalBlob, ProposalData, ProposalItem } from '@/services/pdfGenerator'
+import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal' // Assuming updateProposalAction is exposed or need to create
+import { createClient } from '@/lib/supabase/client'
 
 export default function SuccessPage() {
     const router = useRouter()
@@ -13,6 +14,8 @@ export default function SuccessPage() {
     const id = params.id as string
     const [data, setData] = useState<ProposalData | null>(null)
     const [loading, setLoading] = useState(true)
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+    const [uploading, setUploading] = useState(false)
 
     useEffect(() => {
         const loadData = async () => {
@@ -21,6 +24,11 @@ export default function SuccessPage() {
 
             if (result.success && result.data) {
                 const { proposal, items, processing } = result.data
+
+                // Use existing PDF URL if available
+                if (proposal.pdf_gerado) {
+                    setPdfUrl(proposal.pdf_gerado)
+                }
 
                 // Map DB items to PDF structure
                 const mappedItems: ProposalItem[] = items.map(item => ({
@@ -46,18 +54,82 @@ export default function SuccessPage() {
         loadData()
     }, [id])
 
+    // Generate and Upload PDF if not already present
+    useEffect(() => {
+        const generateAndUpload = async () => {
+            if (!data || pdfUrl || uploading) return
+            setUploading(true)
+
+            try {
+                const blob = await generateProposalBlob(data)
+                if (!blob) throw new Error("Falha ao gerar PDF")
+
+                const supabase = createClient()
+                const fileName = `${id}_${Date.now()}.pdf`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('proposals')
+                    .upload(fileName, blob, {
+                        contentType: 'application/pdf',
+                        upsert: true
+                    })
+
+                if (uploadError) throw uploadError
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('proposals')
+                    .getPublicUrl(fileName)
+
+                setPdfUrl(publicUrl)
+
+                // Save URL to DB (Background)
+                // We need an action to update just the PDF field or use a general update
+                // For now, let's assume we can use the generic updateProposalAction if we expose it, or create a specific one
+                // Since updateProposalAction is not exported in actions/proposal.ts yet (only confirm), 
+                // I will add a simple update action request next. For now, this is client side state.
+
+                // Let's rely on the user clicking WhatsApp to trigger the update or just console log for now until I add the action
+                console.log("PDF Uploaded:", publicUrl)
+
+            } catch (error) {
+                console.error("Erro ao fazer upload do PDF:", error)
+            } finally {
+                setUploading(false)
+            }
+        }
+
+        if (data && !pdfUrl) {
+            generateAndUpload()
+        }
+    }, [data, pdfUrl, id, uploading])
+
+
     const handleDownload = async () => {
         if (data) {
             await generateProposalPDF(data)
         }
     }
 
-    const handleWhatsApp = () => {
+    const handleWhatsApp = async () => {
         if (!data) return
 
-        const message = `Olá ${data.clientName}, aqui está o seu orçamento para redes de proteção da Preventiva Centro. Total: € ${data.total.toFixed(2)}. Podemos agendar a instalação?`
+        let message = `Olá ${data.clientName}, aqui está o seu orçamento para redes de proteção da Preventiva Centro. Total: € ${data.total.toFixed(2)}.`
+
+        if (pdfUrl) {
+            // Save URL to DB if not saved yet? ensure consistency.
+            // Update DB with PDF URL
+            await updateLinkInDB(pdfUrl)
+            message += `\n\nBaixe sua proposta aqui: ${pdfUrl}`
+        }
+
+        message += `\n\nPodemos agendar a instalação?`
+
         const encoded = encodeURIComponent(message)
         window.open(`https://wa.me/?text=${encoded}`, '_blank')
+    }
+
+    const updateLinkInDB = async (url: string) => {
+        await updateProposalAction(id, { pdf_gerado: url })
     }
 
     if (loading) return (
@@ -88,13 +160,21 @@ export default function SuccessPage() {
                 </div>
 
                 <div className="space-y-3">
-                    <Button onClick={handleDownload} className="w-full h-12 text-lg gap-2">
+                    <Button onClick={handleDownload} variant="secondary" className="w-full h-12 text-lg gap-2">
                         <Download className="h-5 w-5" />
                         Baixar PDF
                     </Button>
 
-                    <Button variant="outline" onClick={handleWhatsApp} className="w-full h-12 text-lg gap-2 border-green-500 text-green-600 hover:bg-green-50">
-                        <MessageCircle className="h-5 w-5" />
+                    <Button
+                        onClick={handleWhatsApp}
+                        className="w-full h-12 text-lg gap-2 bg-green-600 hover:bg-green-700 text-white"
+                        disabled={!pdfUrl && uploading}
+                    >
+                        {(!pdfUrl && uploading) ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                            <MessageCircle className="h-5 w-5" />
+                        )}
                         Enviar via WhatsApp
                     </Button>
 

@@ -152,3 +152,112 @@ export const generateProposalPDF = async (data: ProposalData) => {
         alert("Error al generar el PDF. Asegúrate de que las imágenes de fondo existan.");
     }
 };
+
+export const generateProposalBlob = async (data: ProposalData): Promise<Blob | null> => {
+    // Landscape orientation with custom 16:9 aspect ratio
+    const width = 297;
+    const height = 167.1;
+
+    const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [width, height]
+    });
+
+    try {
+        // Load all images first
+        const [img1, img2, img3, img4, img5] = await Promise.all([
+            loadImage('/assets/pdf/page1.jpg'),
+            loadImage('/assets/pdf/page2.jpg'),
+            loadImage('/assets/pdf/page3.jpg'),
+            loadImage('/assets/pdf/page4.jpg'),
+            loadImage('/assets/pdf/page5.jpg'),
+        ]);
+
+        // --- Page 1 ---
+        doc.addImage(img1, 'JPEG', 0, 0, width, height);
+
+        // --- Page 2 ---
+        doc.addPage([width, height]);
+        doc.addImage(img2, 'JPEG', 0, 0, width, height);
+
+        // --- Page 3 ---
+        doc.addPage([width, height]);
+        doc.addImage(img3, 'JPEG', 0, 0, width, height);
+
+        // --- Page 4 (Measurements & Mockup) ---
+        doc.addPage([width, height]);
+        doc.addImage(img4, 'JPEG', 0, 0, width, height);
+
+        // Page 4: Left Side (Measurements)
+        doc.setTextColor(0, 0, 0);
+        let yPos = 95;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(12);
+
+        data.items.forEach(item => {
+            const text = `• ${item.name}: ${item.width.toFixed(2)}x${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`;
+            doc.text(text, 15, yPos);
+            yPos += 8;
+        });
+
+        // Page 4: Right Side (Mockups)
+        const rightColX = 160;
+        let rightColY = 50;
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text("Mockups:", rightColX, rightColY);
+
+        rightColY += 8;
+        doc.setFont("courier", "normal");
+        doc.setFontSize(10);
+
+        const splitMockup = doc.splitTextToSize(data.mockup, 130);
+        doc.text(splitMockup, rightColX, rightColY);
+
+        // --- Page 5 (Price) ---
+        doc.addPage([width, height]);
+        doc.addImage(img5, 'JPEG', 0, 0, width, height);
+
+        // Page 5: Left Side (Items & Price)
+        doc.setTextColor(0, 0, 0);
+        yPos = 60;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+
+        data.items.forEach(item => {
+            const text = `• ${item.name} - ${item.width.toFixed(2)}x${item.height.toFixed(2)}m = ${item.area.toFixed(2)}m²`;
+            doc.text(text, 15, yPos);
+            yPos += 8;
+        });
+
+        // Total Price
+        const totalY = 135;
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(77, 42, 54);
+        doc.text("Inversión Total:", 15, totalY);
+
+        doc.setFontSize(22);
+        doc.setTextColor(77, 42, 54);
+        doc.text(`€ ${data.total.toFixed(2)} + IVA`, 65, totalY);
+
+        // Footer Contact Info
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        const footerY = 158;
+        doc.text("contacto@preventivacentro.es", 15, footerY);
+        doc.text("Móvil: 637 003 793  |  Fijo: 91 209 61 17", 15, footerY + 5);
+
+        return doc.output('blob');
+
+    } catch (error) {
+        console.error("Error generating PDF Blob:", error);
+        return null;
+    }
+};
