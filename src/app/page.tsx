@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-8 gap-8">
@@ -7,12 +9,12 @@ export default function Home() {
       <p className="text-lg text-[var(--color-text-main)]">
         Sistema de geração de propostas comerciais.
       </p>
-      <a
+      <Link
         href="/dashboard"
         className="px-6 py-3 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 transition-opacity"
       >
         Acessar Sistema
-      </a>
+      </Link>
     </div>
   );
 }
