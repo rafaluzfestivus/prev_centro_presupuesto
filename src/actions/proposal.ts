@@ -87,9 +87,9 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
         revalidatePath(`/proposal/${id}`)
         return { success: true, data: result }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to process proposal:', error)
-        return { success: false, error: 'Failed to process proposal' }
+        return { success: false, error: error.message || String(error) }
     }
 }
 
