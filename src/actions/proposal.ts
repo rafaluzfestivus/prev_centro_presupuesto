@@ -15,7 +15,7 @@ export async function createProposalAction(data: CreateProposalInput) {
         // Actually, we should check if we have a user. If anon, maybe explicit null?
         // creating with null for now as we might not have auth setup in this context fully verified
 
-        const proposal = await createProposal(data)
+        const proposal = await createProposal(data, userId)
         revalidatePath('/painel')
         return { success: true, id: proposal.id }
     } catch (error: any) {
