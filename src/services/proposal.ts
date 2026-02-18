@@ -125,7 +125,7 @@ export async function saveAIProcessing(proposalId: string, result: any, rawPromp
             nome_ambiente: item.name,
             largura: item.width,
             altura: item.height,
-            area_m2: item.area,
+            // area_m2: item.area, // Generated column
             valor_unitario: 28.00, // Fixed for now or from item?
             valor_total: item.price,
             ordem: index
@@ -178,7 +178,7 @@ export async function saveProposalItems(proposalId: string, items: any[], total:
             nome_ambiente: item.nome_ambiente || item.name, // Handle both DB and Frontend prop names
             largura: item.largura || item.width,
             altura: item.altura || item.height,
-            area_m2: item.area_m2 || item.area,
+            // area_m2: item.area_m2 || item.area, // Generated column
             valor_unitario: item.valor_unitario || 28.00,
             valor_total: item.valor_total || item.price,
             ordem: index
