@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProposalAction, getProposalsAction } from '@/actions/proposal'
 import { Proposal } from '@/lib/types'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Upload, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 export default function DashboardPage() {
     const router = useRouter()
@@ -22,6 +24,9 @@ export default function DashboardPage() {
     const [measurements, setMeasurements] = useState('')
     const [observations, setObservations] = useState('')
     const [loading, setLoading] = useState(false)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         loadProposals()
@@ -41,11 +46,34 @@ export default function DashboardPage() {
         setLoading(true)
 
         try {
+            let imageUrl = ''
+
+            if (selectedFile) {
+                setUploading(true)
+                const supabase = createClient()
+                const fileExt = selectedFile.name.split('.').pop()
+                const fileName = `input_${Date.now()}.${fileExt}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('proposals')
+                    .upload(fileName, selectedFile)
+
+                if (uploadError) throw uploadError
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('proposals')
+                    .getPublicUrl(fileName)
+
+                imageUrl = publicUrl
+                setUploading(false)
+            }
+
             const result = await createProposalAction({
                 clientName,
                 city,
                 measurements,
-                observations
+                observations,
+                imageUrl
             })
 
             if (result.success && result.id) {
@@ -58,6 +86,20 @@ export default function DashboardPage() {
             alert('Erro ao criar proposta')
         } finally {
             setLoading(false)
+            setUploading(false)
+        }
+    }
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setSelectedFile(e.target.files[0])
+        }
+    }
+
+    const clearFile = () => {
+        setSelectedFile(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
         }
     }
 
@@ -137,9 +179,42 @@ export default function DashboardPage() {
                             />
                         </div>
 
+                        <div className="space-y-2">
+                            <Label htmlFor="file">Imagen / Diseño (Opcional)</Label>
+                            {!selectedFile ? (
+                                <div
+                                    className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                    <span className="text-sm text-gray-500">Clic para subir imagen</span>
+                                    <input
+                                        type="file"
+                                        id="file"
+                                        ref={fileInputRef}
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <div className="h-8 w-8 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center">
+                                            <span className="text-xs font-bold text-gray-500">IMG</span>
+                                        </div>
+                                        <span className="text-sm truncate">{selectedFile.name}</span>
+                                    </div>
+                                    <Button type="button" variant="ghost" size="sm" onClick={clearFile}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+
                         <Button type="submit" className="w-full" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {loading ? 'Procesando...' : 'Generar Propuesta con IA'}
+                            {loading ? (uploading ? 'Subiendo imagen...' : 'Procesando...') : 'Generar Propuesta con IA'}
                         </Button>
                     </form>
                 </section>
@@ -179,8 +254,8 @@ export default function DashboardPage() {
                                             <p className="text-sm text-gray-500">{proposal.cidade}</p>
                                         </div>
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${proposal.status === 'Confirmada' ? 'bg-green-100 text-green-700' :
-                                                proposal.status === 'Processada' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-yellow-100 text-yellow-700'
+                                            proposal.status === 'Processada' ? 'bg-blue-100 text-blue-700' :
+                                                'bg-yellow-100 text-yellow-700'
                                             }`}>
                                             {proposal.status}
                                         </span>

@@ -66,7 +66,20 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 content: `Contexto Atual da Proposta (JSON): ${JSON.stringify(currentCtx)}. \n\n Instrução de Alteração: ${instruction}`
             })
         } else {
-            messages.push({ role: "user", content: proposal.medidas_input })
+            const userContent: any[] = [
+                { type: "text", text: proposal.medidas_input }
+            ]
+
+            if (proposal.input_image_url) {
+                userContent.push({
+                    type: "image_url",
+                    image_url: {
+                        url: proposal.input_image_url,
+                    },
+                })
+            }
+
+            messages.push({ role: "user", content: userContent })
         }
 
         const completion = await openai.chat.completions.create({

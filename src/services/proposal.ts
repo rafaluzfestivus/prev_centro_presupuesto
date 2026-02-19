@@ -12,6 +12,7 @@ export async function createProposal(data: CreateProposalInput, userId?: string)
             cidade: data.city,
             medidas_input: data.measurements,
             observacoes: data.observations,
+            input_image_url: data.imageUrl,
             criado_por: userId,
             status: 'Rascunho'
         })

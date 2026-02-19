@@ -14,6 +14,7 @@ export interface Proposal {
     data_criacao: string;
     data_confirmacao?: string;
     prompts?: any[]; // JSON array
+    input_image_url?: string;
 }
 
 export interface ProposalItem {
@@ -49,4 +50,5 @@ export interface CreateProposalInput {
     city: string;
     measurements: string;
     observations?: string;
+    imageUrl?: string;
 }
