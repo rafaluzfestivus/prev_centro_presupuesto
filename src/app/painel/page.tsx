@@ -11,6 +11,8 @@ import { Proposal } from '@/lib/types'
 import { Loader2, Upload, X, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
+import { Translator } from '@/components/dashboard/Translator'
+
 export default function DashboardPage() {
     const router = useRouter()
 
@@ -329,6 +331,23 @@ export default function DashboardPage() {
                                 </div>
                             ))
                         )}
+                    </div>
+                </section>
+
+                {/* Left Column: Translator - Mobile only or full width if needed, but let's put it under New Proposal on desktop? 
+                    Actually, let's make a grid for it. 
+                */}
+                <section className="col-span-1 lg:col-span-2 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-1 h-full">
+                        <Translator />
+                    </div>
+                    <div className="lg:col-span-2 bg-blue-50 dark:bg-blue-900/10 rounded-xl p-6 border border-blue-100 dark:border-blue-900">
+                        <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">Consejos de Preventiva Centro</h3>
+                        <ul className="text-sm text-blue-700 dark:text-blue-400 space-y-1 list-disc pl-4">
+                            <li>Usa siempre el traductor para ajustar el tono "madrileño".</li>
+                            <li>Sube fotos para que la IA identifique el tipo de ventana.</li>
+                            <li>Revisar siempre los precios mínimos de 80€.</li>
+                        </ul>
                     </div>
                 </section>
 
