@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, RefreshCw, Save, Send, Loader2 } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus } from 'lucide-react'
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 
@@ -101,6 +101,54 @@ export default function ReviewPage() {
 
         const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
         setData(prev => prev ? ({ ...prev, items: newItems, total: newTotal }) : null)
+        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
+        setData(prev => prev ? ({ ...prev, items: newItems, total: newTotal }) : null)
+    }
+
+    const handleAddItem = () => {
+        if (!data) return
+        const newItem: ProposalItem = {
+            id: `new_${Date.now()}`,
+            name: 'Nuevo Item',
+            width: 0,
+            height: 0,
+            area: 0,
+            price: 80,
+            price_rule: 'Manual'
+        }
+        const newItems = [...data.items, newItem]
+        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
+        setData({ ...data, items: newItems, total: newTotal })
+    }
+
+    const handleDeleteItem = (id: string) => {
+        if (!data) return
+        const newItems = data.items.filter(item => item.id !== id)
+        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
+        setData({ ...data, items: newItems, total: newTotal })
+    }
+
+    const handleAddItem = () => {
+        if (!data) return
+        const newItem: ProposalItem = {
+            id: `new_${Date.now()}`,
+            name: 'Nuevo Item',
+            width: 0,
+            height: 0,
+            area: 0,
+            price: 80,
+            price_rule: 'Manual'
+        }
+        const newItems = [...data.items, newItem]
+        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
+        setData({ ...data, items: newItems, total: newTotal })
+    }
+
+    const handleDeleteItem = (id: string) => {
+        if (!data) return
+        const newItems = data.items.filter(item => item.id !== id)
+        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
+        setData({ ...data, items: newItems, total: newTotal })
     }
 
     const handleConfirm = async () => {
@@ -221,7 +269,12 @@ export default function ReviewPage() {
                         <section className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Items Calculados</h2>
-                                {isEditing && <Button size="sm" variant="outline">+ Agregar Item</Button>}
+                                {isEditing && (
+                                    <Button size="sm" variant="outline" onClick={handleAddItem}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Agregar Item
+                                    </Button>
+                                )}
                             </div>
 
                             <div className="space-y-4">
@@ -247,6 +300,17 @@ export default function ReviewPage() {
                                                 </div>
                                             ) : (
                                                 <span className="font-bold text-lg">€ {item.price.toFixed(2)}</span>
+                                            )}
+
+                                            {isEditing && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 ml-2"
+                                                    onClick={() => handleDeleteItem(item.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             )}
                                         </div>
 

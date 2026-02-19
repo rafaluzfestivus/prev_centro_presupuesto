@@ -1,6 +1,6 @@
 'use server'
 
-import { createProposal, getProposals, getProposalById, getLatestAIProcessing, getProposalItems, saveAIProcessing, updateProposal, saveProposalItems } from '@/services/proposal'
+import { createProposal, getProposals, getProposalById, getLatestAIProcessing, getProposalItems, saveAIProcessing, updateProposal, saveProposalItems, deleteProposal } from '@/services/proposal'
 import { CreateProposalInput } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 import { OpenAI } from 'openai'
@@ -138,5 +138,16 @@ export async function updateProposalAction(id: string, updates: any) {
     } catch (error) {
         console.error('Failed to update proposal:', error)
         return { success: false, error: 'Failed to update proposal' }
+    }
+}
+
+export async function deleteProposalAction(id: string) {
+    try {
+        await deleteProposal(id)
+        revalidatePath('/painel')
+        return { success: true }
+    } catch (error) {
+        console.error('Failed to delete proposal:', error)
+        return { success: false, error: 'Failed to delete proposal' }
     }
 }

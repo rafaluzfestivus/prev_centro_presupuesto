@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createProposalAction, getProposalsAction } from '@/actions/proposal'
+import { createProposalAction, getProposalsAction, deleteProposalAction } from '@/actions/proposal'
 import { Proposal } from '@/lib/types'
-import { Loader2, Upload, X } from 'lucide-react'
+import { Loader2, Upload, X, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function DashboardPage() {
@@ -133,6 +133,18 @@ export default function DashboardPage() {
     const handleLogout = () => {
         // Implement logout logic
         router.push('/login')
+    }
+
+    const handleDeleteProposal = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation()
+        if (confirm('¿Estás seguro de que quieres eliminar esta propuesta?')) {
+            const result = await deleteProposalAction(id)
+            if (result.success) {
+                loadProposals()
+            } else {
+                alert('Erro ao excluir proposta')
+            }
+        }
     }
 
     return (
@@ -301,7 +313,15 @@ export default function DashboardPage() {
                                             {proposal.total_geral ? `€ ${Number(proposal.total_geral).toFixed(2)}` : '-'}
                                         </span>
                                     </div>
-                                    <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity flex justify-end">
+                                    <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                            onClick={(e) => handleDeleteProposal(e, proposal.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                         <Button variant="ghost" size="sm" className="h-8 text-[var(--color-primary)]">
                                             {proposal.status === 'Rascunho' ? 'Continuar' : 'Ver Detalles'}
                                         </Button>

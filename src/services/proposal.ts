@@ -96,6 +96,25 @@ export async function updateProposal(id: string, updates: Partial<Proposal>) {
     return data as Proposal
 }
 
+export async function deleteProposal(id: string) {
+    const supabase = await createClient()
+
+    // 1. Delete related items first (orphan removal)
+    await supabase.from('ItemProposta').delete().eq('proposta_id', id)
+
+    // 2. Delete related AI processing
+    await supabase.from('ProcessamentoIA').delete().eq('proposta_id', id)
+
+    // 3. Delete the proposal itself
+    const { error } = await supabase
+        .from('Proposta')
+        .delete()
+        .eq('id', id)
+
+    if (error) throw error
+    return true
+}
+
 export async function saveAIProcessing(proposalId: string, result: any, rawPrompt: any, items: any[]) {
     const supabase = await createClient()
 
