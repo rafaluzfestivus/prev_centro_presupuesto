@@ -86,6 +86,12 @@ export default function DashboardPage() {
                 setUploading(false)
             }
 
+            if (!measurements && !imageUrl) {
+                alert('Por favor, ingresa las medidas o sube una imagen.')
+                setLoading(false)
+                return
+            }
+
             const result = await createProposalAction({
                 clientName,
                 city,
@@ -179,7 +185,7 @@ export default function DashboardPage() {
                             <Label htmlFor="measurements">Medidas (Texto libre)</Label>
                             <textarea
                                 id="measurements"
-                                required
+                                required={!selectedFile}
                                 className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                 placeholder="Pegue aqui o texto do WhatsApp ou digite as medidas..."
                                 value={measurements}

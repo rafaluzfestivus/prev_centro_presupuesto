@@ -66,9 +66,15 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 content: `Contexto Atual da Proposta (JSON): ${JSON.stringify(currentCtx)}. \n\n Instrução de Alteração: ${instruction}`
             })
         } else {
-            const userContent: any[] = [
-                { type: "text", text: proposal.medidas_input }
-            ]
+            const userContent: any[] = []
+
+            if (proposal.medidas_input) {
+                userContent.push({ type: "text", text: proposal.medidas_input })
+            } else if (proposal.input_image_url) {
+                userContent.push({ type: "text", text: "Analise a imagem enviada e extraia as medidas para criar o orçamento." })
+            } else {
+                userContent.push({ type: "text", text: "Nenhuma informação fornecida." })
+            }
 
             if (proposal.input_image_url) {
                 userContent.push({
