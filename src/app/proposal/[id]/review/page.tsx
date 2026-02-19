@@ -101,8 +101,6 @@ export default function ReviewPage() {
 
         const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
         setData(prev => prev ? ({ ...prev, items: newItems, total: newTotal }) : null)
-        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
-        setData(prev => prev ? ({ ...prev, items: newItems, total: newTotal }) : null)
     }
 
     const handleAddItem = () => {
@@ -128,28 +126,7 @@ export default function ReviewPage() {
         setData({ ...data, items: newItems, total: newTotal })
     }
 
-    const handleAddItem = () => {
-        if (!data) return
-        const newItem: ProposalItem = {
-            id: `new_${Date.now()}`,
-            name: 'Nuevo Item',
-            width: 0,
-            height: 0,
-            area: 0,
-            price: 80,
-            price_rule: 'Manual'
-        }
-        const newItems = [...data.items, newItem]
-        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
-        setData({ ...data, items: newItems, total: newTotal })
-    }
 
-    const handleDeleteItem = (id: string) => {
-        if (!data) return
-        const newItems = data.items.filter(item => item.id !== id)
-        const newTotal = newItems.reduce((acc, item) => acc + item.price, 0)
-        setData({ ...data, items: newItems, total: newTotal })
-    }
 
     const handleConfirm = async () => {
         if (!data) return
