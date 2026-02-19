@@ -53,8 +53,8 @@ export function Translator() {
                         placeholder="Escribe en Español ou Português..."
                         className="min-h-[100px] resize-none"
                         value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => {
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
+                        onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault()
                                 handleTranslate()
