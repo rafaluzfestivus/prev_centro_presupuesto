@@ -30,6 +30,24 @@ export default function DashboardPage() {
 
     useEffect(() => {
         loadProposals()
+
+        const handleWindowPaste = (e: ClipboardEvent) => {
+            if (e.clipboardData && e.clipboardData.items) {
+                const items = e.clipboardData.items
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        const file = items[i].getAsFile()
+                        if (file) {
+                            setSelectedFile(file)
+                            break
+                        }
+                    }
+                }
+            }
+        }
+
+        window.addEventListener('paste', handleWindowPaste)
+        return () => window.removeEventListener('paste', handleWindowPaste)
     }, [])
 
     const loadProposals = async () => {
@@ -103,23 +121,8 @@ export default function DashboardPage() {
         }
     }
 
-    const handlePaste = (e: React.ClipboardEvent) => {
-        if (e.clipboardData && e.clipboardData.items) {
-            const items = e.clipboardData.items
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
-                    const file = items[i].getAsFile()
-                    if (file) {
-                        // Create a new file with a proper name if necessary, 
-                        // though clipboard files usually have 'image.png'
-                        setSelectedFile(file)
-                        // Allow only one file for now
-                        break
-                    }
-                }
-            }
-        }
-    }
+    // Removed form-level onPaste in favor of global listener
+
 
     const handleLogout = () => {
         // Implement logout logic
@@ -148,7 +151,7 @@ export default function DashboardPage() {
                 {/* Left Column: New Proposal */}
                 <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 h-fit">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 border-b pb-2">Nueva Propuesta</h2>
-                    <form className="space-y-4" onSubmit={handleGenerate} onPaste={handlePaste}>
+                    <form className="space-y-4" onSubmit={handleGenerate}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="clientName">Nombre del cliente</Label>
@@ -216,16 +219,24 @@ export default function DashboardPage() {
                                     />
                                 </div>
                             ) : (
-                                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <div className="h-8 w-8 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center">
-                                            <span className="text-xs font-bold text-gray-500">IMG</span>
-                                        </div>
-                                        <span className="text-sm truncate">{selectedFile.name}</span>
+                                <div className="space-y-2">
+                                    <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                        <img
+                                            src={URL.createObjectURL(selectedFile)}
+                                            alt="Preview"
+                                            className="w-full h-48 object-contain bg-black/5"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="icon"
+                                            className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-md bg-white/80 hover:bg-white"
+                                            onClick={clearFile}
+                                        >
+                                            <X className="h-4 w-4 text-gray-700" />
+                                        </Button>
                                     </div>
-                                    <Button type="button" variant="ghost" size="sm" onClick={clearFile}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
+                                    <p className="text-xs text-center text-gray-500 truncate px-2">{selectedFile.name}</p>
                                 </div>
                             )}
                         </div>
