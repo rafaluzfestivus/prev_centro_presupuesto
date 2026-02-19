@@ -103,6 +103,24 @@ export default function DashboardPage() {
         }
     }
 
+    const handlePaste = (e: React.ClipboardEvent) => {
+        if (e.clipboardData && e.clipboardData.items) {
+            const items = e.clipboardData.items
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const file = items[i].getAsFile()
+                    if (file) {
+                        // Create a new file with a proper name if necessary, 
+                        // though clipboard files usually have 'image.png'
+                        setSelectedFile(file)
+                        // Allow only one file for now
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     const handleLogout = () => {
         // Implement logout logic
         router.push('/login')
@@ -130,7 +148,7 @@ export default function DashboardPage() {
                 {/* Left Column: New Proposal */}
                 <section className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 h-fit">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 border-b pb-2">Nueva Propuesta</h2>
-                    <form className="space-y-4" onSubmit={handleGenerate}>
+                    <form className="space-y-4" onSubmit={handleGenerate} onPaste={handlePaste}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="clientName">Nombre del cliente</Label>
