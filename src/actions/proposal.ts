@@ -60,33 +60,38 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             { role: "system", content: SYSTEM_PROMPT }
         ]
 
+        // Constrói o conteúdo para a IA sempre focando nos dados originais como "Source of Truth"
+        const userContent: any[] = [
+            { type: "text", text: `--- TRABALHANDO NA PROPOSTA ID: ${id} ---` },
+            { type: "text", text: `DADOS ORIGINAIS ENVIADOS PELO CLIENTE (REFERÊNCIA PRINCIPAL): ${proposal.medidas_input || 'Imagem em anexo'}` }
+        ]
+
+        if (proposal.input_image_url) {
+            userContent.push({
+                type: "image_url",
+                image_url: {
+                    url: proposal.input_image_url,
+                },
+            })
+        }
+
         if (currentCtx) {
-            messages.push({
-                role: "user",
-                content: `Contexto Atual da Proposta (JSON): ${JSON.stringify(currentCtx)}. \n\n Instrução de Alteração: ${instruction}`
+            userContent.push({
+                type: "text",
+                text: `ESTADO ATUAL DA PROPOSTA (JSON): ${JSON.stringify(currentCtx)}`
+            })
+            userContent.push({
+                type: "text",
+                text: `INSTRUÇÃO DE AJUSTE: ${instruction}`
             })
         } else {
-            const userContent: any[] = []
-
-            if (proposal.medidas_input) {
-                userContent.push({ type: "text", text: proposal.medidas_input })
-            } else if (proposal.input_image_url) {
-                userContent.push({ type: "text", text: "Analise a imagem enviada e extraia as medidas para criar o orçamento." })
-            } else {
-                userContent.push({ type: "text", text: "Nenhuma informação fornecida." })
-            }
-
-            if (proposal.input_image_url) {
-                userContent.push({
-                    type: "image_url",
-                    image_url: {
-                        url: proposal.input_image_url,
-                    },
-                })
-            }
-
-            messages.push({ role: "user", content: userContent })
+            userContent.push({
+                type: "text",
+                text: "Analise o input original e crie a proposta inicial."
+            })
         }
+
+        messages.push({ role: "user", content: userContent })
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4o",
