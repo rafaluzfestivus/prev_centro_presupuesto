@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProposalAction, getProposalsAction, deleteProposalAction } from '@/actions/proposal'
 import { Proposal } from '@/lib/types'
-import { Loader2, Upload, X, Trash2, FileText, Plus } from 'lucide-react'
+import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
