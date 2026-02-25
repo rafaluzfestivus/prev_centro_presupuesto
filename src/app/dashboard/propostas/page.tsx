@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProposalAction, getProposalsAction, deleteProposalAction } from '@/actions/proposal'
 import { Proposal } from '@/lib/types'
-import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw } from 'lucide-react'
+import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw, Calendar } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
@@ -72,6 +72,14 @@ export default function ProposalsPage() {
     }
 
     const clearFile = () => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }
+
+    const handleScheduleVisit = (e: React.MouseEvent, p: Proposal) => {
+        e.stopPropagation()
+        // Format proposal data for the agenda
+        const clientName = p.cliente_nome || 'Cliente de Proposta'
+        // We might not have the whatsapp directly in p, but we can try to find it or just go to agenda
+        router.push(`/dashboard/agenda?client=${encodeURIComponent(clientName)}`)
+    }
 
     const handleDeleteProposal = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation()
@@ -169,7 +177,14 @@ export default function ProposalsPage() {
                                     <span className="text-text-muted font-bold">{new Date(p.data_criacao).toLocaleDateString()}</span>
                                     <div className="flex items-center gap-3">
                                         <span className="font-black text-navy">{p.total_geral ? `€ ${Number(p.total_geral).toFixed(2)}` : '-'}</span>
-                                        <button onClick={(e) => handleDeleteProposal(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={16} /></button>
+                                        <button
+                                            onClick={(e) => handleScheduleVisit(e, p)}
+                                            className="p-2 text-accent bg-accent/5 opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-navy rounded-lg transition-all"
+                                            title="Agendar Visita"
+                                        >
+                                            <Calendar size={16} />
+                                        </button>
+                                        <button onClick={(e) => handleDeleteProposal(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><Trash2 size={16} /></button>
                                     </div>
                                 </div>
                             </div>

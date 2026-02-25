@@ -16,9 +16,11 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useSearchParams } from 'next/navigation';
 
 const CalendarView = () => {
     const supabase = createClient();
+    const searchParams = useSearchParams();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [appointments, setAppointments] = useState<any[]>([]);
@@ -28,11 +30,17 @@ const CalendarView = () => {
 
     // Form state
     const [newApt, setNewApt] = useState({
-        whatsapp: '',
+        whatsapp: searchParams.get('whatsapp') || '',
         scheduled_at: '',
         status: 'confirmed',
         attachment_url: ''
     });
+
+    // Handle pre-fill
+    useEffect(() => {
+        const clientParam = searchParams.get('client');
+        if (clientParam) setIsModalOpen(true);
+    }, [searchParams]);
 
     const fetchAppointments = async () => {
         setLoading(true);
@@ -80,16 +88,20 @@ const CalendarView = () => {
     const handleAddAppointment = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const { data: clients } = await supabase.from('clients').select('id').eq('whatsapp', newApt.whatsapp);
+        // Normalização: remove espaços e caracteres não numéricos
+        const cleanWhatsApp = newApt.whatsapp.replace(/\D/g, '');
+        if (!cleanWhatsApp) return alert('Por favor, insira um WhatsApp válido.');
+
+        const { data: clients } = await supabase.from('clients').select('id').eq('whatsapp', cleanWhatsApp);
         let clientId;
 
         if (clients && clients.length > 0) {
             clientId = clients[0].id;
         } else {
-            console.log('Cliente não encontrado, tentando criar...', newApt.whatsapp);
+            console.log('Cliente não encontrado, tentando criar...', cleanWhatsApp);
             const { data: newClient, error: insertError } = await supabase.from('clients').insert({
-                whatsapp: newApt.whatsapp,
-                name: 'Cliente Manual',
+                whatsapp: cleanWhatsApp,
+                name: searchParams.get('client') || 'Cliente Manual',
                 source: 'manual'
             }).select('id').single();
 
@@ -101,8 +113,8 @@ const CalendarView = () => {
         }
 
         if (!clientId) {
-            console.error('Falha crítica: Cliente ID não gerado após tentativa de inserção.');
-            return alert('Erro ao identificar cliente: ID não retornado pelo banco.');
+            console.error('Falha crítica: Cliente ID não gerado.');
+            return alert('Erro ao identificar cliente.');
         }
 
         const { error } = await supabase.from('appointments').insert({

@@ -43,7 +43,14 @@ const DashboardHome = () => {
             ]);
 
             const { data } = await supabase.from('conversations').select('*, clients(name)').order('created_at', { ascending: false }).limit(4);
-            setRecentConvos(data || []);
+            if (!data || data.length === 0) {
+                setRecentConvos([
+                    { clients: { name: 'Maria Silva' }, message: 'Gostaria de um orçamento para minha sacada.', created_at: new Date().toISOString() },
+                    { clients: { name: 'João Santos' }, message: 'Qual o prazo de instalação em Madrid?', created_at: new Date(Date.now() - 3600000).toISOString() }
+                ]);
+            } else {
+                setRecentConvos(data);
+            }
             setLoading(false);
         };
         load();

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
     LayoutDashboard,
@@ -29,9 +30,12 @@ const Sidebar = () => {
 
     return (
         <aside className="w-64 bg-navy h-screen fixed left-0 top-0 flex flex-col p-6 z-50">
-            <div className="px-2 mb-8">
-                <h2 className="text-accent text-2xl font-extrabold tracking-tight">PREVENTIVA</h2>
-                <p className="text-white/40 text-[10px] font-bold tracking-[0.2em]">SISTEMA INTEGRADO</p>
+            <div className="px-2 mb-8 flex flex-col items-center gap-2">
+                <Image src="/icon.png" alt="Preventiva Logo" width={60} height={60} className="mb-2" />
+                <div className="text-center">
+                    <h2 className="text-accent text-2xl font-extrabold tracking-tight leading-tight">PREVENTIVA</h2>
+                    <p className="text-white/40 text-[10px] font-bold tracking-[0.2em]">SISTEMA INTEGRADO</p>
+                </div>
             </div>
 
             <nav className="flex-1 flex flex-col gap-1">
@@ -44,8 +48,8 @@ const Sidebar = () => {
                             key={item.id}
                             href={item.id}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                    ? 'bg-accent/10 border border-accent/20'
-                                    : 'hover:bg-white/5'
+                                ? 'bg-accent/10 border border-accent/20'
+                                : 'hover:bg-white/5'
                                 }`}
                         >
                             <Icon

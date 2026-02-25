@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Search, Trash2, FileText, Globe, RefreshCw } from 'lucide-react';
+import { BookOpen, Search, Trash2, FileText, Globe, RefreshCw, Plus, X, Save } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 const KnowledgeManager = () => {
@@ -9,6 +9,9 @@ const KnowledgeManager = () => {
     const [documents, setDocuments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [newDocContent, setNewDocContent] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const fetchDocs = async () => {
         setLoading(true);
@@ -32,6 +35,26 @@ const KnowledgeManager = () => {
         else fetchDocs();
     };
 
+    const handleAddDoc = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newDocContent.trim()) return;
+
+        setSaving(true);
+        const { error } = await supabase.from('knowledge_base').insert({
+            content: newDocContent,
+            metadata: { source: 'manual', category: 'General' }
+        });
+
+        if (error) {
+            alert('Erro ao salvar documento: ' + error.message);
+        } else {
+            setNewDocContent('');
+            setIsModalOpen(false);
+            fetchDocs();
+        }
+        setSaving(false);
+    };
+
     const filteredDocs = documents.filter(doc =>
         doc.content?.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -44,6 +67,13 @@ const KnowledgeManager = () => {
                     <p className="text-text-muted">Gerencie os documentos que alimentam a inteligência da IA.</p>
                 </div>
                 <div className="flex gap-4">
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-accent text-navy font-bold rounded-xl hover:shadow-lg transition-all"
+                    >
+                        <Plus size={20} />
+                        Adicionar
+                    </button>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
                         <input
@@ -112,6 +142,41 @@ const KnowledgeManager = () => {
                     </tbody>
                 </table>
             </div>
+
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div className="glass-card w-full max-w-2xl p-10 bg-white border-none shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                        <div className="flex justify-between items-center mb-8">
+                            <h2 className="text-2xl font-bold text-navy">Novo Conhecimento</h2>
+                            <button onClick={() => setIsModalOpen(false)} className="text-text-muted hover:text-navy transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleAddDoc} className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-bold text-navy mb-2">Conteúdo do Documento</label>
+                                <textarea
+                                    required
+                                    value={newDocContent}
+                                    onChange={e => setNewDocContent(e.target.value)}
+                                    placeholder="Cole aqui informações sobre redes, preços, horários ou regras de negócio..."
+                                    className="w-full min-h-[300px] p-6 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none resize-none text-sm leading-relaxed"
+                                />
+                                <p className="mt-2 text-xs text-text-muted font-medium">A IA usará este texto para responder perguntas dos clientes.</p>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="w-full py-4 bg-accent text-navy font-extrabold rounded-xl hover:shadow-xl transition-all disabled:opacity-50 text-lg flex items-center justify-center gap-2"
+                            >
+                                {saving ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
+                                {saving ? 'Salvando...' : 'Salvar Documento'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
