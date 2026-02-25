@@ -86,15 +86,24 @@ const CalendarView = () => {
         if (clients && clients.length > 0) {
             clientId = clients[0].id;
         } else {
-            const { data: newClient } = await supabase.from('clients').insert({
+            console.log('Cliente não encontrado, tentando criar...', newApt.whatsapp);
+            const { data: newClient, error: insertError } = await supabase.from('clients').insert({
                 whatsapp: newApt.whatsapp,
                 name: 'Cliente Manual',
                 source: 'manual'
             }).select('id').single();
+
+            if (insertError) {
+                console.error('Erro ao inserir cliente:', insertError);
+                return alert('Erro ao criar cliente: ' + insertError.message);
+            }
             clientId = newClient?.id;
         }
 
-        if (!clientId) return alert('Erro ao identificar cliente.');
+        if (!clientId) {
+            console.error('Falha crítica: Cliente ID não gerado após tentativa de inserção.');
+            return alert('Erro ao identificar cliente: ID não retornado pelo banco.');
+        }
 
         const { error } = await supabase.from('appointments').insert({
             client_id: clientId,
