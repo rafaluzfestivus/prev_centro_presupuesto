@@ -14,7 +14,7 @@ import {
     eachDayOfInterval
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
 
@@ -27,28 +27,39 @@ const CalendarView = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
 
     // Form state
-    const [newApt, setNewApt] = useState({
-        whatsapp: searchParams.get('whatsapp') || '',
+    const [formData, setFormData] = useState({
+        client_name: '',
+        whatsapp: '',
         scheduled_at: '',
         status: 'confirmed',
         attachment_url: ''
     });
 
-    // Handle pre-fill
+    // Handle pre-fill from URL
     useEffect(() => {
         const clientParam = searchParams.get('client');
-        if (clientParam) setIsModalOpen(true);
+        const whatsappParam = searchParams.get('whatsapp');
+        if (clientParam || whatsappParam) {
+            setFormData(prev => ({
+                ...prev,
+                client_name: clientParam || '',
+                whatsapp: whatsappParam || ''
+            }));
+            setIsModalOpen(true);
+        }
     }, [searchParams]);
 
     const fetchAppointments = async () => {
         setLoading(true);
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('appointments')
             .select('*, clients(name, whatsapp, location)')
             .order('scheduled_at', { ascending: true });
 
+        if (error) console.error('Error fetching appointments:', error);
         setAppointments(data || []);
         setLoading(false);
     };
@@ -63,7 +74,22 @@ const CalendarView = () => {
     const onDateClick = (day: Date) => {
         setSelectedDate(day);
         const dateStr = format(day, "yyyy-MM-dd");
-        setNewApt({ ...newApt, scheduled_at: `${dateStr}T09:00` });
+        setFormData({ ...formData, scheduled_at: `${dateStr}T09:00` });
+        setSelectedAppointment(null);
+        setIsModalOpen(true);
+    };
+
+    const handleAppointmentClick = (e: React.MouseEvent, apt: any) => {
+        e.stopPropagation();
+        setSelectedAppointment(apt);
+        setFormData({
+            client_name: apt.clients?.name || '',
+            whatsapp: apt.clients?.whatsapp || '',
+            scheduled_at: format(new Date(apt.scheduled_at), "yyyy-MM-dd'T'HH:mm"),
+            status: apt.status,
+            attachment_url: apt.attachment_url || ''
+        });
+        setIsModalOpen(true);
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,57 +106,101 @@ const CalendarView = () => {
             alert('Error en la carga: ' + error.message);
         } else {
             const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
-            setNewApt({ ...newApt, attachment_url: publicUrl });
+            setFormData({ ...formData, attachment_url: publicUrl });
         }
         setUploading(false);
     };
 
-    const handleAddAppointment = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Normalização: remove espaços e caracteres não numéricos
-        const cleanWhatsApp = newApt.whatsapp.replace(/\D/g, '');
+        const cleanWhatsApp = formData.whatsapp.replace(/\D/g, '');
         if (!cleanWhatsApp) return alert('Por favor, insira um WhatsApp válido.');
 
-        const { data: clients } = await supabase.from('clients').select('id').eq('whatsapp', cleanWhatsApp);
+        // 1. Manage Client
         let clientId;
+        const { data: existingClients } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('whatsapp', cleanWhatsApp);
 
-        if (clients && clients.length > 0) {
-            clientId = clients[0].id;
+        if (existingClients && existingClients.length > 0) {
+            clientId = existingClients[0].id;
+            // Update name if changed
+            await supabase.from('clients').update({ name: formData.client_name }).eq('id', clientId);
         } else {
-            console.log('Cliente no encontrado, intentando crear...', cleanWhatsApp);
             const { data: newClient, error: insertError } = await supabase.from('clients').insert({
                 whatsapp: cleanWhatsApp,
-                name: searchParams.get('client') || 'Cliente Manual',
+                name: formData.client_name || 'Cliente Manual',
                 source: 'manual'
             }).select('id').single();
 
-            if (insertError) {
-                console.error('Error al insertar cliente:', insertError);
-                return alert('Error al crear cliente: ' + insertError.message);
-            }
+            if (insertError) return alert('Error al crear cliente: ' + insertError.message);
             clientId = newClient?.id;
         }
 
-        if (!clientId) {
-            console.error('Falla crítica: Cliente ID no generado.');
-            return alert('Error al identificar cliente.');
-        }
+        if (!clientId) return alert('Error al identificar cliente.');
 
-        const { error } = await supabase.from('appointments').insert({
-            client_id: clientId,
-            scheduled_at: newApt.scheduled_at,
-            status: newApt.status,
-            attachment_url: newApt.attachment_url
-        });
+        // 2. Insert or Update Appointment
+        let error;
+        if (selectedAppointment) {
+            const { error: updateError } = await supabase
+                .from('appointments')
+                .update({
+                    client_id: clientId,
+                    scheduled_at: formData.scheduled_at,
+                    status: formData.status,
+                    attachment_url: formData.attachment_url
+                })
+                .eq('id', selectedAppointment.id);
+            error = updateError;
+        } else {
+            const { error: insertError } = await supabase
+                .from('appointments')
+                .insert({
+                    client_id: clientId,
+                    scheduled_at: formData.scheduled_at,
+                    status: formData.status,
+                    attachment_url: formData.attachment_url
+                });
+            error = insertError;
+        }
 
         if (error) {
-            alert('Error al agendar: ' + error.message);
+            alert('Error: ' + error.message);
         } else {
             setIsModalOpen(false);
-            setNewApt({ whatsapp: '', scheduled_at: '', status: 'confirmed', attachment_url: '' });
+            resetForm();
             fetchAppointments();
         }
+    };
+
+    const handleDelete = async () => {
+        if (!selectedAppointment || !confirm('¿Estás seguro de que quieres cancelar esta cita?')) return;
+
+        const { error } = await supabase
+            .from('appointments')
+            .delete()
+            .eq('id', selectedAppointment.id);
+
+        if (error) {
+            alert('Error al cancelar: ' + error.message);
+        } else {
+            setIsModalOpen(false);
+            resetForm();
+            fetchAppointments();
+        }
+    };
+
+    const resetForm = () => {
+        setFormData({
+            client_name: '',
+            whatsapp: '',
+            scheduled_at: '',
+            status: 'confirmed',
+            attachment_url: ''
+        });
+        setSelectedAppointment(null);
     };
 
     const renderHeader = () => {
@@ -146,7 +216,7 @@ const CalendarView = () => {
                     </div>
                 </div>
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => { resetForm(); setIsModalOpen(true); }}
                     className="flex items-center gap-2 px-5 py-3 bg-accent text-navy font-bold rounded-xl hover:shadow-lg transition-all"
                 >
                     <Plus size={20} />
@@ -201,11 +271,16 @@ const CalendarView = () => {
                                 {dayAppointments.map((apt, idx) => (
                                     <div
                                         key={idx}
-                                        className="text-[10px] p-1.5 bg-bg-dark rounded flex flex-col border-l-2 border-accent"
+                                        onClick={(e) => handleAppointmentClick(e, apt)}
+                                        className={`text-[10px] p-1.5 rounded flex flex-col border-l-2 transition-transform hover:scale-105 ${apt.status === 'pending' ? 'bg-gray-100 border-gray-400' : 'bg-bg-dark border-accent'
+                                            }`}
                                         title={`${format(new Date(apt.scheduled_at), 'HH:mm')} - ${apt.clients?.name || 'Cliente'}`}
                                     >
-                                        <span className="font-bold text-navy">{format(new Date(apt.scheduled_at), 'HH:mm')}</span>
-                                        <span className="truncate opacity-70">{apt.clients?.name || 'Cliente'}</span>
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-navy">{format(new Date(apt.scheduled_at), 'HH:mm')}</span>
+                                            {apt.attachment_url && <ShieldCheck size={10} className="text-accent" />}
+                                        </div>
+                                        <span className="truncate opacity-70 font-medium">{apt.clients?.name || 'Cliente'}</span>
                                     </div>
                                 ))}
                             </div>
@@ -235,54 +310,93 @@ const CalendarView = () => {
                 <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                     <div className="glass-card w-full max-w-md p-10 bg-white border-none shadow-2xl relative animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-8">
-                            <h2 className="text-2xl font-bold text-navy">Nueva Cita</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-text-muted hover:text-navy transition-colors">
+                            <h2 className="text-2xl font-bold text-navy">{selectedAppointment ? 'Editar Cita' : 'Nueva Cita'}</h2>
+                            <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-text-muted hover:text-navy transition-colors">
                                 <X size={24} />
                             </button>
                         </div>
-                        <form onSubmit={handleAddAppointment} className="space-y-6">
+                        <form onSubmit={handleSubmit} className="space-y-5">
                             <div>
-                                <label className="block text-sm font-bold text-navy mb-2">WhatsApp del Cliente</label>
+                                <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">Nombre del Cliente</label>
                                 <input
-                                    type="text" required value={newApt.whatsapp}
-                                    onChange={e => setNewApt({ ...newApt, whatsapp: e.target.value })}
+                                    type="text" required value={formData.client_name}
+                                    onChange={e => setFormData({ ...formData, client_name: e.target.value })}
+                                    placeholder="Nombre completo"
+                                    className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">WhatsApp / Teléfono</label>
+                                <input
+                                    type="text" required value={formData.whatsapp}
+                                    onChange={e => setFormData({ ...formData, whatsapp: e.target.value })}
                                     placeholder="Ej: 34600000000"
                                     className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-navy mb-2">Fecha y Hora</label>
-                                <input
-                                    type="datetime-local" required value={newApt.scheduled_at}
-                                    onChange={e => setNewApt({ ...newApt, scheduled_at: e.target.value })}
-                                    className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">Fecha y Hora</label>
+                                    <input
+                                        type="datetime-local" required value={formData.scheduled_at}
+                                        onChange={e => setFormData({ ...formData, scheduled_at: e.target.value })}
+                                        className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none text-xs"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">Estado</label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={e => setFormData({ ...formData, status: e.target.value })}
+                                        className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none text-xs appearance-none"
+                                    >
+                                        <option value="pending">Pendiente</option>
+                                        <option value="confirmed">Confirmada</option>
+                                        <option value="completed">Completada</option>
+                                        <option value="cancelled">Cancelada</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-navy mb-2">Adjunto / Presupuesto</label>
-                                <div className="relative">
+                                <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">Documento / Presupuesto</label>
+                                <div className="p-4 border-2 border-dashed border-border rounded-xl bg-bg-dark/50">
                                     <input
                                         type="file"
                                         onChange={handleFileUpload}
-                                        className="w-full text-xs text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent file:text-navy hover:file:bg-accent/80 cursor-pointer"
+                                        className="w-full text-xs text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-accent file:text-navy hover:file:bg-accent/80 cursor-pointer"
                                     />
-                                    {uploading && <p className="mt-2 text-xs font-bold text-accent animate-pulse">Enviando documento...</p>}
-                                    {newApt.attachment_url && (
-                                        <div className="mt-2 flex items-center gap-2 text-xs text-green-600 font-bold">
-                                            <CheckCircle size={14} /> Documento vinculado
+                                    {uploading && <p className="mt-2 text-xs font-bold text-accent animate-pulse">Subiendo...</p>}
+                                    {formData.attachment_url && (
+                                        <div className="mt-3 flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-xs text-green-600 font-bold">
+                                                <CheckCircle size={14} /> Archivo listo
+                                            </div>
+                                            <a href={formData.attachment_url} target="_blank" rel="noreferrer" className="text-[10px] text-accent underline font-black uppercase">Ver Documento</a>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <button
-                                type="submit"
-                                disabled={uploading}
-                                className="w-full py-4 bg-accent text-navy font-extrabold rounded-xl hover:shadow-xl transition-all disabled:opacity-50 text-lg"
-                            >
-                                Confirmar Cita
-                            </button>
+                            <div className="pt-2 flex flex-col gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={uploading}
+                                    className="w-full py-4 bg-accent text-navy font-black rounded-xl hover:shadow-xl transition-all disabled:opacity-50 text-base shadow-sm"
+                                >
+                                    {selectedAppointment ? 'Actualizar Cita' : 'Confirmar Cita'}
+                                </button>
+
+                                {selectedAppointment && (
+                                    <button
+                                        type="button"
+                                        onClick={handleDelete}
+                                        className="w-full py-3 bg-red-50 text-red-600 font-bold rounded-xl hover:bg-red-600 hover:text-white transition-all text-sm border border-red-100"
+                                    >
+                                        Cancelar / Eliminar Cita
+                                    </button>
+                                )}
+                            </div>
                         </form>
                     </div>
                 </div>
