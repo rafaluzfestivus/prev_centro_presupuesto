@@ -1,6 +1,6 @@
-
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { CONTACT, BRAND, PRICING } from '@/lib/constants';
 
 // Type definitions
 export interface ProposalItem {
@@ -132,15 +132,15 @@ export const generateProposalPDF = async (data: ProposalData) => {
 
         // Value
         doc.setFontSize(22);
-        doc.setTextColor(77, 42, 54); // Brand Wine Color (Standard)
+        doc.setTextColor(BRAND.PRIMARY_COLOR); // Brand Wine Color (Standard)
         doc.text(`€ ${data.total.toFixed(2)} + IVA`, 65, totalY);
 
         // Footer Contact Info
         doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
         const footerY = 158; // Moved up to valid range (max 167)
-        doc.text("contacto@preventivacentro.es", 15, footerY);
-        doc.text("Móvil: 637 003 793  |  Fijo: 91 209 61 17", 15, footerY + 5);
+        doc.text(CONTACT.EMAIL, 15, footerY);
+        doc.text(`Móvil: ${CONTACT.MOBILE}  |  Fijo: ${CONTACT.PHONE}`, 15, footerY + 5);
 
 
         // Save
@@ -240,19 +240,20 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob | n
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
-        doc.setTextColor(77, 42, 54);
+        doc.setTextColor(BRAND.PRIMARY_COLOR);
         doc.text("Inversión Total:", 15, totalY);
 
+        // Value
         doc.setFontSize(22);
-        doc.setTextColor(77, 42, 54);
+        doc.setTextColor(BRAND.PRIMARY_COLOR);
         doc.text(`€ ${data.total.toFixed(2)} + IVA`, 65, totalY);
 
         // Footer Contact Info
         doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
         const footerY = 158;
-        doc.text("contacto@preventivacentro.es", 15, footerY);
-        doc.text("Móvil: 637 003 793  |  Fijo: 91 209 61 17", 15, footerY + 5);
+        doc.text(CONTACT.EMAIL, 15, footerY);
+        doc.text(`Móvil: ${CONTACT.MOBILE}  |  Fijo: ${CONTACT.PHONE}`, 15, footerY + 5);
 
         return doc.output('blob');
 

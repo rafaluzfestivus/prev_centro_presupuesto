@@ -1,6 +1,6 @@
-
 import { createClient } from '@/lib/supabase/server'
 import { CreateProposalInput, Proposal, ProposalItem, AIProcessingResult } from '@/lib/types'
+import { PRICING } from '@/lib/constants'
 
 export async function createProposal(data: CreateProposalInput, userId?: string) {
     const supabase = await createClient()
@@ -147,7 +147,7 @@ export async function saveAIProcessing(proposalId: string, result: any, rawPromp
             largura: item.width,
             altura: item.height,
             // area_m2: item.area, // Generated column
-            valor_unitario: 28.00, // Fixed for now or from item?
+            valor_unitario: PRICING.PRICE_PER_M2,
             valor_total: item.price,
             ordem: index
         }))
@@ -200,7 +200,7 @@ export async function saveProposalItems(proposalId: string, items: any[], total:
             largura: item.largura || item.width,
             altura: item.altura || item.height,
             // area_m2: item.area_m2 || item.area, // Generated column
-            valor_unitario: item.valor_unitario || 28.00,
+            valor_unitario: item.valor_unitario || PRICING.PRICE_PER_M2,
             valor_total: item.valor_total || item.price,
             ordem: index
         }))

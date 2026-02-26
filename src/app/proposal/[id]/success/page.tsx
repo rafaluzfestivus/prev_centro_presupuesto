@@ -83,13 +83,13 @@ export default function SuccessPage() {
                 setPdfUrl(publicUrl)
 
                 // Save URL to DB (Background)
-                // We need an action to update just the PDF field or use a general update
-                // For now, let's assume we can use the generic updateProposalAction if we expose it, or create a specific one
-                // Since updateProposalAction is not exported in actions/proposal.ts yet (only confirm), 
-                // I will add a simple update action request next. For now, this is client side state.
+                try {
+                    await updateProposalAction(id, { pdf_gerado: publicUrl })
+                } catch (err) {
+                    console.error("Error saving PDF link to DB:", err)
+                }
 
-                // Let's rely on the user clicking WhatsApp to trigger the update or just console log for now until I add the action
-                console.log("PDF Uploaded:", publicUrl)
+                console.log("PDF Uploaded and Persisted:", publicUrl)
 
             } catch (error) {
                 console.error("Error al subir el PDF:", error)
@@ -113,16 +113,17 @@ export default function SuccessPage() {
     const handleWhatsApp = async () => {
         if (!data) return
 
-        let message = `Hola ${data.clientName}, aquí tienes tu presupuesto para redes de protección de Preventiva Centro. Total: € ${data.total.toFixed(2)}.`
+        let message = `*Preventiva Centro - Presupuesto Técnico*\n\n`
+        message += `Hola ${data.clientName},\n\n`
+        message += `Adjunto tu presupuesto para redes de protección en *${data.city}*.\n\n`
+        message += `*Detalles de la inversión:*\n`
+        message += `• Valor Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
 
         if (pdfUrl) {
-            // Save URL to DB if not saved yet? ensure consistency.
-            // Update DB with PDF URL
-            await updateLinkInDB(pdfUrl)
-            message += `\n\nDescarga tu propuesta aquí: ${pdfUrl}`
+            message += `📥 Descarga tu propuesta detallada aquí:\n${pdfUrl}\n\n`
         }
 
-        message += `\n\n¿Podemos agendar la instalación?`
+        message += `¿Deseas que agendemos la instalación para esta semana?`
 
         const encoded = encodeURIComponent(message)
         window.open(`https://wa.me/?text=${encoded}`, '_blank')

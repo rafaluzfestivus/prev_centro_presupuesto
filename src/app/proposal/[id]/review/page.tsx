@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus } from 'lucide-react'
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
+import { PRICING } from '@/lib/constants'
 
 // Frontend Data Structure
 type ProposalItem = {
@@ -25,7 +26,6 @@ type ProposalData = {
     city: string
     items: ProposalItem[]
     mockup: string
-    logic: string
     logic: string
     total: number
     whatsapp: string
@@ -88,8 +88,8 @@ export default function ReviewPage() {
                     const h = field === 'height' ? Number(value) : item.height
                     updated.area = w * h
                     // Only simple recalc if price wasn't manually set? For now, we overwrite.
-                    const calculated = updated.area * 28
-                    updated.price = Math.max(80, calculated)
+                    const calculated = updated.area * PRICING.PRICE_PER_M2
+                    updated.price = Math.max(PRICING.MIN_PRICE_PER_ITEM, calculated)
                 }
 
                 if (field === 'price') {
@@ -114,7 +114,7 @@ export default function ReviewPage() {
             width: 0,
             height: 0,
             area: 0,
-            price: 80,
+            price: PRICING.MIN_PRICE_PER_ITEM,
             price_rule: 'Manual'
         }
         const newItems = [...data.items, newItem]
@@ -321,9 +321,9 @@ export default function ReviewPage() {
                                             </div>
                                         </div>
 
-                                        {(item.price_rule === 'Minimo' || item.price === 80) && (
+                                        {(item.price_rule === 'Minimo' || item.price === PRICING.MIN_PRICE_PER_ITEM) && (
                                             <div className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded inline-block w-fit">
-                                                * Aplicado valor mínimo (80€)
+                                                * Aplicado valor mínimo ({PRICING.MIN_PRICE_PER_ITEM}€)
                                             </div>
                                         )}
                                     </div>
