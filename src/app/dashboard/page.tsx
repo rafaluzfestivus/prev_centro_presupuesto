@@ -27,6 +27,7 @@ const DashboardHome = () => {
     const supabase = createClient();
     const [stats, setStats] = useState<any[]>([]);
     const [recentConvos, setRecentConvos] = useState<any[]>([]);
+    const [recentLeads, setRecentLeads] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -41,6 +42,15 @@ const DashboardHome = () => {
                 { label: 'Citas', value: '0', icon: Calendar },
                 { label: 'Traspasos', value: String(handoverCount || 0), icon: ShieldCheck }
             ]);
+
+            const { data: leadData } = await supabase
+                .from('clients')
+                .select('*')
+                .eq('source', 'site')
+                .order('created_at', { ascending: false })
+                .limit(4);
+
+            setRecentLeads(leadData || []);
 
             const { data } = await supabase.from('conversations').select('*, clients(name)').order('created_at', { ascending: false }).limit(4);
             if (!data || data.length === 0) {
@@ -70,30 +80,43 @@ const DashboardHome = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="glass-card p-10 bg-white border-none shadow-sm">
                     <h2 className="text-xl font-bold mb-8 text-navy uppercase tracking-widest flex items-center gap-3">
-                        <MessageSquare className="text-accent" />
-                        Conversaciones Recientes
+                        <Users className="text-accent" />
+                        Leads Recientes (Sitio)
                     </h2>
                     <div className="space-y-4">
                         {loading ? (
                             <div className="animate-pulse space-y-4">
                                 {[1, 2, 3].map(i => <div key={i} className="h-20 bg-gray-50 rounded-2xl" />)}
                             </div>
-                        ) : recentConvos.map((c, i) => (
-                            <div key={i} className="flex items-center justify-between p-5 bg-bg-dark/50 rounded-2xl border border-border/50 hover:bg-white transition-all">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-navy font-black">
-                                        {c.clients?.name?.charAt(0) || 'C'}
+                        ) : recentLeads.length > 0 ? (
+                            recentLeads.map((l, i) => (
+                                <div key={i} className="flex items-center justify-between p-5 bg-bg-dark/50 rounded-2xl border border-border/50 hover:bg-white transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-navy font-black text-sm">
+                                            {l.name?.charAt(0) || 'L'}
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-bold text-navy leading-none">{l.name}</p>
+                                                {l.service_requested && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 font-black uppercase">
+                                                        {l.service_requested}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-text-muted mt-1 italic truncate max-w-[220px]">
+                                                {l.message || l.whatsapp}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-navy">{c.clients?.name}</p>
-                                        <p className="text-xs text-text-muted truncate max-w-[200px]">{c.message}</p>
-                                    </div>
+                                    <span className="text-[10px] font-black text-text-muted uppercase">
+                                        {new Date(l.created_at).toLocaleDateString([], { day: '2-digit', month: 'short' })}
+                                    </span>
                                 </div>
-                                <span className="text-[10px] font-black text-text-muted uppercase">
-                                    {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                            </div>
-                        ))}
+                            ))
+                        ) : (
+                            <p className="text-center p-10 text-text-muted text-sm italic">Esperando nuevos leads...</p>
+                        )}
                     </div>
                 </div>
 
