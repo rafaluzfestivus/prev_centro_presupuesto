@@ -23,8 +23,7 @@ export async function POST(req: Request) {
         }
 
         const messages: any[] = [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "system", content: "Responde siempre en formato JSON." }
+            { role: "system", content: `${SYSTEM_PROMPT}\n\nResponde siempre en formato JSON.` }
         ]
 
         if (current_data) {
@@ -49,8 +48,18 @@ export async function POST(req: Request) {
             throw new Error("No content received from AI")
         }
 
+        // More robust cleaning: only split if looks like markdown
+        let cleanContent = content.trim();
+        if (cleanContent.startsWith('```')) {
+            const parts = cleanContent.split('```');
+            const jsonPart = parts.find(p => p.includes('{') && p.includes('}'));
+            if (jsonPart) {
+                cleanContent = jsonPart.replace(/^json\n/, '').trim();
+            }
+        }
+
         // Parse JSON to ensure it's valid before returning
-        const structuredData = JSON.parse(content)
+        const structuredData = JSON.parse(cleanContent)
 
         return NextResponse.json(structuredData)
     } catch (error) {

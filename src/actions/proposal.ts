@@ -68,13 +68,12 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             .eq('key', 'proposal_system_prompt')
             .single()
 
-        const activeSystemPrompt = configData?.value || SYSTEM_PROMPT
-        console.log(`[AI] Using ${configData?.value ? 'DB proposal_system_prompt' : 'Hardcoded'} System Prompt`)
+        const activeSystemPrompt = `${configData?.value || SYSTEM_PROMPT}\n\nIMPORTANTE: Responde siempre en formato JSON válido.`;
+        console.log(`[AI] Using ${configData?.value ? 'DB proposal_system_prompt' : 'Hardcoded'} System Prompt`);
 
         const messages: any[] = [
-            { role: "system", content: activeSystemPrompt },
-            { role: "system", content: "IMPORTANTE: Responde siempre en formato JSON válido." }
-        ]
+            { role: "system", content: activeSystemPrompt }
+        ];
 
         // Constrói o conteúdo para a IA sempre focando nos dados originais como "Source of Truth"
         const userContent: any[] = [
@@ -120,19 +119,24 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
         let content = completion.choices[0].message.content
         if (!content) throw new Error("No AI content")
 
-        // Clean content if it's wrapped in markdown code blocks
-        if (content.includes('```json')) {
-            content = content.split('```json')[1].split('```')[0].trim()
-        } else if (content.includes('```')) {
-            content = content.split('```')[1].split('```')[0].trim()
-        }
-
         let result;
         try {
-            result = JSON.parse(content)
+            // More robust cleaning: only split if looks like markdown
+            let cleanContent = content.trim();
+            if (cleanContent.startsWith('```')) {
+                const parts = cleanContent.split('```');
+                // find the part that looks like JSON
+                const jsonPart = parts.find(p => p.includes('{') && p.includes('}'));
+                if (jsonPart) {
+                    cleanContent = jsonPart.replace(/^json\n/, '').trim();
+                }
+            }
+
+            result = JSON.parse(cleanContent);
         } catch (parseError) {
-            console.error('[AI] JSON Parse Error:', parseError, content)
-            throw new Error("La IA devolvió un formato inválido. Inténtalo de nuevo.")
+            console.error('[AI] JSON Parse Error:', parseError, content);
+            const preview = content.substring(0, 50).replace(/\n/g, ' ');
+            throw new Error(`La IA devolvió un formato inválido. (${preview}...)`);
         }
 
         // Basic validation
