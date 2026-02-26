@@ -34,12 +34,13 @@ const DashboardHome = () => {
         const load = async () => {
             const { count: clientCount } = await supabase.from('clients').select('*', { count: 'exact', head: true });
             const { count: convoCount } = await supabase.from('conversations').select('*', { count: 'exact', head: true });
+            const { count: apptCount } = await supabase.from('appointments').select('*', { count: 'exact', head: true });
             const { count: handoverCount } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'handover');
 
             setStats([
                 { label: 'Total Leads', value: String(clientCount || 0), icon: Users, trend: 'Nuevo' },
-                { label: 'Mensajes', value: String(convoCount || 0), icon: MessageSquare, trend: '+12%' },
-                { label: 'Citas', value: '0', icon: Calendar },
+                { label: 'Mensajes', value: String(convoCount || 0), icon: MessageSquare },
+                { label: 'Citas', value: String(apptCount || 0), icon: Calendar },
                 { label: 'Traspasos', value: String(handoverCount || 0), icon: ShieldCheck }
             ]);
 
