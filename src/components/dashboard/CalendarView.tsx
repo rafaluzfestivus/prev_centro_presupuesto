@@ -33,7 +33,7 @@ const CalendarView = () => {
     const [formData, setFormData] = useState({
         client_name: '',
         whatsapp: '',
-        scheduled_at: '',
+        date_start: '',
         status: 'confirmed',
         attachment_url: ''
     });
@@ -57,7 +57,7 @@ const CalendarView = () => {
         const { data, error } = await supabase
             .from('appointments')
             .select('*, clients(name, whatsapp, location)')
-            .order('scheduled_at', { ascending: true });
+            .order('date_start', { ascending: true });
 
         if (error) console.error('Error fetching appointments:', error);
         setAppointments(data || []);
@@ -74,7 +74,7 @@ const CalendarView = () => {
     const onDateClick = (day: Date) => {
         setSelectedDate(day);
         const dateStr = format(day, "yyyy-MM-dd");
-        setFormData({ ...formData, scheduled_at: `${dateStr}T09:00` });
+        setFormData({ ...formData, date_start: `${dateStr}T09:00` });
         setSelectedAppointment(null);
         setIsModalOpen(true);
     };
@@ -85,7 +85,7 @@ const CalendarView = () => {
         setFormData({
             client_name: apt.clients?.name || '',
             whatsapp: apt.clients?.whatsapp || '',
-            scheduled_at: format(new Date(apt.scheduled_at), "yyyy-MM-dd'T'HH:mm"),
+            date_start: format(new Date(apt.date_start || apt.scheduled_at), "yyyy-MM-dd'T'HH:mm"),
             status: apt.status,
             attachment_url: apt.attachment_url || ''
         });
@@ -145,10 +145,11 @@ const CalendarView = () => {
         let error;
         if (selectedAppointment) {
             const { error: updateError } = await supabase
-                .from('appointments')
                 .update({
                     client_id: clientId,
-                    scheduled_at: formData.scheduled_at,
+                    date_start: formData.date_start,
+                    date_end: formData.date_start, // Set same as start for simple appointments
+                    scheduled_at: formData.date_start,
                     status: formData.status,
                     attachment_url: formData.attachment_url
                 })
@@ -159,7 +160,9 @@ const CalendarView = () => {
                 .from('appointments')
                 .insert({
                     client_id: clientId,
-                    scheduled_at: formData.scheduled_at,
+                    date_start: formData.date_start,
+                    date_end: formData.date_start,
+                    scheduled_at: formData.date_start,
                     status: formData.status,
                     attachment_url: formData.attachment_url
                 });
@@ -196,7 +199,7 @@ const CalendarView = () => {
         setFormData({
             client_name: '',
             whatsapp: '',
-            scheduled_at: '',
+            date_start: '',
             status: 'confirmed',
             attachment_url: ''
         });
@@ -253,7 +256,7 @@ const CalendarView = () => {
                     const isSelected = isSameDay(day, selectedDate);
                     const isCurrentMonth = isSameMonth(day, monthStart);
                     const isToday = isSameDay(day, new Date());
-                    const dayAppointments = appointments.filter(apt => isSameDay(new Date(apt.scheduled_at), day));
+                    const dayAppointments = appointments.filter(apt => isSameDay(new Date(apt.date_start || apt.scheduled_at), day));
 
                     return (
                         <div
@@ -274,10 +277,10 @@ const CalendarView = () => {
                                         onClick={(e) => handleAppointmentClick(e, apt)}
                                         className={`text-[10px] p-1.5 rounded flex flex-col border-l-2 transition-transform hover:scale-105 ${apt.status === 'pending' ? 'bg-gray-100 border-gray-400' : 'bg-bg-dark border-accent'
                                             }`}
-                                        title={`${format(new Date(apt.scheduled_at), 'HH:mm')} - ${apt.clients?.name || 'Cliente'}`}
+                                        title={`${format(new Date(apt.date_start || apt.scheduled_at), 'HH:mm')} - ${apt.clients?.name || 'Cliente'}`}
                                     >
                                         <div className="flex justify-between items-center">
-                                            <span className="font-bold text-navy">{format(new Date(apt.scheduled_at), 'HH:mm')}</span>
+                                            <span className="font-bold text-navy">{format(new Date(apt.date_start || apt.scheduled_at), 'HH:mm')}</span>
                                             {apt.attachment_url && <ShieldCheck size={10} className="text-accent" />}
                                         </div>
                                         <span className="truncate opacity-70 font-medium">{apt.clients?.name || 'Cliente'}</span>
@@ -338,8 +341,8 @@ const CalendarView = () => {
                                 <div>
                                     <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">Fecha y Hora</label>
                                     <input
-                                        type="datetime-local" required value={formData.scheduled_at}
-                                        onChange={e => setFormData({ ...formData, scheduled_at: e.target.value })}
+                                        type="datetime-local" required value={formData.date_start}
+                                        onChange={e => setFormData({ ...formData, date_start: e.target.value })}
                                         className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none text-xs"
                                     />
                                 </div>
