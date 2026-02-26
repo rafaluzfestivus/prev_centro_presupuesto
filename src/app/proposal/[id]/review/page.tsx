@@ -26,7 +26,9 @@ type ProposalData = {
     items: ProposalItem[]
     mockup: string
     logic: string
+    logic: string
     total: number
+    whatsapp: string
 }
 
 export default function ReviewPage() {
@@ -67,7 +69,8 @@ export default function ReviewPage() {
                 items: mappedItems,
                 mockup: processing?.mockup_ascii || '',
                 logic: processing?.logica_calculo || '',
-                total: Number(proposal.total_geral || processing?.total_calculado || 0)
+                total: Number(proposal.total_geral || processing?.total_calculado || 0),
+                whatsapp: proposal.whatsapp || ''
             })
         }
         setLoading(false)
@@ -233,6 +236,14 @@ export default function ReviewPage() {
                                 <Input value={data.city} onChange={(e) => setData({ ...data, city: e.target.value })} />
                             ) : (
                                 <p className="font-medium text-lg">{data.city}</p>
+                            )}
+                        </div>
+                        <div className="space-y-1">
+                            <Label>WhatsApp</Label>
+                            {isEditing ? (
+                                <Input value={data.whatsapp} onChange={(e) => setData({ ...data, whatsapp: e.target.value })} />
+                            ) : (
+                                <p className="font-medium text-lg">{data.whatsapp || 'No informado'}</p>
                             )}
                         </div>
                     </div>

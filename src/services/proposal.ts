@@ -13,6 +13,7 @@ export async function createProposal(data: CreateProposalInput, userId?: string)
             medidas_input: data.measurements,
             observacoes: data.observations,
             input_image_url: data.imageUrl,
+            whatsapp: data.whatsapp,
             criado_por: userId,
             status: 'Rascunho'
         })

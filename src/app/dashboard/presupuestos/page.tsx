@@ -19,6 +19,7 @@ export default function ProposalsPage() {
     const [city, setCity] = useState('')
     const [measurements, setMeasurements] = useState('')
     const [observations, setObservations] = useState('')
+    const [whatsapp, setWhatsapp] = useState('')
     const [loading, setLoading] = useState(false)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
@@ -65,7 +66,7 @@ export default function ProposalsPage() {
                 setUploading(false)
             }
             if (!measurements && !imageUrl) { alert('Por favor, ingresa las medidas o sube una imagen.'); setLoading(false); return; }
-            const result = await createProposalAction({ clientName, city, measurements, observations, imageUrl })
+            const result = await createProposalAction({ clientName, city, measurements, observations, imageUrl, whatsapp })
             if (result.success && result.id) router.push(`/proposal/${result.id}/processing`)
             else alert('Error al crear presupuesto: ' + (result.error || 'Error desconocido'))
         } catch (error) { console.error(error); alert('Error al crear presupuesto') } finally { setLoading(false); setUploading(false) }
@@ -113,6 +114,10 @@ export default function ProposalsPage() {
                             <div className="space-y-2">
                                 <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Ciudad</Label>
                                 <Input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej: Madrid" className="p-4 bg-bg-dark border-none rounded-xl" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">WhatsApp</Label>
+                                <Input required value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ej: 34600000000" className="p-4 bg-bg-dark border-none rounded-xl" />
                             </div>
                         </div>
 

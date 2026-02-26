@@ -1,6 +1,7 @@
 'use server'
 
 import { createProposal, getProposals, getProposalById, getLatestAIProcessing, getProposalItems, saveAIProcessing, updateProposal, saveProposalItems, deleteProposal } from '@/services/proposal'
+import { createClient } from '@/lib/supabase/server'
 import { CreateProposalInput } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 import { OpenAI } from 'openai'
@@ -119,15 +120,56 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
 
 export async function confirmProposalAction(id: string, total: number, items: any[]) {
     try {
-        // Save manual edits first
+        const supabase = await createClient()
+
+        // 1. Get proposal to get whatsapp and other data
+        const proposal = await getProposalById(id)
+        const whatsapp = proposal.whatsapp?.replace(/\D/g, '')
+
+        // 2. Save manual edits first
         await saveProposalItems(id, items, total)
 
-        // Then confirm status
+        // 3. Then confirm status
         await updateProposal(id, {
             status: 'Confirmada',
             data_confirmacao: new Date().toISOString()
         })
+
+        // 4. Create/Update Client and Create Appointment if whatsapp is present
+        if (whatsapp) {
+            // Upsert client
+            const { data: client, error: clientError } = await supabase
+                .from('clients')
+                .upsert({
+                    name: proposal.cliente_nome,
+                    whatsapp: whatsapp,
+                    location: proposal.cidade,
+                    source: 'proposta',
+                    status: 'lead'
+                }, { onConflict: 'whatsapp' })
+                .select()
+                .single()
+
+            if (clientError) console.error('Error upserting client:', clientError)
+
+            if (client) {
+                // Create pending appointment
+                const { error: aptError } = await supabase
+                    .from('appointments')
+                    .insert({
+                        client_id: client.id,
+                        scheduled_at: new Date().toISOString(), // Default to now, can be adjusted in agenda
+                        status: 'pending',
+                        notes: `Creado desde presupuesto ${id}. Total: €${total.toFixed(2)}`
+                    })
+
+                if (aptError) console.error('Error creating appointment:', aptError)
+            }
+        }
+
         revalidatePath(`/proposal/${id}`)
+        revalidatePath('/dashboard/citas')
+        revalidatePath('/dashboard/clientes')
         return { success: true }
     } catch (error) {
         console.error('Failed to confirm:', error)

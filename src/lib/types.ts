@@ -15,6 +15,7 @@ export interface Proposal {
     data_confirmacao?: string;
     prompts?: any[]; // JSON array
     input_image_url?: string;
+    whatsapp?: string;
 }
 
 export interface ProposalItem {
@@ -51,4 +52,5 @@ export interface CreateProposalInput {
     measurements: string;
     observations?: string;
     imageUrl?: string;
+    whatsapp?: string;
 }
