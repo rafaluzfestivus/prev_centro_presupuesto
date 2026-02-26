@@ -145,11 +145,12 @@ const CalendarView = () => {
         let error;
         if (selectedAppointment) {
             const { error: updateError } = await supabase
+                .from('appointments')
                 .update({
                     client_id: clientId,
-                    date_start: formData.date_start,
-                    date_end: formData.date_start, // Set same as start for simple appointments
-                    scheduled_at: formData.date_start,
+                    date_start: formData.date_start || new Date().toISOString(),
+                    date_end: formData.date_start || new Date().toISOString(),
+                    scheduled_at: formData.date_start || new Date().toISOString(),
                     status: formData.status,
                     attachment_url: formData.attachment_url
                 })
@@ -160,9 +161,9 @@ const CalendarView = () => {
                 .from('appointments')
                 .insert({
                     client_id: clientId,
-                    date_start: formData.date_start,
-                    date_end: formData.date_start,
-                    scheduled_at: formData.date_start,
+                    date_start: formData.date_start || new Date().toISOString(),
+                    date_end: formData.date_start || new Date().toISOString(),
+                    scheduled_at: formData.date_start || new Date().toISOString(),
                     status: formData.status,
                     attachment_url: formData.attachment_url
                 });
