@@ -62,7 +62,7 @@ export default function SuccessPage() {
 
             try {
                 const blob = await generateProposalBlob(data)
-                if (!blob) throw new Error("Falha ao gerar PDF")
+                if (!blob) throw new Error("Fallo al generar PDF")
 
                 const supabase = createClient()
                 const fileName = `${id}_${Date.now()}.pdf`
@@ -92,7 +92,7 @@ export default function SuccessPage() {
                 console.log("PDF Uploaded:", publicUrl)
 
             } catch (error) {
-                console.error("Erro ao fazer upload do PDF:", error)
+                console.error("Error al subir el PDF:", error)
             } finally {
                 setUploading(false)
             }
@@ -113,16 +113,16 @@ export default function SuccessPage() {
     const handleWhatsApp = async () => {
         if (!data) return
 
-        let message = `Olá ${data.clientName}, aqui está o seu orçamento para redes de proteção da Preventiva Centro. Total: € ${data.total.toFixed(2)}.`
+        let message = `Hola ${data.clientName}, aquí tienes tu presupuesto para redes de protección de Preventiva Centro. Total: € ${data.total.toFixed(2)}.`
 
         if (pdfUrl) {
             // Save URL to DB if not saved yet? ensure consistency.
             // Update DB with PDF URL
             await updateLinkInDB(pdfUrl)
-            message += `\n\nBaixe sua proposta aqui: ${pdfUrl}`
+            message += `\n\nDescarga tu propuesta aquí: ${pdfUrl}`
         }
 
-        message += `\n\nPodemos agendar a instalação?`
+        message += `\n\n¿Podemos agendar la instalación?`
 
         const encoded = encodeURIComponent(message)
         window.open(`https://wa.me/?text=${encoded}`, '_blank')
@@ -138,7 +138,7 @@ export default function SuccessPage() {
         </div>
     )
 
-    if (!data) return <div className="p-8 text-center">Dados da proposta não encontrados.</div>
+    if (!data) return <div className="p-8 text-center">Datos del presupuesto no encontrados.</div>
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
@@ -150,8 +150,8 @@ export default function SuccessPage() {
                 </div>
 
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Proposta Gerada!</h1>
-                    <p className="text-gray-500 mt-2">O orçamento para <span className="font-semibold">{data.clientName}</span> está pronto.</p>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">¡Presupuesto Generado!</h1>
+                    <p className="text-gray-500 mt-2">El presupuesto para <span className="font-semibold">{data.clientName}</span> está listo.</p>
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
@@ -162,7 +162,7 @@ export default function SuccessPage() {
                 <div className="space-y-3">
                     <Button onClick={handleDownload} variant="secondary" className="w-full h-12 text-lg gap-2">
                         <Download className="h-5 w-5" />
-                        Baixar PDF
+                        Descargar PDF
                     </Button>
 
                     <Button
@@ -175,12 +175,12 @@ export default function SuccessPage() {
                         ) : (
                             <MessageCircle className="h-5 w-5" />
                         )}
-                        Enviar via WhatsApp
+                        Enviar vía WhatsApp
                     </Button>
 
                     <Button variant="ghost" onClick={() => router.push('/painel')} className="w-full">
                         <Home className="h-4 w-4 mr-2" />
-                        Voltar ao Início
+                        Volver al Inicio
                     </Button>
                 </div>
             </div>

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Save, RotateCcw, Trash2, Zap, Shield } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-const DEFAULT_PROMPT = `Você é um Assistente especializado em Janelas e Varandas de Alumínio...`;
+const DEFAULT_PROMPT = `Eres el Consultor Técnico de Preventiva Centro en Madrid, especialista en redes de protección. Tu objetivo es transformar medidas brutas en un presupuesto técnico impecable.`;
 
 const PromptEditor = () => {
     const supabase = createClient();
@@ -28,13 +28,13 @@ const PromptEditor = () => {
     const handleSave = async () => {
         setSaving(true);
         const { error } = await supabase.from('app_config').upsert({ key: 'system_prompt', value: prompt });
-        if (error) alert('Erro ao salvar: ' + error.message);
-        else alert('Prompt do Cérebro IA atualizado!');
+        if (error) alert('Error al guardar: ' + error.message);
+        else alert('¡Cerebro IA actualizado!');
         setSaving(false);
     };
 
     const handleCleanup = async () => {
-        if (!confirm('ATENÇÃO: Limpar todos os Leads, Conversas e Agendamentos?')) return;
+        if (!confirm('ATENCIÓN: ¿Limpiar todos los Leads, Conversaciones y Citas?')) return;
         setCleaning(true);
         try {
             await Promise.all([
@@ -42,16 +42,16 @@ const PromptEditor = () => {
                 supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
                 supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000')
             ]);
-            alert('Limpeza concluída!');
-        } catch (e: any) { alert('Erro: ' + e.message); }
+            alert('¡Limpieza concluida!');
+        } catch (e: any) { alert('Error: ' + e.message); }
         setCleaning(false);
     };
 
     return (
         <div className="prompt-editor">
             <header className="mb-10">
-                <h1 className="text-3xl font-bold mb-2">Cérebro <span className="accent-text">IA</span></h1>
-                <p className="text-text-muted">Configure o comportamento e a inteligência do seu assistente.</p>
+                <h1 className="text-3xl font-bold mb-2">Cerebro <span className="accent-text">IA</span></h1>
+                <p className="text-text-muted">Configura el comportamiento y la inteligencia de tu asistente.</p>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -70,7 +70,7 @@ const PromptEditor = () => {
                                 onChange={(e) => setPrompt(e.target.value)}
                                 className="w-full h-[500px] p-6 bg-bg-dark border border-border rounded-xl text-navy font-mono text-sm leading-relaxed focus:ring-2 focus:ring-accent/30 outline-none resize-none"
                                 disabled={loading}
-                                placeholder="Defina aqui como a IA deve se comportar..."
+                                placeholder="Define aquí cómo debe comportarse la IA..."
                             />
                             <div className="mt-8 flex gap-4">
                                 <button
@@ -79,14 +79,14 @@ const PromptEditor = () => {
                                     className="flex-1 py-4 bg-accent text-navy font-extrabold rounded-xl hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg"
                                 >
                                     <Save size={20} />
-                                    {saving ? 'Guardando...' : 'Guardar Alterações'}
+                                    {saving ? 'Guardando...' : 'Guardar Cambios'}
                                 </button>
                                 <button
                                     onClick={() => setPrompt(DEFAULT_PROMPT)}
                                     className="px-6 py-4 bg-white border border-border text-navy font-bold rounded-xl hover:bg-gray-50 flex items-center gap-3"
                                 >
                                     <RotateCcw size={20} />
-                                    Resetar
+                                    Reiniciar
                                 </button>
                             </div>
                         </div>
@@ -97,10 +97,10 @@ const PromptEditor = () => {
                     <div className="glass-card p-8 bg-white/80 border-none shadow-sm h-fit">
                         <div className="flex items-center gap-3 mb-6">
                             <Shield className="text-red-500" size={20} />
-                            <h2 className="font-bold text-navy uppercase tracking-widest text-sm">Zona de Risco</h2>
+                            <h2 className="font-bold text-navy uppercase tracking-widest text-sm">Zona de Riesgo</h2>
                         </div>
                         <p className="text-xs text-text-muted mb-6 leading-relaxed">
-                            Use esta ferramenta para limpar todos os dados de exemplo (Leads, Agendamentos e Conversas) antes de entrar em produção.
+                            Usa esta herramienta para limpiar todos los datos de ejemplo (Leads, Citas y Conversaciones) antes de entrar en producción.
                         </p>
                         <button
                             onClick={handleCleanup}
@@ -108,7 +108,7 @@ const PromptEditor = () => {
                             className="w-full py-4 bg-red-50 text-red-600 border border-red-100 font-extrabold rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-3"
                         >
                             <Trash2 size={20} />
-                            {cleaning ? 'Limpando...' : 'Limpar Tudo'}
+                            {cleaning ? 'Limpiando...' : 'Limpiar Todo'}
                         </button>
                     </div>
                 </div>

@@ -136,11 +136,11 @@ export default function ReviewPage() {
             if (result.success) {
                 router.push(`/proposal/${id}/success`)
             } else {
-                alert('Erro ao confirmar: ' + result.error)
+                alert('Error al confirmar: ' + result.error)
             }
         } catch (error) {
             console.error(error)
-            alert('Erro ao confirmar proposta')
+            alert('Error al confirmar presupuesto')
         } finally {
             setIsConfirming(false)
         }
@@ -157,7 +157,7 @@ export default function ReviewPage() {
             const result = await processProposalWithAIAction(id, aiInstruction, data)
 
             if (!result.success || !result.data) {
-                throw new Error(result.error || 'Falha ao reprocessar')
+                throw new Error(result.error || 'Fallo al reprocesar')
             }
 
             const newData = result.data
@@ -174,7 +174,7 @@ export default function ReviewPage() {
             setAiInstruction('')
         } catch (error) {
             console.error(error)
-            alert('Falha ao reprocessar com IA')
+            alert('Fallo al reprocesar con IA')
         } finally {
             setIsReprocessing(false)
         }
@@ -188,7 +188,7 @@ export default function ReviewPage() {
         )
     }
 
-    if (!data) return <div className="p-8 text-center">Nenhum dado encontrado para esta proposta.</div>
+    if (!data) return <div className="p-8 text-center">No se han encontrado datos para este presupuesto.</div>
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
@@ -199,7 +199,7 @@ export default function ReviewPage() {
                         <Button variant="ghost" size="icon" onClick={() => router.back()}>
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
-                        <h1 className="text-lg font-bold text-[var(--color-secondary)]">Revisión de Propuesta</h1>
+                        <h1 className="text-lg font-bold text-[var(--color-secondary)]">Revisión de Presupuesto</h1>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => setIsEditing(!isEditing)}>

@@ -19,7 +19,7 @@ export async function createProposalAction(data: CreateProposalInput) {
         revalidatePath('/painel')
         return { success: true, id: proposal.id }
     } catch (error: any) {
-        console.error('Failed to create proposal:', error)
+        console.error('Failed to create presupuesto:', error)
         return { success: false, error: error.message || String(error) }
     }
 }
@@ -29,8 +29,8 @@ export async function getProposalsAction() {
         const proposals = await getProposals()
         return { success: true, data: proposals }
     } catch (error) {
-        console.error('Failed to fetch proposals:', error)
-        return { success: false, error: 'Failed to fetch proposals' }
+        console.error('Failed to fetch presupuestos:', error)
+        return { success: false, error: 'Error al obtener los presupuestos' }
     }
 }
 
@@ -42,8 +42,8 @@ export async function getProposalDetailsAction(id: string) {
 
         return { success: true, data: { proposal, items, processing } }
     } catch (error) {
-        console.error('Failed to fetch proposal details:', error)
-        return { success: false, error: 'Failed to fetch proposal details' }
+        console.error('Failed to fetch presupuesto details:', error)
+        return { success: false, error: 'Error al obtener los detalles del presupuesto' }
     }
 }
 
@@ -62,8 +62,8 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
 
         // Constrói o conteúdo para a IA sempre focando nos dados originais como "Source of Truth"
         const userContent: any[] = [
-            { type: "text", text: `--- TRABALHANDO NA PROPOSTA ID: ${id} ---` },
-            { type: "text", text: `DADOS ORIGINAIS ENVIADOS PELO CLIENTE (REFERÊNCIA PRINCIPAL): ${proposal.medidas_input || 'Imagem em anexo'}` }
+            { type: "text", text: `--- TRABAJANDO EN EL PRESUPUESTO ID: ${id} ---` },
+            { type: "text", text: `DATOS ORIGINALES ENVIADOS POR EL CLIENTE (REFERENCIA PRINCIPAL): ${proposal.medidas_input || 'Imagen adjunta'}` }
         ]
 
         if (proposal.input_image_url) {
@@ -78,16 +78,16 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
         if (currentCtx) {
             userContent.push({
                 type: "text",
-                text: `ESTADO ATUAL DA PROPOSTA (JSON): ${JSON.stringify(currentCtx)}`
+                text: `ESTADO ACTUAL DEL PRESUPUESTO (JSON): ${JSON.stringify(currentCtx)}`
             })
             userContent.push({
                 type: "text",
-                text: `INSTRUÇÃO DE AJUSTE: ${instruction}`
+                text: `INSTRUCCIÓN DE AJUSTE: ${instruction}`
             })
         } else {
             userContent.push({
                 type: "text",
-                text: "Analise o input original e crie a proposta inicial."
+                text: "Analiza el input original y crea el presupuesto inicial."
             })
         }
 
@@ -112,7 +112,7 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
         return { success: true, data: result }
 
     } catch (error: any) {
-        console.error('Failed to process proposal:', error)
+        console.error('Failed to process presupuesto:', error)
         return { success: false, error: error.message || String(error) }
     }
 }
@@ -131,7 +131,7 @@ export async function confirmProposalAction(id: string, total: number, items: an
         return { success: true }
     } catch (error) {
         console.error('Failed to confirm:', error)
-        return { success: false, error: 'Failed to confirm' }
+        return { success: false, error: 'Error al confirmar' }
     }
 }
 
@@ -141,8 +141,8 @@ export async function updateProposalAction(id: string, updates: any) {
         revalidatePath(`/proposal/${id}`)
         return { success: true }
     } catch (error) {
-        console.error('Failed to update proposal:', error)
-        return { success: false, error: 'Failed to update proposal' }
+        console.error('Failed to update presupuesto:', error)
+        return { success: false, error: 'Error al actualizar el presupuesto' }
     }
 }
 
@@ -152,7 +152,7 @@ export async function deleteProposalAction(id: string) {
         revalidatePath('/painel')
         return { success: true }
     } catch (error) {
-        console.error('Failed to delete proposal:', error)
-        return { success: false, error: 'Failed to delete proposal' }
+        console.error('Failed to delete presupuesto:', error)
+        return { success: false, error: 'Error al eliminar el presupuesto' }
     }
 }

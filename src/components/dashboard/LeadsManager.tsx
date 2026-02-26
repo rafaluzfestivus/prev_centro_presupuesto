@@ -32,7 +32,7 @@ const LeadsManager = () => {
             .update({ status })
             .eq('id', id);
 
-        if (error) alert('Erro ao atualizar status: ' + error.message);
+        if (error) alert('Error al actualizar el estado: ' + error.message);
         else fetchLeads();
     };
 
@@ -45,15 +45,15 @@ const LeadsManager = () => {
         <div className="leads-manager">
             <header className="mb-10 flex justify-between items-end">
                 <div>
-                    <h1 className="text-3xl font-bold mb-2">Leads do <span className="accent-text">Site</span></h1>
-                    <p className="text-text-muted">Gestão de contatos capturados via formulário web.</p>
+                    <h1 className="text-3xl font-bold mb-2">Leads del <span className="accent-text">Sitio</span></h1>
+                    <p className="text-text-muted">Gestión de contactos captados vía formulario web.</p>
                 </div>
                 <div className="flex gap-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
                         <input
                             type="text"
-                            placeholder="Buscar por nome ou zap..."
+                            placeholder="Buscar por nombre o WhatsApp..."
                             className="pl-10 pr-4 py-2.5 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 w-64 text-navy"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -62,7 +62,7 @@ const LeadsManager = () => {
                     <button
                         onClick={fetchLeads}
                         className="p-2.5 bg-white border border-border rounded-xl text-navy hover:bg-gray-50 transition-colors"
-                        title="Atualizar"
+                        title="Actualizar"
                     >
                         <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                     </button>
@@ -74,15 +74,15 @@ const LeadsManager = () => {
                     <thead>
                         <tr className="bg-white border-b-2 border-border">
                             <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Lead</th>
-                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Contato</th>
-                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Localização</th>
-                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Status</th>
-                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider text-right">Ações</th>
+                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Contacto</th>
+                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Localización</th>
+                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Estado</th>
+                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white/50">
                         {loading ? (
-                            <tr><td colSpan={5} className="p-10 text-center text-text-muted">Sincronizando com Supabase...</td></tr>
+                            <tr><td colSpan={5} className="p-10 text-center text-text-muted">Sincronizando con Supabase...</td></tr>
                         ) : filteredLeads.length > 0 ? (
                             filteredLeads.map((lead) => (
                                 <tr key={lead.id} className="border-b border-border hover:bg-white/80 transition-colors">
@@ -99,17 +99,17 @@ const LeadsManager = () => {
                                     </td>
                                     <td className="p-5">
                                         <p className="text-sm font-semibold text-navy">{lead.whatsapp}</p>
-                                        <p className="text-xs text-text-muted">{lead.email || 'Sem e-mail'}</p>
+                                        <p className="text-xs text-text-muted">{lead.email || 'Sin e-mail'}</p>
                                     </td>
                                     <td className="p-5 text-sm text-text-main font-medium">
-                                        {lead.location || 'Não informado'}
+                                        {lead.location || 'No informado'}
                                     </td>
                                     <td className="p-5">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${lead.status === 'processed' ? 'bg-green-100 text-green-700' :
-                                                lead.status === 'handover' ? 'bg-accent/20 text-accent' :
-                                                    'bg-gray-100 text-gray-600'
+                                            lead.status === 'handover' ? 'bg-accent/20 text-accent' :
+                                                'bg-gray-100 text-gray-600'
                                             }`}>
-                                            {lead.status === 'processed' ? 'Processado' : lead.status === 'handover' ? 'Handover' : 'Novo'}
+                                            {lead.status === 'processed' ? 'Procesado' : lead.status === 'handover' ? 'Traspaso' : 'Nuevo'}
                                         </span>
                                     </td>
                                     <td className="p-5 text-right">
@@ -117,14 +117,14 @@ const LeadsManager = () => {
                                             <button
                                                 onClick={() => updateStatus(lead.id, 'handover')}
                                                 className="p-2 rounded-lg bg-accent/10 text-accent hover:bg-accent hover:text-navy transition-all"
-                                                title="Mover para Handover"
+                                                title="Mover a Traspaso"
                                             >
                                                 <AlertCircle size={18} />
                                             </button>
                                             <button
                                                 onClick={() => updateStatus(lead.id, 'processed')}
                                                 className="p-2 rounded-lg bg-green-100 text-green-600 hover:bg-green-600 hover:text-white transition-all"
-                                                title="Marcar como Concluído"
+                                                title="Marcar como Concluido"
                                             >
                                                 <CheckCircle size={18} />
                                             </button>
@@ -133,7 +133,7 @@ const LeadsManager = () => {
                                 </tr>
                             ))
                         ) : (
-                            <tr><td colSpan={5} className="p-10 text-center text-text-muted">Nenhum lead encontrado.</td></tr>
+                            <tr><td colSpan={5} className="p-10 text-center text-text-muted">No se han encontrado leads.</td></tr>
                         )}
                     </tbody>
                 </table>

@@ -29,9 +29,9 @@ const KnowledgeManager = () => {
     }, []);
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Tem certeza que deseja excluir este documento?')) return;
+        if (!confirm('¿Estás seguro de que deseas eliminar este documento?')) return;
         const { error } = await supabase.from('knowledge_base').delete().eq('id', id);
-        if (error) alert('Erro ao excluir: ' + error.message);
+        if (error) alert('Error al eliminar: ' + error.message);
         else fetchDocs();
     };
 
@@ -46,7 +46,7 @@ const KnowledgeManager = () => {
         });
 
         if (error) {
-            alert('Erro ao salvar documento: ' + error.message);
+            alert('Error al guardar el documento: ' + error.message);
         } else {
             setNewDocContent('');
             setIsModalOpen(false);
@@ -63,8 +63,8 @@ const KnowledgeManager = () => {
         <div className="knowledge-manager">
             <header className="mb-10 flex justify-between items-end">
                 <div>
-                    <h1 className="text-3xl font-bold mb-2">Base de <span className="accent-text">Conhecimento</span></h1>
-                    <p className="text-text-muted">Gerencie os documentos que alimentam a inteligência da IA.</p>
+                    <h1 className="text-3xl font-bold mb-2">Base de <span className="accent-text">Conocimiento</span></h1>
+                    <p className="text-text-muted">Gestiona los documentos que alimentan la inteligencia de la IA.</p>
                 </div>
                 <div className="flex gap-4">
                     <button
@@ -72,13 +72,13 @@ const KnowledgeManager = () => {
                         className="flex items-center gap-2 px-6 py-2.5 bg-accent text-navy font-bold rounded-xl hover:shadow-lg transition-all"
                     >
                         <Plus size={20} />
-                        Adicionar
+                        Añadir
                     </button>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />
                         <input
                             type="text"
-                            placeholder="Buscar nos documentos..."
+                            placeholder="Buscar en los documentos..."
                             className="pl-10 pr-4 py-2.5 bg-white border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 w-64 text-navy"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -96,13 +96,13 @@ const KnowledgeManager = () => {
                         <tr className="bg-white border-b-2 border-border text-navy">
                             <th className="p-5 text-sm font-bold uppercase tracking-wider">Documento</th>
                             <th className="p-5 text-sm font-bold uppercase tracking-wider">Tipo</th>
-                            <th className="p-5 text-sm font-bold uppercase tracking-wider">Data de Upload</th>
-                            <th className="p-5 text-sm font-bold uppercase tracking-wider text-right">Ações</th>
+                            <th className="p-5 text-sm font-bold uppercase tracking-wider">Fecha de Carga</th>
+                            <th className="p-5 text-sm font-bold uppercase tracking-wider text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white/50">
                         {loading ? (
-                            <tr><td colSpan={4} className="p-10 text-center text-text-muted">Carregando conhecimento...</td></tr>
+                            <tr><td colSpan={4} className="p-10 text-center text-text-muted">Cargando conocimiento...</td></tr>
                         ) : filteredDocs.length > 0 ? (
                             filteredDocs.map((doc) => (
                                 <tr key={doc.id} className="border-b border-border hover:bg-white/80 transition-colors">
@@ -129,7 +129,7 @@ const KnowledgeManager = () => {
                                         <button
                                             onClick={() => handleDelete(doc.id)}
                                             className="p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all"
-                                            title="Excluir documento"
+                                            title="Eliminar documento"
                                         >
                                             <Trash2 size={18} />
                                         </button>
@@ -137,7 +137,7 @@ const KnowledgeManager = () => {
                                 </tr>
                             ))
                         ) : (
-                            <tr><td colSpan={4} className="p-10 text-center text-text-muted">Nenhum documento encontrado.</td></tr>
+                            <tr><td colSpan={4} className="p-10 text-center text-text-muted">No se han encontrado documentos.</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -147,22 +147,22 @@ const KnowledgeManager = () => {
                 <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                     <div className="glass-card w-full max-w-2xl p-10 bg-white border-none shadow-2xl relative animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-8">
-                            <h2 className="text-2xl font-bold text-navy">Novo Conhecimento</h2>
+                            <h2 className="text-2xl font-bold text-navy">Nuevo Conocimiento</h2>
                             <button onClick={() => setIsModalOpen(false)} className="text-text-muted hover:text-navy transition-colors">
                                 <X size={24} />
                             </button>
                         </div>
                         <form onSubmit={handleAddDoc} className="space-y-6">
                             <div>
-                                <label className="block text-sm font-bold text-navy mb-2">Conteúdo do Documento</label>
+                                <label className="block text-sm font-bold text-navy mb-2">Contenido del Documento</label>
                                 <textarea
                                     required
                                     value={newDocContent}
                                     onChange={e => setNewDocContent(e.target.value)}
-                                    placeholder="Cole aqui informações sobre redes, preços, horários ou regras de negócio..."
+                                    placeholder="Pega aquí información sobre redes, precios, horarios o reglas de negocio..."
                                     className="w-full min-h-[300px] p-6 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none resize-none text-sm leading-relaxed"
                                 />
-                                <p className="mt-2 text-xs text-text-muted font-medium">A IA usará este texto para responder perguntas dos clientes.</p>
+                                <p className="mt-2 text-xs text-text-muted font-medium">La IA usará este texto para responder preguntas de los clientes.</p>
                             </div>
 
                             <button
@@ -171,7 +171,7 @@ const KnowledgeManager = () => {
                                 className="w-full py-4 bg-accent text-navy font-extrabold rounded-xl hover:shadow-xl transition-all disabled:opacity-50 text-lg flex items-center justify-center gap-2"
                             >
                                 {saving ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
-                                {saving ? 'Salvando...' : 'Salvar Documento'}
+                                {saving ? 'Guardando...' : 'Guardar Documento'}
                             </button>
                         </form>
                     </div>

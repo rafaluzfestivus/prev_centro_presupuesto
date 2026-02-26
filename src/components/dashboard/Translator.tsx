@@ -22,11 +22,11 @@ export function Translator() {
             if (result.success && result.data) {
                 setOutput(result.data)
             } else {
-                alert('Erro ao traduzir')
+                alert('Error al traducir')
             }
         } catch (error) {
             console.error(error)
-            alert('Erro ao traduzir')
+            alert('Error al traducir')
         } finally {
             setLoading(false)
         }
@@ -50,7 +50,7 @@ export function Translator() {
             <CardContent className="flex-1 flex flex-col gap-4">
                 <div className="space-y-2">
                     <Textarea
-                        placeholder="Escribe en Español ou Português..."
+                        placeholder="Escribe en Español o Portugués..."
                         className="min-h-[100px] resize-none"
                         value={input}
                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}

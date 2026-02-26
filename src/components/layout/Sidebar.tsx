@@ -20,12 +20,12 @@ const Sidebar = () => {
 
     const menuItems = [
         { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: '/dashboard/propostas', label: 'Propostas IA', icon: FileText },
-        { id: '/dashboard/leads', label: 'Leads do Site', icon: Users },
-        { id: '/dashboard/agenda', label: 'Agenda', icon: Calendar },
-        { id: '/dashboard/conversas', label: 'Conversas', icon: MessageSquare },
-        { id: '/dashboard/conhecimento', label: 'Conhecimento', icon: BookOpen },
-        { id: '/dashboard/config', label: 'Cérebro IA', icon: Settings },
+        { id: '/dashboard/presupuestos', label: 'Presupuestos IA', icon: FileText },
+        { id: '/dashboard/clientes', label: 'Leads del Sitio', icon: Users },
+        { id: '/dashboard/citas', label: 'Agenda', icon: Calendar },
+        { id: '/dashboard/conversaciones', label: 'Conversaciones', icon: MessageSquare },
+        { id: '/dashboard/conocimiento', label: 'Conocimiento', icon: BookOpen },
+        { id: '/dashboard/configuracion', label: 'Cerebro IA', icon: Settings },
     ];
 
     return (
@@ -68,7 +68,7 @@ const Sidebar = () => {
             <div className="pt-6 border-t border-white/10 mt-6">
                 <button className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-red-500/10 group w-full text-left">
                     <LogOut size={20} className="text-white/50 group-hover:text-red-400" />
-                    <span className="text-sm font-semibold text-white/50 group-hover:text-red-400">Sair</span>
+                    <span className="text-sm font-semibold text-white/50 group-hover:text-red-400">Salir</span>
                 </button>
             </div>
         </aside>

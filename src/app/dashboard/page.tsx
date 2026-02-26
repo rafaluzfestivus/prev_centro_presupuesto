@@ -36,17 +36,17 @@ const DashboardHome = () => {
             const { count: handoverCount } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'handover');
 
             setStats([
-                { label: 'Total Leads', value: String(clientCount || 0), icon: Users, trend: 'Novo' },
-                { label: 'Mensagens', value: String(convoCount || 0), icon: MessageSquare, trend: '+12%' },
-                { label: 'Agendamentos', value: '0', icon: Calendar },
-                { label: 'Handovers', value: String(handoverCount || 0), icon: ShieldCheck }
+                { label: 'Total Leads', value: String(clientCount || 0), icon: Users, trend: 'Nuevo' },
+                { label: 'Mensajes', value: String(convoCount || 0), icon: MessageSquare, trend: '+12%' },
+                { label: 'Citas', value: '0', icon: Calendar },
+                { label: 'Traspasos', value: String(handoverCount || 0), icon: ShieldCheck }
             ]);
 
             const { data } = await supabase.from('conversations').select('*, clients(name)').order('created_at', { ascending: false }).limit(4);
             if (!data || data.length === 0) {
                 setRecentConvos([
-                    { clients: { name: 'Maria Silva' }, message: 'Gostaria de um orçamento para minha sacada.', created_at: new Date().toISOString() },
-                    { clients: { name: 'João Santos' }, message: 'Qual o prazo de instalação em Madrid?', created_at: new Date(Date.now() - 3600000).toISOString() }
+                    { clients: { name: 'Maria Silva' }, message: 'Me gustaría un presupuesto para mi balcón.', created_at: new Date().toISOString() },
+                    { clients: { name: 'João Santos' }, message: '¿Cuál es el plazo de instalación en Madrid?', created_at: new Date(Date.now() - 3600000).toISOString() }
                 ]);
             } else {
                 setRecentConvos(data);
@@ -59,8 +59,8 @@ const DashboardHome = () => {
     return (
         <DashboardLayout>
             <header className="mb-10">
-                <h1 className="text-4xl font-extrabold mb-2 text-navy">Bem-vindo, <span className="accent-text">Rafael</span></h1>
-                <p className="text-text-muted text-lg">Seu centro integrado de propostas e atendimento.</p>
+                <h1 className="text-4xl font-extrabold mb-2 text-navy">Bienvenido, <span className="accent-text">Rafael</span></h1>
+                <p className="text-text-muted text-lg">Tu centro integrado de presupuestos y atención.</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -71,7 +71,7 @@ const DashboardHome = () => {
                 <div className="glass-card p-10 bg-white border-none shadow-sm">
                     <h2 className="text-xl font-bold mb-8 text-navy uppercase tracking-widest flex items-center gap-3">
                         <MessageSquare className="text-accent" />
-                        Conversas Recentes
+                        Conversaciones Recientes
                     </h2>
                     <div className="space-y-4">
                         {loading ? (
@@ -100,13 +100,13 @@ const DashboardHome = () => {
                 <div className="glass-card p-10 bg-white border-none shadow-sm">
                     <h2 className="text-xl font-bold mb-8 text-navy uppercase tracking-widest flex items-center gap-3">
                         <ShieldCheck className="text-accent" />
-                        Status do Sistema
+                        Estado del Sistema
                     </h2>
                     <div className="space-y-6">
                         {[
-                            { label: 'Base de Dados', desc: 'Supabase Realtime', status: 'Ativo' },
-                            { label: 'Gerador IA', desc: 'OpenAI GPT-4o', status: 'Ativo' },
-                            { label: 'Workflows', desc: 'n8n Automations', status: 'Ativo' }
+                            { label: 'Base de Datos', desc: 'Supabase Realtime', status: 'Activo' },
+                            { label: 'Generador IA', desc: 'OpenAI GPT-4o', status: 'Activo' },
+                            { label: 'Workflows', desc: 'n8n Automations', status: 'Activo' }
                         ].map((s, i) => (
                             <div key={i} className="flex justify-between items-center p-4 rounded-xl bg-bg-dark/30">
                                 <div>

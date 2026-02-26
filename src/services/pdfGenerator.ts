@@ -145,7 +145,7 @@ export const generateProposalPDF = async (data: ProposalData) => {
 
         // Save
         const safeName = data.clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        doc.save(`Preventiva_Propuesta_${safeName}.pdf`);
+        doc.save(`Preventiva_Presupuesto_${safeName}.pdf`);
 
     } catch (error) {
         console.error("Error generating PDF:", error);

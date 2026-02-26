@@ -13,7 +13,7 @@ import {
     isSameDay,
     eachDayOfInterval
 } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -77,7 +77,7 @@ const CalendarView = () => {
             .upload(fileName, file);
 
         if (error) {
-            alert('Erro no upload: ' + error.message);
+            alert('Error en la carga: ' + error.message);
         } else {
             const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
             setNewApt({ ...newApt, attachment_url: publicUrl });
@@ -98,7 +98,7 @@ const CalendarView = () => {
         if (clients && clients.length > 0) {
             clientId = clients[0].id;
         } else {
-            console.log('Cliente não encontrado, tentando criar...', cleanWhatsApp);
+            console.log('Cliente no encontrado, intentando crear...', cleanWhatsApp);
             const { data: newClient, error: insertError } = await supabase.from('clients').insert({
                 whatsapp: cleanWhatsApp,
                 name: searchParams.get('client') || 'Cliente Manual',
@@ -106,15 +106,15 @@ const CalendarView = () => {
             }).select('id').single();
 
             if (insertError) {
-                console.error('Erro ao inserir cliente:', insertError);
-                return alert('Erro ao criar cliente: ' + insertError.message);
+                console.error('Error al insertar cliente:', insertError);
+                return alert('Error al crear cliente: ' + insertError.message);
             }
             clientId = newClient?.id;
         }
 
         if (!clientId) {
-            console.error('Falha crítica: Cliente ID não gerado.');
-            return alert('Erro ao identificar cliente.');
+            console.error('Falla crítica: Cliente ID no generado.');
+            return alert('Error al identificar cliente.');
         }
 
         const { error } = await supabase.from('appointments').insert({
@@ -125,7 +125,7 @@ const CalendarView = () => {
         });
 
         if (error) {
-            alert('Erro ao agendar: ' + error.message);
+            alert('Error al agendar: ' + error.message);
         } else {
             setIsModalOpen(false);
             setNewApt({ whatsapp: '', scheduled_at: '', status: 'confirmed', attachment_url: '' });
@@ -138,7 +138,7 @@ const CalendarView = () => {
             <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-6">
                     <h2 className="text-2xl font-bold capitalize text-navy">
-                        {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                        {format(currentMonth, 'MMMM yyyy', { locale: es })}
                     </h2>
                     <div className="flex gap-2">
                         <button onClick={prevMonth} className="p-2 bg-white border border-border rounded-lg hover:bg-gray-50 transition-colors"><ChevronLeft size={20} /></button>
@@ -157,7 +157,7 @@ const CalendarView = () => {
     };
 
     const renderDays = () => {
-        const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         return (
             <div className="grid grid-cols-7 mb-2 border-b border-border">
                 {days.map(day => (
@@ -219,8 +219,8 @@ const CalendarView = () => {
     return (
         <div className="calendar-container">
             <header className="mb-10">
-                <h1 className="text-3xl font-bold mb-2">Agenda de <span className="accent-text">Instalações</span></h1>
-                <p className="text-text-muted">Cronograma mensal de visitas técnicas e instalações.</p>
+                <h1 className="text-3xl font-bold mb-2">Agenda de <span className="accent-text">Instalaciones</span></h1>
+                <p className="text-text-muted">Cronograma mensual de visitas técnicas e instalaciones.</p>
             </header>
 
             <div className="glass-card p-10 mt-6 bg-white shadow-xl border-none">
@@ -235,23 +235,23 @@ const CalendarView = () => {
                 <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
                     <div className="glass-card w-full max-w-md p-10 bg-white border-none shadow-2xl relative animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-8">
-                            <h2 className="text-2xl font-bold text-navy">Nova Visita</h2>
+                            <h2 className="text-2xl font-bold text-navy">Nueva Cita</h2>
                             <button onClick={() => setIsModalOpen(false)} className="text-text-muted hover:text-navy transition-colors">
                                 <X size={24} />
                             </button>
                         </div>
                         <form onSubmit={handleAddAppointment} className="space-y-6">
                             <div>
-                                <label className="block text-sm font-bold text-navy mb-2">WhatsApp do Cliente</label>
+                                <label className="block text-sm font-bold text-navy mb-2">WhatsApp del Cliente</label>
                                 <input
                                     type="text" required value={newApt.whatsapp}
                                     onChange={e => setNewApt({ ...newApt, whatsapp: e.target.value })}
-                                    placeholder="Ex: 34600000000"
+                                    placeholder="Ej: 34600000000"
                                     className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-navy mb-2">Data e Hora</label>
+                                <label className="block text-sm font-bold text-navy mb-2">Fecha y Hora</label>
                                 <input
                                     type="datetime-local" required value={newApt.scheduled_at}
                                     onChange={e => setNewApt({ ...newApt, scheduled_at: e.target.value })}
@@ -260,7 +260,7 @@ const CalendarView = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-navy mb-2">Anexo / Orçamento</label>
+                                <label className="block text-sm font-bold text-navy mb-2">Adjunto / Presupuesto</label>
                                 <div className="relative">
                                     <input
                                         type="file"
@@ -281,7 +281,7 @@ const CalendarView = () => {
                                 disabled={uploading}
                                 className="w-full py-4 bg-accent text-navy font-extrabold rounded-xl hover:shadow-xl transition-all disabled:opacity-50 text-lg"
                             >
-                                Confirmar Agendamento
+                                Confirmar Cita
                             </button>
                         </form>
                     </div>
