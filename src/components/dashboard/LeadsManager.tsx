@@ -74,15 +74,16 @@ const LeadsManager = () => {
                     <thead>
                         <tr className="bg-white border-b-2 border-border">
                             <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Lead</th>
-                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Contacto</th>
+                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Contacto / Servicio</th>
                             <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Localización</th>
+                            <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Mensaje</th>
                             <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider">Estado</th>
                             <th className="p-5 text-sm font-bold text-navy uppercase tracking-wider text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white/50">
                         {loading ? (
-                            <tr><td colSpan={5} className="p-10 text-center text-text-muted">Sincronizando con Supabase...</td></tr>
+                            <tr><td colSpan={6} className="p-10 text-center text-text-muted">Sincronizando con Supabase...</td></tr>
                         ) : filteredLeads.length > 0 ? (
                             filteredLeads.map((lead) => (
                                 <tr key={lead.id} className="border-b border-border hover:bg-white/80 transition-colors">
@@ -99,10 +100,25 @@ const LeadsManager = () => {
                                     </td>
                                     <td className="p-5">
                                         <p className="text-sm font-semibold text-navy">{lead.whatsapp}</p>
-                                        <p className="text-xs text-text-muted">{lead.email || 'Sin e-mail'}</p>
+                                        <p className="text-xs text-text-muted mb-1">{lead.email || 'Sin e-mail'}</p>
+                                        <span className="inline-block px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold uppercase border border-blue-100">
+                                            {lead.service_requested || 'General'}
+                                        </span>
                                     </td>
-                                    <td className="p-5 text-sm text-text-main font-medium">
-                                        {lead.location || 'No informado'}
+                                    <td className="p-5">
+                                        <p className="text-sm text-text-main font-medium">
+                                            {lead.location || (lead.postal_code ? `CP: ${lead.postal_code}` : 'No informado')}
+                                        </p>
+                                        {lead.location && lead.postal_code && (
+                                            <p className="text-[10px] text-text-muted">CP: {lead.postal_code}</p>
+                                        )}
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="max-w-[250px] bg-bg-dark/20 p-3 rounded-xl border border-border/30">
+                                            <p className="text-xs text-navy italic leading-relaxed whitespace-pre-line">
+                                                {lead.message || 'Sin mensaje adicional'}
+                                            </p>
+                                        </div>
                                     </td>
                                     <td className="p-5">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${lead.status === 'processed' ? 'bg-green-100 text-green-700' :
@@ -133,7 +149,7 @@ const LeadsManager = () => {
                                 </tr>
                             ))
                         ) : (
-                            <tr><td colSpan={5} className="p-10 text-center text-text-muted">No se han encontrado leads.</td></tr>
+                            <tr><td colSpan={6} className="p-10 text-center text-text-muted">No se han encontrado leads.</td></tr>
                         )}
                     </tbody>
                 </table>

@@ -60,19 +60,20 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             apiKey: process.env.OPENAI_API_KEY,
         })
 
-        // Fetch System Prompt from DB
+        // Fetch System Prompt from DB - Use a specific key for proposals to avoid chatbot conflicts
         const supabase = await createClient()
         const { data: configData } = await supabase
             .from('config')
             .select('value')
-            .eq('key', 'system_prompt')
+            .eq('key', 'proposal_system_prompt')
             .single()
 
         const activeSystemPrompt = configData?.value || SYSTEM_PROMPT
-        console.log(`[AI] Using ${configData?.value ? 'DB' : 'Hardcoded'} System Prompt`)
+        console.log(`[AI] Using ${configData?.value ? 'DB proposal_system_prompt' : 'Hardcoded'} System Prompt`)
 
         const messages: any[] = [
-            { role: "system", content: activeSystemPrompt }
+            { role: "system", content: activeSystemPrompt },
+            { role: "system", content: "IMPORTANTE: Responde siempre en formato JSON válido." }
         ]
 
         // Constrói o conteúdo para a IA sempre focando nos dados originais como "Source of Truth"

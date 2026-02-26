@@ -23,7 +23,8 @@ export async function POST(req: Request) {
         }
 
         const messages: any[] = [
-            { role: "system", content: SYSTEM_PROMPT }
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: "Responde siempre en formato JSON." }
         ]
 
         if (current_data) {
