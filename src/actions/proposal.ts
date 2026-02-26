@@ -50,15 +50,29 @@ export async function getProposalDetailsAction(id: string) {
 
 export async function processProposalWithAIAction(id: string, instruction?: string, currentCtx?: any) {
     try {
+        console.log(`[AI] Processing proposal ${id}...`)
         const proposal = await getProposalById(id)
+        console.log(`[AI] Proposal found: ${proposal.cliente_nome}`)
 
         // --- AI LOGIC START ---
+        console.log(`[AI] Initializing OpenAI with key: ${process.env.OPENAI_API_KEY ? 'Present' : 'MISSING'}`)
         const openai = new OpenAI({
             apiKey: process.env.OPENAI_API_KEY,
         })
 
+        // Fetch System Prompt from DB
+        const supabase = await createClient()
+        const { data: configData } = await supabase
+            .from('config')
+            .select('value')
+            .eq('key', 'system_prompt')
+            .single()
+
+        const activeSystemPrompt = configData?.value || SYSTEM_PROMPT
+        console.log(`[AI] Using ${configData?.value ? 'DB' : 'Hardcoded'} System Prompt`)
+
         const messages: any[] = [
-            { role: "system", content: SYSTEM_PROMPT }
+            { role: "system", content: activeSystemPrompt }
         ]
 
         // Constrói o conteúdo para a IA sempre focando nos dados originais como "Source of Truth"
@@ -94,20 +108,45 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
 
         messages.push({ role: "user", content: userContent })
 
+        console.log(`[AI] Sending request to GPT-4o...`)
         const completion = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: messages,
             response_format: { type: "json_object" },
             temperature: 0.1,
         })
-        const content = completion.choices[0].message.content
+        console.log(`[AI] Response received from OpenAI`)
+        let content = completion.choices[0].message.content
         if (!content) throw new Error("No AI content")
 
-        const result = JSON.parse(content)
+        // Clean content if it's wrapped in markdown code blocks
+        if (content.includes('```json')) {
+            content = content.split('```json')[1].split('```')[0].trim()
+        } else if (content.includes('```')) {
+            content = content.split('```')[1].split('```')[0].trim()
+        }
+
+        let result;
+        try {
+            result = JSON.parse(content)
+        } catch (parseError) {
+            console.error('[AI] JSON Parse Error:', parseError, content)
+            throw new Error("La IA devolvió un formato inválido. Inténtalo de nuevo.")
+        }
+
+        // Basic validation
+        if (!result.items || !Array.isArray(result.items)) {
+            console.error('[AI] Invalid structure:', result)
+            throw new Error("La IA no generó los ítems correctamente.")
+        }
+
+        console.log(`[AI] JSON parsed successfully. Items: ${result.items.length}`)
         // --- AI LOGIC END ---
 
         // Save to DB
+        console.log(`[AI] Saving processing result to DB...`)
         await saveAIProcessing(id, result, instruction || proposal.medidas_input, result.items)
+        console.log(`[AI] Processing completed and saved for ${id}`)
 
         revalidatePath(`/proposal/${id}`)
         return { success: true, data: result }

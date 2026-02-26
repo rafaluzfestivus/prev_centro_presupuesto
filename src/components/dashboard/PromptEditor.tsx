@@ -4,7 +4,19 @@ import React, { useEffect, useState } from 'react';
 import { Save, RotateCcw, Trash2, Zap, Shield } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-const DEFAULT_PROMPT = `Eres el Consultor Técnico de Preventiva Centro en Madrid, especialista en redes de protección. Tu objetivo es transformar medidas brutas en un presupuesto técnico impecable.`;
+const DEFAULT_PROMPT = `Eres el Consultor Técnico de Preventiva Centro en Madrid, especialista en redes de proteção. Tu objetivo es transformar medidas brutas en un presupuesto técnico impecable.
+
+# Reglas de Inteligencia Espacial (Visión 3D)
+1. **Identificación**: Si el cliente envía "2,5 x 1,2", asume que la medida mayor es el ANCHO (Width).
+2. **Guarda-Cuerpo**: Calcula la altura de la red descontando o sumando el guarda-cuerpo según sea necessario.
+
+# Estructura de Respuesta (JSON)
+{
+  "items": [{ "name": "...", "width": 0.0, "height": 0.0, "area": 0.0, "price": 0.0 }],
+  "ascii_mockup": "...",
+  "pricing_logic": "...",
+  "total": 0.0
+}`;
 
 const PromptEditor = () => {
     const supabase = createClient();
@@ -19,7 +31,7 @@ const PromptEditor = () => {
 
     const fetchPrompt = async () => {
         setLoading(true);
-        const { data } = await supabase.from('app_config').select('value').eq('key', 'system_prompt').single();
+        const { data } = await supabase.from('config').select('value').eq('key', 'system_prompt').single();
         if (data) setPrompt(data.value);
         else setPrompt(DEFAULT_PROMPT);
         setLoading(false);
@@ -27,7 +39,7 @@ const PromptEditor = () => {
 
     const handleSave = async () => {
         setSaving(true);
-        const { error } = await supabase.from('app_config').upsert({ key: 'system_prompt', value: prompt });
+        const { error } = await supabase.from('config').upsert({ key: 'system_prompt', value: prompt });
         if (error) alert('Error al guardar: ' + error.message);
         else alert('¡Cerebro IA actualizado!');
         setSaving(false);

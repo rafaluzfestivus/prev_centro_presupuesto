@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { processProposalWithAIAction } from '@/actions/proposal'
 
 const STEPS = [
@@ -55,9 +55,28 @@ export default function ProcessingPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen flex items-center justify-center text-red-500 flex-col gap-4">
-                <p>Error: {error}</p>
-                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-500 text-white rounded">Tentar Novamente</button>
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center space-y-4">
+                    <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <X size={32} />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900">Error de Procesamiento</h2>
+                    <p className="text-gray-600 text-sm leading-relaxed">{error}</p>
+                    <div className="pt-4 flex flex-col gap-3">
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="w-full py-3 bg-[var(--color-primary)] text-white rounded-xl font-bold hover:shadow-lg transition-all"
+                        >
+                            Tentar Novamente
+                        </button>
+                        <button
+                            onClick={() => router.push('/dashboard/presupuestos')}
+                            className="w-full py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
+                        >
+                            Volver al Dashboard
+                        </button>
+                    </div>
+                </div>
             </div>
         )
     }
