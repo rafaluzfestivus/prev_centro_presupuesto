@@ -165,9 +165,11 @@ export async function saveAIProcessing(proposalId: string, result: any, rawPromp
 
     // Check if new prompt is already in (to avoid dupes on re-runs if logic assumes append)
     // For now simple append with timestamp
+    const displayPrompt = typeof rawPrompt === 'string' ? rawPrompt : JSON.stringify(rawPrompt);
+
     const newPromptEntry = {
         timestamp: new Date().toISOString(),
-        prompt: rawPrompt,
+        prompt: displayPrompt,
     }
 
     const { error: updateError } = await supabase

@@ -148,10 +148,18 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 text: `INSTRUCCIÓN DE AJUSTE: ${instruction}`
             })
         } else if (instruction === 'confirmed_items' && currentCtx) {
-            // Special case: we already have the items, just calc prices
+            // Special case: we already have the items, just calc prices and generate mockup
             userContent.push({
                 type: "text",
-                text: `TEMOS OS ITENS CONFIRMADOS PELO USUÁRIO. CALCULE O PREÇO DE CADA UM E O TOTAL. ITENS: ${JSON.stringify(currentCtx)}`
+                text: `EL USUARIO HA REVISADO Y CONFIRMADO LOS SIGUIENTES ÍTEMS PARA EL PRESUPUESTO. 
+                
+                INSTRUCCIONES OBLIGATORIAS:
+                1. USA EXACTAMENTE ESTOS ÍTEMS. NO CAMBIES LOS NOMBRES, NI LAS MEDIDAS, NI LOS ELIMINES.
+                2. CALCULA EL PRECIO DE CADA ÍTEM (MÁXIMO ENTRE 28€/m² O MÍNIMO DE 80€).
+                3. GENERA UN NUEVO MOCKUP ASCII QUE REPRESENTE ESTOS ÍTEMS EXACTAMENTE.
+                4. SI UN ÍTEM TIENE MEDIDAS 0, DESCARTALO O AVISE EN 'missing_info'.
+                
+                ÍTEMS CONFIRMADOS: ${JSON.stringify(currentCtx)}`
             })
         } else {
             userContent.push({
@@ -160,7 +168,9 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             })
         }
 
-        messages.push({ role: "user", content: userContent })
+        if (instruction === 'confirmed_items') {
+            console.log(`[AI] Processing confirmed items:`, currentCtx)
+        }
 
         console.log(`[AI] Sending request to GPT-4o...`)
         const completion = await openai.chat.completions.create({
@@ -247,6 +257,8 @@ export async function confirmProposalAction(id: string, total: number, items: an
             status: 'Confirmada',
             data_confirmacao: new Date().toISOString()
         })
+
+        console.log(`[AI] Confirmed items for proposal ${id}`)
 
         // 4. Create/Update Client and Create Appointment if whatsapp is present
         if (whatsapp) {
