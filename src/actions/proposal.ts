@@ -1,5 +1,6 @@
 'use server'
 
+import fs from 'fs'
 import { createProposal, getProposals, getProposalById, getLatestAIProcessing, getProposalItems, saveAIProcessing, updateProposal, saveProposalItems, deleteProposal } from '@/services/proposal'
 import { createClient } from '@/lib/supabase/server'
 import { CreateProposalInput } from '@/lib/types'
@@ -203,14 +204,10 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             throw new Error(`La IA devolvió un formato inválido. (${preview}...)`);
         }
 
-        // Basic validation
         if (!result.items || !Array.isArray(result.items)) {
-            console.error('[AI] Invalid structure:', result)
-            throw new Error("La IA no generó los ítems correctamente.")
+            fs.appendFileSync('ai_debug.log', `[AI] ERROR: result.items is missing or not an array\n`);
+            throw new Error("La IA no generó os ítems correctamente. Verifique si as medidas estão claras no pedido.");
         }
-
-        console.log(`[AI] JSON parsed successfully. Items: ${result.items.length}`)
-        // --- AI LOGIC END ---
 
         // Apply pricing minimums manually if AI forgets, or let AI do it. 
         // The system prompt should handle it, but let's ensure.
