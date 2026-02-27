@@ -32,7 +32,22 @@ export default function ProcessingPage() {
                 }, 1500)
 
                 // Call Server Action
-                const result = await processProposalWithAIAction(id)
+                const source = new URLSearchParams(window.location.search).get('source')
+                let result;
+
+                if (source === 'preview') {
+                    const confirmedData = localStorage.getItem(`confirmed_items_${id}`)
+                    if (confirmedData) {
+                        const items = JSON.parse(confirmedData)
+                        // Use special 'confirmed_items' instruction to signal pricing only
+                        result = await processProposalWithAIAction(id, 'confirmed_items', items)
+                        localStorage.removeItem(`confirmed_items_${id}`)
+                    } else {
+                        result = await processProposalWithAIAction(id)
+                    }
+                } else {
+                    result = await processProposalWithAIAction(id)
+                }
 
                 clearInterval(interval)
                 setCurrentStep(STEPS.length - 1)

@@ -6,6 +6,8 @@ import { CreateProposalInput } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
 import { OpenAI } from 'openai'
 import { SYSTEM_PROMPT } from '@/services/ai/prompt'
+import { EXTRACTION_SYSTEM_PROMPT } from '@/services/ai/extraction_prompt'
+import { PRICING } from '@/lib/constants'
 
 export async function createProposalAction(data: CreateProposalInput) {
     try {
@@ -45,6 +47,52 @@ export async function getProposalDetailsAction(id: string) {
     } catch (error) {
         console.error('Failed to fetch presupuesto details:', error)
         return { success: false, error: 'Error al obtener los detalles del presupuesto' }
+    }
+}
+
+export async function interpretProposalAction(id: string) {
+    try {
+        console.log(`[AI] Interpreting proposal ${id}...`)
+        const proposal = await getProposalById(id)
+
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        })
+
+        const messages: any[] = [
+            { role: "system", content: EXTRACTION_SYSTEM_PROMPT }
+        ];
+
+        const userContent: any[] = [
+            { type: "text", text: `--- INTERPRETANDO PEDIDO ID: ${id} ---` },
+            { type: "text", text: `INPUT ORIGINAL: ${proposal.medidas_input || 'Imagen adjunta'}` }
+        ]
+
+        if (proposal.input_image_url) {
+            userContent.push({
+                type: "image_url",
+                image_url: { url: proposal.input_image_url },
+            })
+        }
+
+        messages.push({ role: "user", content: userContent })
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: messages,
+            response_format: { type: "json_object" },
+            temperature: 0.1,
+        })
+
+        let content = completion.choices[0].message.content
+        if (!content) throw new Error("No AI content")
+
+        let result = JSON.parse(content);
+        return { success: true, data: result }
+
+    } catch (error: any) {
+        console.error('Failed to interpret presupuesto:', error)
+        return { success: false, error: error.message || String(error) }
     }
 }
 
@@ -99,6 +147,12 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 type: "text",
                 text: `INSTRUCCIÓN DE AJUSTE: ${instruction}`
             })
+        } else if (instruction === 'confirmed_items' && currentCtx) {
+            // Special case: we already have the items, just calc prices
+            userContent.push({
+                type: "text",
+                text: `TEMOS OS ITENS CONFIRMADOS PELO USUÁRIO. CALCULE O PREÇO DE CADA UM E O TOTAL. ITENS: ${JSON.stringify(currentCtx)}`
+            })
         } else {
             userContent.push({
                 type: "text",
@@ -147,6 +201,21 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
 
         console.log(`[AI] JSON parsed successfully. Items: ${result.items.length}`)
         // --- AI LOGIC END ---
+
+        // Apply pricing minimums manually if AI forgets, or let AI do it. 
+        // The system prompt should handle it, but let's ensure.
+        result.items = result.items.map((item: any) => {
+            const area = item.width * item.height;
+            const calculatedPrice = area * PRICING.PRICE_PER_M2;
+            const finalPrice = Math.max(calculatedPrice, PRICING.MIN_PRICE_PER_ITEM);
+            return {
+                ...item,
+                area: parseFloat(area.toFixed(2)),
+                price: parseFloat(finalPrice.toFixed(2)),
+                price_rule: finalPrice === PRICING.MIN_PRICE_PER_ITEM ? 'Minimo' : 'Calculado'
+            }
+        });
+        result.total = result.items.reduce((sum: number, item: any) => sum + item.price, 0);
 
         // Save to DB
         console.log(`[AI] Saving processing result to DB...`)

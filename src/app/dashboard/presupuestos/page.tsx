@@ -67,7 +67,7 @@ export default function ProposalsPage() {
             }
             if (!measurements && !imageUrl) { alert('Por favor, ingresa las medidas o sube una imagen.'); setLoading(false); return; }
             const result = await createProposalAction({ clientName, city, measurements, observations, imageUrl, whatsapp })
-            if (result.success && result.id) router.push(`/proposal/${result.id}/processing`)
+            if (result.success && result.id) router.push(`/proposal/${result.id}/preview`)
             else alert('Error al crear presupuesto: ' + (result.error || 'Error desconocido'))
         } catch (error) { console.error(error); alert('Error al crear presupuesto') } finally { setLoading(false); setUploading(false) }
     }
