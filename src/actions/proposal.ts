@@ -124,13 +124,22 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             { role: "system", content: activeSystemPrompt }
         ];
 
-        // Constrói o conteúdo para a IA sempre focando nos dados originais como "Source of Truth"
+        // Constrói o conteúdo para a IA
+        const isConfirmedStep = instruction === 'confirmed_items';
+
         const userContent: any[] = [
             { type: "text", text: `--- TRABAJANDO EN EL PRESUPUESTO ID: ${id} ---` },
-            { type: "text", text: `DATOS ORIGINALES ENVIADOS POR EL CLIENTE (REFERENCIA PRINCIPAL): ${proposal.medidas_input || 'Imagen adjunta'}` }
+            {
+                type: "text",
+                text: isConfirmedStep
+                    ? `DATOS ORIGINALES (OBSOLETOS - SOLO REFERENCIA): ${proposal.medidas_input || 'N/A'}`
+                    : `DATOS ORIGINALES ENVIADOS POR EL CLIENTE (REFERENCIA PRINCIPAL): ${proposal.medidas_input || 'Imagen adjunta'}`
+            }
         ]
 
-        if (proposal.input_image_url) {
+        // Solo enviamos imagen si NO estamos en el paso de confirmación, para evitar que la IA
+        // intente "re-interpretar" los píxeles ignorando las correcciones manuales del usuario.
+        if (proposal.input_image_url && !isConfirmedStep) {
             userContent.push({
                 type: "image_url",
                 image_url: {
@@ -146,10 +155,11 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 text: `EL USUARIO HA REVISADO Y CONFIRMADO LOS SIGUIENTES ÍTEMS PARA EL PRESUPUESTO. 
                 
                 INSTRUCCIONES OBLIGATORIAS:
-                1. USA EXACTAMENTE ESTOS ÍTEMS. NO CAMBIES LOS NOMBRES, NI LAS MEDIDAS, NI LOS ELIMINES.
-                2. CALCULA EL PRECIO DE CADA ÍTEM (MÁXIMO ENTRE 28€/m² O MÍNIMO DE 80€).
-                3. GENERA UN NUEVO MOCKUP ASCII QUE REPRESENTE ESTOS ÍTEMS EXACTAMENTE.
-                4. SI UN ÍTEM TIENE MEDIDAS 0, DESCARTALO O AVISE EN 'missing_info'.
+                1. USA EXACTAMENTE ESTOS ÍTEMS. NO CAMBIES LOS NOMBRES, NI LAS MEDIDAS, NI OS ELIMINES.
+                2. IGNORA CUALQUIER REGLA DE NORMALIZACIÓN ANTERIOR (como 'ancho siempre mayor que alto').
+                3. CALCULA EL PRECIO DE CADA ÍTEM (MÁXIMO ENTRE 28€/m² O MÍNIMO DE 80€).
+                4. GENERA UN NUEVO MOCKUP ASCII QUE REPRESENTE ESTOS ÍTEMS EXACTAMENTE.
+                5. SI UN ÍTEM TIENE MEDIDAS 0, DESCARTALO O AVISE EN 'missing_info'.
                 
                 ÍTEMS CONFIRMADOS: ${JSON.stringify(currentCtx)}`
             })
