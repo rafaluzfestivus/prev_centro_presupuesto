@@ -109,12 +109,12 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             apiKey: process.env.OPENAI_API_KEY,
         })
 
-        // Fetch System Prompt from DB - Use a specific key for proposals to avoid chatbot conflicts
+        // Fetch System Prompt from DB - Synchronize with Dashboard Editor key
         const supabase = await createClient()
         const { data: configData } = await supabase
             .from('config')
             .select('value')
-            .eq('key', 'proposal_system_prompt')
+            .eq('key', 'system_prompt')
             .single()
 
         const activeSystemPrompt = `${configData?.value || SYSTEM_PROMPT}\n\nIMPORTANTE: Responde siempre en formato JSON válido.`;
@@ -159,9 +159,10 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 2. IGNORA CUALQUIER REGLA DE NORMALIZACIÓN ANTERIOR (como 'ancho siempre mayor que alto').
                 3. CALCULA EL PRECIO DE CADA ÍTEM (MÁXIMO ENTRE 28€/m² O MÍNIMO DE 80€).
                 4. GENERA UN NUEVO MOCKUP ASCII QUE REPRESENTE ESTOS ÍTEMS EXACTAMENTE.
-                5. SI UN ÍTEM TIENE MEDIDAS 0, DESCARTALO O AVISE EN 'missing_info'.
+                5. SI UM ÍTEM TIENE MEDIDAS 0, DESCARTALO O AVISE EN 'missing_info'.
+                6. NÃO USE O EXEMPLO DO PROMPT DO SISTEMA. USE ESTES DADOS REAIS ABAIXO.
                 
-                ÍTEMS CONFIRMADOS: ${JSON.stringify(currentCtx)}`
+                ÍTEMS REAIS CONFIRMADOS PELO USUÁRIO: ${JSON.stringify(currentCtx)}`
             })
         } else if (currentCtx) {
             userContent.push({
