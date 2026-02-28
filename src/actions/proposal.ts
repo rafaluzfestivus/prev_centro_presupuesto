@@ -139,16 +139,7 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             })
         }
 
-        if (currentCtx) {
-            userContent.push({
-                type: "text",
-                text: `ESTADO ACTUAL DEL PRESUPUESTO (JSON): ${JSON.stringify(currentCtx)}`
-            })
-            userContent.push({
-                type: "text",
-                text: `INSTRUCCIÓN DE AJUSTE: ${instruction}`
-            })
-        } else if (instruction === 'confirmed_items' && currentCtx) {
+        if (instruction === 'confirmed_items' && currentCtx) {
             // Special case: we already have the items, just calc prices and generate mockup
             userContent.push({
                 type: "text",
@@ -162,10 +153,19 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 
                 ÍTEMS CONFIRMADOS: ${JSON.stringify(currentCtx)}`
             })
+        } else if (currentCtx) {
+            userContent.push({
+                type: "text",
+                text: `ESTADO ACTUAL DEL PRESUPUESTO (JSON): ${JSON.stringify(currentCtx)}`
+            })
+            userContent.push({
+                type: "text",
+                text: `INSTRUCCIÓN DE AJUSTE: ${instruction}`
+            })
         } else {
             userContent.push({
                 type: "text",
-                text: "Analiza el input original y crea el presupuesto inicial."
+                text: "Analiza el input original e crea el presupuesto inicial."
             })
         }
 
