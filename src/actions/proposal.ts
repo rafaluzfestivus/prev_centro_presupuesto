@@ -184,6 +184,8 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             console.log(`[AI] Processing confirmed items:`, currentCtx)
         }
 
+        messages.push({ role: "user", content: userContent })
+
         console.log(`[AI] Sending request to GPT-4o...`)
         const completion = await openai.chat.completions.create({
             model: "gpt-4o",
