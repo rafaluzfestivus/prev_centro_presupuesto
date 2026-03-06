@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useEffect, useState } from 'react';
-import { Users, Search, RefreshCw, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Users, Search, RefreshCw, CheckCircle, Clock, AlertCircle, FilePlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 const LeadsManager = () => {
@@ -9,6 +10,7 @@ const LeadsManager = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const supabase = createClient();
+    const router = useRouter();
 
     const fetchLeads = async () => {
         setLoading(true);
@@ -130,6 +132,21 @@ const LeadsManager = () => {
                                     </td>
                                     <td className="p-5 text-right">
                                         <div className="flex justify-end gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    const params = new URLSearchParams({
+                                                        source: 'lead',
+                                                        name: lead.name || '',
+                                                        whatsapp: lead.whatsapp || '',
+                                                        message: lead.message || ''
+                                                    });
+                                                    router.push(`/proposal/new?${params.toString()}`);
+                                                }}
+                                                className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all"
+                                                title="Gerar Proposta"
+                                            >
+                                                <FilePlus size={18} />
+                                            </button>
                                             <button
                                                 onClick={() => updateStatus(lead.id, 'handover')}
                                                 className="p-2 rounded-lg bg-accent/10 text-accent hover:bg-accent hover:text-navy transition-all"

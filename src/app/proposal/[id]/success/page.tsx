@@ -5,14 +5,20 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Download, MessageCircle, Home, Loader2, Share2 } from 'lucide-react'
 import { generateProposalPDF, generateProposalBlob, ProposalData, ProposalItem } from '@/services/pdfGenerator'
-import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal' // Assuming updateProposalAction is exposed or need to create
+
+// Extend ProposalData if needed for local state
+interface ExtendedProposalData extends ProposalData {
+    whatsapp?: string;
+}
+
+import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SuccessPage() {
     const router = useRouter()
     const params = useParams()
     const id = params.id as string
-    const [data, setData] = useState<ProposalData | null>(null)
+    const [data, setData] = useState<ExtendedProposalData | null>(null)
     const [loading, setLoading] = useState(true)
     const [pdfUrl, setPdfUrl] = useState<string | null>(null)
     const [uploading, setUploading] = useState(false)
@@ -45,7 +51,8 @@ export default function SuccessPage() {
                     city: proposal.cidade,
                     items: mappedItems,
                     total: Number(proposal.total_geral || 0),
-                    mockup: processing?.mockup_ascii || ''
+                    mockup: processing?.mockup_ascii || '',
+                    whatsapp: proposal.whatsapp
                 })
             }
             setLoading(false)
@@ -126,7 +133,10 @@ export default function SuccessPage() {
         message += `¿Deseas que agendemos la instalación para esta semana?`
 
         const encoded = encodeURIComponent(message)
-        window.open(`https://wa.me/?text=${encoded}`, '_blank')
+        // Check if data.whatsapp is available to send directly
+        const whatsappNumber = data.whatsapp?.replace(/\D/g, '')
+        const baseUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}` : `https://wa.me/`
+        window.open(`${baseUrl}?text=${encoded}`, '_blank')
     }
 
     const updateLinkInDB = async (url: string) => {
@@ -143,46 +153,58 @@ export default function SuccessPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg max-w-md w-full text-center space-y-6">
+            <div className="bg-white dark:bg-gray-800 p-10 rounded-[2rem] shadow-2xl max-w-lg w-full text-center space-y-8 border-none relative overflow-hidden">
+                {/* Decoration */}
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-accent to-navy" />
+
                 <div className="flex justify-center">
-                    <div className="h-20 w-20 bg-green-100 rounded-full flex items-center justify-center">
-                        <CheckCircle2 className="h-10 w-10 text-green-600" />
+                    <div className="h-24 w-24 bg-green-50 rounded-full flex items-center justify-center animate-bounce-short">
+                        <CheckCircle2 className="h-12 w-12 text-green-500" />
                     </div>
                 </div>
 
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">¡Presupuesto Generado!</h1>
-                    <p className="text-gray-500 mt-2">El presupuesto para <span className="font-semibold">{data.clientName}</span> está listo.</p>
+                <div className="space-y-2">
+                    <h1 className="text-3xl font-black text-navy tracking-tight">Proposta Criada!</h1>
+                    <p className="text-gray-500 font-medium">O orçamento para <span className="text-navy font-bold">{data.clientName}</span> está pronto para envio.</p>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
-                    <p className="text-sm text-gray-500">Valor Total</p>
-                    <p className="text-3xl font-bold text-[var(--color-primary)]">€ {data.total.toFixed(2)}</p>
+                <div className="bg-navy p-8 rounded-2xl shadow-inner text-white relative group">
+                    <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-1">Investimento Total</p>
+                    <p className="text-4xl font-black text-accent tracking-tighter">€ {data.total.toFixed(2)}</p>
+                    <div className="absolute -right-2 -bottom-2 opacity-10 group-hover:rotate-12 transition-transform">
+                        <Share2 size={80} />
+                    </div>
                 </div>
 
-                <div className="space-y-3">
-                    <Button onClick={handleDownload} variant="secondary" className="w-full h-12 text-lg gap-2">
-                        <Download className="h-5 w-5" />
-                        Descargar PDF
-                    </Button>
-
+                <div className="space-y-4">
                     <Button
                         onClick={handleWhatsApp}
-                        className="w-full h-12 text-lg gap-2 bg-green-600 hover:bg-green-700 text-white"
+                        className="w-full h-16 text-lg font-black gap-3 bg-green-500 hover:bg-green-600 hover:shadow-lg hover:shadow-green-200 text-white rounded-2xl transition-all"
                         disabled={!pdfUrl && uploading}
                     >
                         {(!pdfUrl && uploading) ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <Loader2 className="h-6 w-6 animate-spin" />
                         ) : (
-                            <MessageCircle className="h-5 w-5" />
+                            <MessageCircle className="h-6 w-6" />
                         )}
-                        Enviar vía WhatsApp
+                        Enviar para o Cliente
                     </Button>
 
-                    <Button variant="ghost" onClick={() => router.push('/painel')} className="w-full">
-                        <Home className="h-4 w-4 mr-2" />
-                        Volver al Inicio
-                    </Button>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Button onClick={handleDownload} variant="outline" className="h-14 font-bold border-2 rounded-xl gap-2 hover:bg-gray-50 border-gray-100 text-navy">
+                            <Download className="h-5 w-5" />
+                            Versão PDF
+                        </Button>
+
+                        <Button variant="ghost" onClick={() => router.push('/dashboard/presupuestos')} className="h-14 font-bold rounded-xl text-gray-400 hover:text-navy">
+                            <Home className="h-5 w-5 mr-2" />
+                            Lista Geral
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-50">
+                    <p className="text-[10px] font-black uppercase text-gray-300 tracking-[0.2em]">Próximo Passo: Aguardar confirmação para agendar</p>
                 </div>
             </div>
         </div>

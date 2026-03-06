@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,6 +24,21 @@ export default function ProposalsPage() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+        const source = searchParams.get('source')
+        if (source === 'lead') {
+            const name = searchParams.get('name')
+            const wa = searchParams.get('whatsapp')
+            const msg = searchParams.get('message')
+
+            if (name) setClientName(name)
+            if (wa) setWhatsapp(wa)
+            if (msg) setMeasurements(`Pedido vindo do site:\n${msg}`)
+        }
+    }, [searchParams])
 
     useEffect(() => {
         loadProposals()

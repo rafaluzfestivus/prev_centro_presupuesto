@@ -270,9 +270,9 @@ export async function confirmProposalAction(id: string, total: number, items: an
 
         console.log(`[AI] Confirmed items for proposal ${id}`)
 
-        // 4. Create/Update Client and Create Appointment if whatsapp is present
+        // 4. Create/Update Client if whatsapp is present
         if (whatsapp) {
-            // Upsert client
+            // Upsert client - always keep client data updated
             const { data: client, error: clientError } = await supabase
                 .from('clients')
                 .upsert({
@@ -286,29 +286,72 @@ export async function confirmProposalAction(id: string, total: number, items: an
                 .single()
 
             if (clientError) console.error('Error upserting client:', clientError)
-
-            if (client) {
-                // Create pending appointment
-                const { error: aptError } = await supabase
-                    .from('appointments')
-                    .insert({
-                        client_id: client.id,
-                        scheduled_at: new Date().toISOString(), // Default to now, can be adjusted in agenda
-                        status: 'pending',
-                        notes: `Creado desde presupuesto ${id}. Total: €${total.toFixed(2)}`
-                    })
-
-                if (aptError) console.error('Error creating appointment:', aptError)
-            }
         }
 
         revalidatePath(`/proposal/${id}`)
-        revalidatePath('/dashboard/citas')
+        revalidatePath('/dashboard/presupuestos')
         revalidatePath('/dashboard/clientes')
         return { success: true }
     } catch (error) {
         console.error('Failed to confirm:', error)
         return { success: false, error: 'Error al confirmar' }
+    }
+}
+
+export async function closeSaleAction(id: string) {
+    try {
+        const supabase = await createClient()
+        const proposal = await getProposalById(id)
+
+        if (!proposal) throw new Error("Propuesta no encontrada")
+
+        const whatsapp = proposal.whatsapp?.replace(/\D/g, '')
+
+        // 1. Update Proposal Status to Closed
+        await updateProposal(id, {
+            status: 'Confirmada', // Assuming 'Confirmada' means closed/won in the current schema
+            // If we have a 'Fechada' status, we should use it. 
+            // Checking Proposta.status check constraint from previous tool call:
+            // ARRAY['Rascunho'::text, 'Processada'::text, 'Confirmada'::text]
+            // We'll stick to 'Confirmada' but we could use a field like 'closed_at' if it existed.
+        })
+
+        // 2. Ensure Client exists and Create Appointment
+        if (whatsapp) {
+            const { data: client } = await supabase
+                .from('clients')
+                .upsert({
+                    name: proposal.cliente_nome,
+                    whatsapp: whatsapp,
+                    location: proposal.cidade,
+                    source: 'proposta',
+                    status: 'customer'
+                }, { onConflict: 'whatsapp' })
+                .select()
+                .single()
+
+            if (client) {
+                const { error: aptError } = await supabase
+                    .from('appointments')
+                    .insert({
+                        client_id: client.id,
+                        scheduled_at: new Date().toISOString(),
+                        status: 'pending',
+                        notes: `Venta cerrada desde presupuesto ${id}. Total: €${proposal.total_geral}`
+                    })
+
+                if (aptError) throw aptError
+            }
+        }
+
+        revalidatePath(`/proposal/${id}`)
+        revalidatePath('/dashboard/citas')
+        revalidatePath('/dashboard/presupuestos')
+
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to close sale:', error)
+        return { success: false, error: error.message || 'Error al cerrar venta' }
     }
 }
 

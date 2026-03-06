@@ -69,8 +69,23 @@ export async function POST(req: Request) {
             }
         }
 
-        // Parse JSON to ensure it's valid before returning
-        const structuredData = JSON.parse(cleanContent)
+        let structuredData;
+        try {
+            structuredData = JSON.parse(cleanContent);
+        } catch (e) {
+            // If direct parse fails, try to extract anything between { and }
+            const match = cleanContent.match(/\{[\s\S]*\}/);
+            if (match) {
+                try {
+                    structuredData = JSON.parse(match[0]);
+                } catch (e2) {
+                    console.error("Failed to parse extracted JSON:", e2);
+                    throw new Error("Formato JSON inválido recebido da IA");
+                }
+            } else {
+                throw new Error("A IA não retornou um objeto JSON válido");
+            }
+        }
 
         return NextResponse.json(structuredData)
     } catch (error) {
