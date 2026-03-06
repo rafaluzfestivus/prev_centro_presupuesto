@@ -28,7 +28,7 @@ const PromptEditor = () => {
 
     const handleSave = async () => {
         setSaving(true);
-        const { error } = await supabase.from('config').upsert({ key: 'system_prompt', value: prompt });
+        const { error } = await supabase.from('config').upsert({ key: 'system_prompt', value: prompt }, { onConflict: 'key' });
         if (error) alert('Error al guardar: ' + error.message);
         else alert('¡Cerebro IA actualizado!');
         setSaving(false);
