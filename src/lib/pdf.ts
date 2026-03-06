@@ -70,9 +70,10 @@ export const generateProposalPDF = async (data: ProposalData) => {
         doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(255, 255, 255);
-        doc.text(data.clientName.toUpperCase(), 20, pageHeight - 30);
+        // More space for the name
+        doc.text(data.clientName.toUpperCase(), 20, pageHeight - 25);
         doc.setFontSize(10);
-        doc.text(format(new Date(), "dd/MM/yyyy"), 20, pageHeight - 20);
+        doc.text(format(new Date(), "dd/MM/yyyy"), 20, pageHeight - 15);
 
         // --- PAGE 2: RISK ---
         doc.addPage();
@@ -86,35 +87,32 @@ export const generateProposalPDF = async (data: ProposalData) => {
         doc.addPage();
         doc.addImage(images[3], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-        // Background has "Confirmación de Medidas" at ~40mm and "Basado en..." at ~60mm
-        let currentY = 75;
+        // Background has "Confirmación de Medidas" and "Basado en tu descrição, cubriremos:"
+        // We start lower to avoid overlap (Basado... is at ~65mm)
+        let currentY = 90;
 
         doc.setTextColor(BRAND.PRIMARY_COLOR);
-        doc.setFontSize(10);
+        doc.setFontSize(9); // More compact for many items
         doc.setFont('helvetica', 'normal');
         data.items.forEach((item) => {
             doc.text(`• ${item.name}: ${item.width.toFixed(2)}m x ${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`, 15, currentY);
-            currentY += 6;
+            currentY += 5.5;
         });
 
-        // Mockup - Centered and Larger
+        // Mockup - Positioned lower to avoid overlap with large lists
         if (data.mockup) {
-            doc.setFontSize(8);
+            doc.setFontSize(7);
             doc.setFont('courier', 'normal');
-            doc.setTextColor(180, 180, 180);
+            doc.setTextColor(200, 200, 200);
             const mockupLines = data.mockup.split('\n');
-            // Shift mockup lower to the clear white space
-            doc.text(mockupLines.slice(0, 18), 15, 115);
+            doc.text(mockupLines.slice(0, 12), 15, 132);
         }
 
         // --- PAGE 5: BUDGET ---
         doc.addPage();
         doc.addImage(images[4], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-        // Background has "¿Qué incluye su inversión?" at ~60mm
-        // The bullet points start at ~140mm in the image
-        // We target the gap between 75mm and 130mm
-
+        // Gap between "¿Qué incluye su inversión?" and bullets is around 65-135mm
         const tableData = data.items.map(item => [
             item.name,
             `${item.area.toFixed(2)}m²`,
@@ -122,7 +120,7 @@ export const generateProposalPDF = async (data: ProposalData) => {
         ]);
 
         autoTable(doc, {
-            startY: 75,
+            startY: 68, // Slightly higher to fit more items and leave room for Total
             margin: { left: 15, right: pageWidth / 2 + 10 },
             head: [['Descrição', 'Área', 'Valor']],
             body: tableData,
@@ -133,14 +131,19 @@ export const generateProposalPDF = async (data: ProposalData) => {
             },
             styles: {
                 fontSize: 9,
-                cellPadding: 3
+                cellPadding: 2.5
             },
             columnStyles: {
                 2: { halign: 'right' }
+            },
+            didDrawPage: (data) => {
+                // Background images should not be repeated on new pages if table overflows
+                // But autoTable might create a new page if list is long. 
+                // For now we assume typical proposals fit.
             }
         });
 
-        const finalY = (doc as any).lastAutoTable.finalY + 10;
+        const finalY = (doc as any).lastAutoTable.finalY + 8;
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(BRAND.PRIMARY_COLOR);
