@@ -2,6 +2,7 @@
 import { OpenAI } from 'openai'
 import { NextResponse } from 'next/server'
 import { SYSTEM_PROMPT } from '@/services/ai/prompt'
+import { createClient } from '@/lib/supabase/server'
 
 // Initialize OpenAI client
 
@@ -22,8 +23,18 @@ export async function POST(req: Request) {
             )
         }
 
+        // Fetch System Prompt from DB
+        const supabase = await createClient()
+        const { data: configData } = await supabase
+            .from('config')
+            .select('value')
+            .eq('key', 'system_prompt')
+            .single()
+
+        const activeSystemPrompt = `${configData?.value || SYSTEM_PROMPT}\n\nResponde sempre em formato JSON.`
+
         const messages: any[] = [
-            { role: "system", content: `${SYSTEM_PROMPT}\n\nResponde siempre en formato JSON.` }
+            { role: "system", content: activeSystemPrompt }
         ]
 
         if (current_data) {

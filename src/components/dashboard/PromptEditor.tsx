@@ -3,20 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { Save, RotateCcw, Trash2, Zap, Shield } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { SYSTEM_PROMPT } from '@/services/ai/prompt';
 
-const DEFAULT_PROMPT = `Eres el Consultor Técnico de Preventiva Centro en Madrid, especialista en redes de proteção. Tu objetivo es transformar medidas brutas en un presupuesto técnico impecable.
-
-# Reglas de Inteligencia Espacial (Visión 3D)
-1. **Identificación**: Si el cliente envía "2,5 x 1,2", asume que la medida mayor es el ANCHO (Width).
-2. **Guarda-Cuerpo**: Calcula la altura de la red descontando o sumando el guarda-cuerpo según sea necessario.
-
-# Estructura de Respuesta (JSON)
-{
-  "items": [{ "name": "...", "width": 0.0, "height": 0.0, "area": 0.0, "price": 0.0 }],
-  "ascii_mockup": "...",
-  "pricing_logic": "...",
-  "total": 0.0
-}`;
+const DEFAULT_PROMPT = SYSTEM_PROMPT;
 
 const PromptEditor = () => {
     const supabase = createClient();
