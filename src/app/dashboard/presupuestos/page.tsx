@@ -11,8 +11,11 @@ import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw, Calendar } from 
 import { createClient } from '@/lib/supabase/client'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
-export default function ProposalsPage() {
+import { Suspense } from 'react'
+
+function ProposalsContent() {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [proposals, setProposals] = useState<Proposal[]>([])
     const [loadingHistory, setLoadingHistory] = useState(true)
     const [clientName, setClientName] = useState('')
@@ -24,8 +27,6 @@ export default function ProposalsPage() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
-
-    const searchParams = useSearchParams()
 
     useEffect(() => {
         const source = searchParams.get('source')
@@ -80,79 +81,76 @@ export default function ProposalsPage() {
                 imageUrl = publicUrl
                 setUploading(false)
             }
-            if (!measurements && !imageUrl) { alert('Por favor, ingresa las medidas o sube una imagen.'); setLoading(false); return; }
+            if (!measurements && !imageUrl) { alert('Por favor, insira as medidas ou envie uma imagem.'); setLoading(false); return; }
             const result = await createProposalAction({ clientName, city, measurements, observations, imageUrl, whatsapp })
             if (result.success && result.id) router.push(`/proposal/${result.id}/preview`)
-            else alert('Error al crear presupuesto: ' + (result.error || 'Error desconocido'))
-        } catch (error) { console.error(error); alert('Error al crear presupuesto') } finally { setLoading(false); setUploading(false) }
+            else alert('Erro ao criar orçamento: ' + (result.error || 'Erro desconhecido'))
+        } catch (error) { console.error(error); alert('Erro ao criar orçamento') } finally { setLoading(false); setUploading(false) }
     }
 
     const clearFile = () => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }
 
     const handleScheduleVisit = (e: React.MouseEvent, p: Proposal) => {
         e.stopPropagation()
-        // Format proposal data for the agenda
-        const clientName = p.cliente_nome || 'Cliente de Proposta'
-        // We might not have the whatsapp directly in p, but we can try to find it or just go to agenda
+        const clientName = p.cliente_nome || 'Cliente da Proposta'
         router.push(`/dashboard/citas?client=${encodeURIComponent(clientName)}`)
     }
 
     const handleDeleteProposal = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation()
-        if (confirm('¿Estás seguro de que quieres eliminar este presupuesto?')) {
+        if (confirm('Tem certeza que deseja excluir este orçamento?')) {
             const result = await deleteProposalAction(id)
             if (result.success) loadProposals()
-            else alert('Error al eliminar presupuesto')
+            else alert('Erro ao excluir orçamento')
         }
     }
 
     return (
         <DashboardLayout>
             <header className="mb-10">
-                <h1 className="text-3xl font-bold mb-2">Generador de <span className="accent-text">Presupuestos</span></h1>
-                <p className="text-text-muted">Crea presupuestos profesionales en segundos con ayuda de IA.</p>
+                <h1 className="text-3xl font-bold mb-2">Gerenciador de <span className="accent-text">Orçamentos</span></h1>
+                <p className="text-text-muted">Crie orçamentos profissionais em segundos com ajuda de IA.</p>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* New Proposal Form */}
                 <div className="glass-card p-10 bg-white border-none shadow-sm h-fit">
                     <h2 className="text-xl font-bold text-navy mb-8 uppercase tracking-widest flex items-center gap-3">
                         <Plus className="text-accent" />
-                        Nuevo Presupuesto
+                        Novo Orçamento
                     </h2>
                     <form className="space-y-6" onSubmit={handleGenerate}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Cliente</Label>
-                                <Input required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ej: Ana Garcia" className="p-4 bg-bg-dark border-none rounded-xl" />
+                                <Input required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex: Ana Garcia" className="p-4 bg-bg-dark border-none rounded-xl" />
                             </div>
                             <div className="space-y-2">
-                                <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Ciudad</Label>
-                                <Input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej: Madrid" className="p-4 bg-bg-dark border-none rounded-xl" />
+                                <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Cidade</Label>
+                                <Input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex: Madrid" className="p-4 bg-bg-dark border-none rounded-xl" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">WhatsApp</Label>
-                                <Input required value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ej: 34600000000" className="p-4 bg-bg-dark border-none rounded-xl" />
+                                <Input required value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex: 34600000000" className="p-4 bg-bg-dark border-none rounded-xl" />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Medidas y Detalles</Label>
+                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Medidas e Detalhes</Label>
                             <textarea
                                 required={!selectedFile}
                                 className="w-full min-h-[150px] p-6 bg-bg-dark border-none rounded-xl text-sm focus:ring-2 focus:ring-accent/30 outline-none resize-none"
-                                placeholder="Describe las medidas o pega el texto de WhatsApp..."
+                                placeholder="Descreva as medidas ou cole o texto do WhatsApp..."
                                 value={measurements}
                                 onChange={(e) => setMeasurements(e.target.value)}
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Imagen / Croquis</Label>
+                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Imagem / Esboço</Label>
                             {!selectedFile ? (
                                 <div className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-bg-dark transition-colors" onClick={() => fileInputRef.current?.click()}>
                                     <Upload className="h-8 w-8 text-accent mb-3" />
-                                    <span className="text-sm font-bold text-navy">Subir Imagen</span>
+                                    <span className="text-sm font-bold text-navy">Enviar Imagem</span>
                                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])} />
                                 </div>
                             ) : (
@@ -165,17 +163,16 @@ export default function ProposalsPage() {
 
                         <Button type="submit" className="w-full py-4 bg-accent text-navy font-black rounded-xl hover:shadow-xl transition-all h-auto text-lg" disabled={loading}>
                             {loading && <Loader2 className="mr-3 h-5 w-5 animate-spin" />}
-                            {loading ? 'Procesando...' : 'GENERAR PRESUPUESTO CON IA'}
+                            {loading ? 'Processando...' : 'GERAR ORÇAMENTO COM IA'}
                         </Button>
                     </form>
                 </div>
 
-                {/* History Section */}
                 <div className="glass-card p-10 bg-white border-none shadow-sm flex flex-col h-[700px]">
                     <div className="flex justify-between items-center mb-8">
                         <h2 className="text-xl font-bold text-navy uppercase tracking-widest flex items-center gap-3">
                             <FileText className="text-accent" />
-                            Historial
+                            Histórico
                         </h2>
                         <button onClick={loadProposals} disabled={loadingHistory} className="p-2 text-text-muted hover:text-navy transition-colors">
                             <RefreshCw size={20} className={loadingHistory ? 'animate-spin' : ''} />
@@ -204,7 +201,7 @@ export default function ProposalsPage() {
                                         >
                                             <Calendar size={16} />
                                         </button>
-                                        <button onClick={(e) => handleDeleteProposal(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Eliminar"><Trash2 size={16} /></button>
+                                        <button onClick={(e) => handleDeleteProposal(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><Trash2 size={16} /></button>
                                     </div>
                                 </div>
                             </div>
@@ -213,5 +210,13 @@ export default function ProposalsPage() {
                 </div>
             </div>
         </DashboardLayout>
+    )
+}
+
+export default function ProposalsPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-accent" /></div>}>
+            <ProposalsContent />
+        </Suspense>
     )
 }
