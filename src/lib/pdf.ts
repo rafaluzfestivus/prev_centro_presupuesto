@@ -44,9 +44,9 @@ const loadImage = (url: string): Promise<string> => {
 
 export const generateProposalPDF = async (data: ProposalData) => {
     const doc = new jsPDF({
-        orientation: 'landscape', // The images look landscape (likely 1920x1080 or similar)
+        orientation: 'landscape',
         unit: 'mm',
-        format: 'a4'
+        format: [297, 167] // Approximately 16:9 aspect ratio
     });
 
     const pageWidth = doc.internal.pageSize.width;
@@ -86,33 +86,32 @@ export const generateProposalPDF = async (data: ProposalData) => {
         doc.addPage();
         doc.addImage(images[3], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-        doc.setTextColor(BRAND.PRIMARY_COLOR);
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Ambientes a serem protegidos:', 15, 65);
+        // Background already has "Confirmación de Medidas" and "Basado en tu descripción..."
+        // We start lower to avoid overlap
+        let currentY = 100;
 
+        doc.setTextColor(BRAND.PRIMARY_COLOR);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        data.items.forEach((item, index) => {
-            doc.text(`• ${item.name}: ${item.width.toFixed(2)}m x ${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`, 15, 75 + (index * 6));
+        data.items.forEach((item) => {
+            doc.text(`• ${item.name}: ${item.width.toFixed(2)}m x ${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`, 15, currentY);
+            currentY += 7;
         });
 
-        if (data.mockup) {
-            doc.setFontSize(8);
+        if (data.mockup && data.items.length < 6) { // Only show mockup if there's space
+            doc.setFontSize(7);
             doc.setFont('courier', 'normal');
-            doc.setTextColor(100, 100, 100);
+            doc.setTextColor(150, 150, 150);
             const mockupLines = data.mockup.split('\n');
-            doc.text(mockupLines.slice(0, 15), 15, 120); // Show partial mockup if it fits
+            doc.text(mockupLines.slice(0, 12), 15, currentY + 10);
         }
 
         // --- PAGE 5: BUDGET ---
         doc.addPage();
         doc.addImage(images[4], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-        doc.setTextColor(BRAND.PRIMARY_COLOR);
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Resumo do Investimento', 15, 60);
+        // Background already has headers
+        // Just the table and total
 
         const tableData = data.items.map(item => [
             item.name,
@@ -121,8 +120,8 @@ export const generateProposalPDF = async (data: ProposalData) => {
         ]);
 
         autoTable(doc, {
-            startY: 70,
-            margin: { left: 15, right: pageWidth / 2 + 10 }, // Keep table on the left white space
+            startY: 105, // Lower to avoid background headers
+            margin: { left: 15, right: pageWidth / 2 + 10 },
             head: [['Descrição', 'Área', 'Valor']],
             body: tableData,
             headStyles: {
@@ -144,11 +143,6 @@ export const generateProposalPDF = async (data: ProposalData) => {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(BRAND.PRIMARY_COLOR);
         doc.text(`TOTAL DO INVESTIMENTO: € ${data.total.toFixed(2)}`, 15, finalY);
-
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(100, 100, 100);
-        doc.text('* Pagamento facilitado e garantia de 3 anos inclusa.', 15, finalY + 8);
 
         // Save the PDF
         doc.save(`Proposta_Preventiva_${data.clientName.replace(/\s+/g, '_')}.pdf`);
