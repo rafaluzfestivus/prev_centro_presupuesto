@@ -206,7 +206,7 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 // find the part that looks like JSON
                 const jsonPart = parts.find(p => p.includes('{') && p.includes('}'));
                 if (jsonPart) {
-                    cleanContent = jsonPart.replace(/^json\n/, '').trim();
+                    cleanContent = jsonPart.replace(/^(json|)\n/, '').trim();
                 }
             }
 
@@ -217,22 +217,39 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
             throw new Error(`La IA devolvió un formato inválido. (${preview}...)`);
         }
 
+        // Support both "items" and "components" (from newer prompts)
+        if (!result.items && result.components) {
+            console.log(`[AI] Mapping 'components' to 'items'`);
+            result.items = result.components.map((comp: any) => ({
+                name: comp.face || comp.name || "Elemento",
+                width: comp.dimensions?.width_or_depth || comp.width || 0,
+                height: comp.dimensions?.height || comp.height || 0,
+                description: comp.description || "",
+                price: comp.price,
+                price_rule: comp.price_rule
+            }));
+        }
+
         if (!result.items || !Array.isArray(result.items)) {
-            console.error(`[AI] ERROR: result.items is missing or not an array`);
+            console.error(`[AI] ERROR: result.items is missing or not an array`, result);
             throw new Error("La IA no generó os ítems correctamente. Verifique si as medidas estão claras no pedido.");
         }
 
         // Apply pricing minimums manually if AI forgets, or let AI do it. 
         // The system prompt should handle it, but let's ensure.
         result.items = result.items.map((item: any) => {
-            const area = item.width * item.height;
+            const width = parseFloat(String(item.width).replace(',', '.'));
+            const height = parseFloat(String(item.height).replace(',', '.'));
+            const area = width * height;
             const calculatedPrice = area * PRICING.PRICE_PER_M2;
             const finalPrice = Math.max(calculatedPrice, PRICING.MIN_PRICE_PER_ITEM);
             return {
                 ...item,
+                width,
+                height,
                 area: parseFloat(area.toFixed(2)),
-                price: parseFloat(finalPrice.toFixed(2)),
-                price_rule: finalPrice === PRICING.MIN_PRICE_PER_ITEM ? 'Minimo' : 'Calculado'
+                price: item.price || parseFloat(finalPrice.toFixed(2)),
+                price_rule: item.price_rule || (finalPrice === PRICING.MIN_PRICE_PER_ITEM ? 'Minimo' : 'Calculado')
             }
         });
         result.total = result.items.reduce((sum: number, item: any) => sum + item.price, 0);
