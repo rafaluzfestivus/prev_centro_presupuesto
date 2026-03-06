@@ -1,6 +1,6 @@
 'use server'
 
-import fs from 'fs'
+
 import { createProposal, getProposals, getProposalById, getLatestAIProcessing, getProposalItems, saveAIProcessing, updateProposal, saveProposalItems, deleteProposal } from '@/services/proposal'
 import { createClient } from '@/lib/supabase/server'
 import { CreateProposalInput } from '@/lib/types'
@@ -218,7 +218,7 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
         }
 
         if (!result.items || !Array.isArray(result.items)) {
-            fs.appendFileSync('ai_debug.log', `[AI] ERROR: result.items is missing or not an array\n`);
+            console.error(`[AI] ERROR: result.items is missing or not an array`);
             throw new Error("La IA no generó os ítems correctamente. Verifique si as medidas estão claras no pedido.");
         }
 
