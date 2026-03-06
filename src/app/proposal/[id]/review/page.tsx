@@ -5,10 +5,11 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus, Download } from 'lucide-react'
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
+import { generateProposalPDF } from '@/lib/pdf'
 
 // Frontend Data Structure
 type ProposalItem = {
@@ -201,6 +202,11 @@ export default function ReviewPage() {
         }
     }
 
+    const handleDownloadPDF = () => {
+        if (!data) return
+        generateProposalPDF(data)
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -228,6 +234,13 @@ export default function ReviewPage() {
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => setIsEditing(!isEditing)} className="hidden md:flex">
                             {isEditing ? 'Cancelar Edición' : 'Editar Manualmente'}
+                        </Button>
+                        <Button
+                            onClick={handleDownloadPDF}
+                            className="bg-gray-100 hover:bg-gray-200 text-navy font-bold px-4"
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Gerar PDF
                         </Button>
                         <Button
                             onClick={handleConfirm}
