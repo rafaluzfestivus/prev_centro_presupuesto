@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { BRAND, CONTACT } from './constants';
+import { BRAND } from './constants';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -18,117 +18,143 @@ interface ProposalData {
     items: ProposalItem[];
     total: number;
     whatsapp: string;
+    mockup?: string;
 }
 
-export const generateProposalPDF = (data: ProposalData) => {
-    const doc = new jsPDF();
+const loadImage = (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg', 0.8));
+            } else {
+                reject(new Error('Could not get canvas context'));
+            }
+        };
+        img.onerror = () => reject(new Error(`Could not load image at ${url}`));
+        img.src = url;
+    });
+};
+
+export const generateProposalPDF = async (data: ProposalData) => {
+    const doc = new jsPDF({
+        orientation: 'landscape', // The images look landscape (likely 1920x1080 or similar)
+        unit: 'mm',
+        format: 'a4'
+    });
+
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
 
-    // --- Page 1: Design Header & Client Info ---
+    try {
+        // Prepare image URLs
+        const imgUrls = [
+            '/assets/pdf/page1.jpg',
+            '/assets/pdf/page2.jpg',
+            '/assets/pdf/page3.jpg',
+            '/assets/pdf/page4.jpg',
+            '/assets/pdf/page5.jpg'
+        ];
 
-    // Header Wine Rectangle
-    doc.setFillColor(BRAND.PRIMARY_COLOR);
-    doc.rect(0, 0, pageWidth, 40, 'F');
+        // Load all images
+        const images = await Promise.all(imgUrls.map(url => loadImage(url)));
 
-    // Company Name / Logo Placeholder
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PREVENTIVA NORTE', 20, 25);
+        // --- PAGE 1: COVER ---
+        doc.addImage(images[0], 'JPEG', 0, 0, pageWidth, pageHeight);
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.text(data.clientName.toUpperCase(), 20, pageHeight - 30);
+        doc.setFontSize(10);
+        doc.text(format(new Date(), "dd/MM/yyyy"), 20, pageHeight - 20);
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Especialistas em Redes de Proteção', 20, 32);
+        // --- PAGE 2: RISK ---
+        doc.addPage();
+        doc.addImage(images[1], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-    // Date
-    const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-    doc.setFontSize(10);
-    doc.text(today, pageWidth - 20, 25, { align: 'right' });
+        // --- PAGE 3: BRAND ---
+        doc.addPage();
+        doc.addImage(images[2], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-    // Client Info Section
-    doc.setTextColor(BRAND.SECONDARY_COLOR);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PROPOSTA COMERCIAL', 20, 55);
+        // --- PAGE 4: PROJECT DETAILS ---
+        doc.addPage();
+        doc.addImage(images[3], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-    doc.setDrawColor(BRAND.ACCENT_COLOR);
-    doc.setLineWidth(1);
-    doc.line(20, 58, 80, 58);
+        doc.setTextColor(BRAND.PRIMARY_COLOR);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Ambientes a serem protegidos:', 15, 65);
 
-    doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Cliente: ${data.clientName}`, 20, 70);
-    doc.text(`Cidade: ${data.city || 'N/A'}`, 20, 77);
-    doc.text(`WhatsApp: ${data.whatsapp || 'N/A'}`, 20, 84);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        data.items.forEach((item, index) => {
+            doc.text(`• ${item.name}: ${item.width.toFixed(2)}m x ${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`, 15, 75 + (index * 6));
+        });
 
-    // --- Page 1: Items Table ---
-
-    const tableData = data.items.map(item => [
-        item.name,
-        `${item.width.toFixed(2)}m`,
-        `${item.height.toFixed(2)}m`,
-        `${item.area.toFixed(2)}m²`,
-        `€ ${item.price.toFixed(2)}`
-    ]);
-
-    autoTable(doc, {
-        startY: 95,
-        head: [['Ambiente', 'Largura', 'Altura', 'Área', 'Valor']],
-        body: tableData,
-        headStyles: {
-            fillColor: BRAND.PRIMARY_COLOR,
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'center'
-        },
-        columnStyles: {
-            0: { halign: 'left', fontStyle: 'bold' },
-            1: { halign: 'center' },
-            2: { halign: 'center' },
-            3: { halign: 'center' },
-            4: { halign: 'right', fontStyle: 'bold' }
-        },
-        styles: {
-            fontSize: 10,
-            cellPadding: 5
-        },
-        alternateRowStyles: {
-            fillColor: [245, 245, 245]
+        if (data.mockup) {
+            doc.setFontSize(8);
+            doc.setFont('courier', 'normal');
+            doc.setTextColor(100, 100, 100);
+            const mockupLines = data.mockup.split('\n');
+            doc.text(mockupLines.slice(0, 15), 15, 120); // Show partial mockup if it fits
         }
-    });
 
-    // --- Summary & Total ---
+        // --- PAGE 5: BUDGET ---
+        doc.addPage();
+        doc.addImage(images[4], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+        doc.setTextColor(BRAND.PRIMARY_COLOR);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Resumo do Investimento', 15, 60);
 
-    // Total Box
-    doc.setFillColor(BRAND.SECONDARY_COLOR);
-    doc.rect(pageWidth - 80, finalY, 60, 20, 'F');
+        const tableData = data.items.map(item => [
+            item.name,
+            `${item.area.toFixed(2)}m²`,
+            `€ ${item.price.toFixed(2)}`
+        ]);
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.text('TOTAL GERAL', pageWidth - 75, finalY + 7);
+        autoTable(doc, {
+            startY: 70,
+            margin: { left: 15, right: pageWidth / 2 + 10 }, // Keep table on the left white space
+            head: [['Descrição', 'Área', 'Valor']],
+            body: tableData,
+            headStyles: {
+                fillColor: BRAND.PRIMARY_COLOR,
+                textColor: [255, 255, 255],
+                fontStyle: 'bold'
+            },
+            styles: {
+                fontSize: 9,
+                cellPadding: 3
+            },
+            columnStyles: {
+                2: { halign: 'right' }
+            }
+        });
 
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`€ ${data.total.toFixed(2)}`, pageWidth - 75, finalY + 15);
+        const finalY = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(BRAND.PRIMARY_COLOR);
+        doc.text(`TOTAL DO INVESTIMENTO: € ${data.total.toFixed(2)}`, 15, finalY);
 
-    // --- Footer ---
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(100, 100, 100);
+        doc.text('* Pagamento facilitado e garantia de 3 anos inclusa.', 15, finalY + 8);
 
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, pageHeight - 30, pageWidth - 20, pageHeight - 30);
+        // Save the PDF
+        doc.save(`Proposta_Preventiva_${data.clientName.replace(/\s+/g, '_')}.pdf`);
 
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text([
-        `Contacto: ${CONTACT.PHONE} / ${CONTACT.MOBILE}`,
-        `E-mail: ${CONTACT.EMAIL}`,
-        'Obrigado pela preferência!'
-    ], pageWidth / 2, pageHeight - 20, { align: 'center' });
-
-    // Save the PDF
-    doc.save(`Proposta_${data.clientName.replace(/\s+/g, '_')}.pdf`);
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Erro ao gerar PDF com template. Verifique se os assets estão acessíveis.');
+    }
 };
