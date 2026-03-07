@@ -58,8 +58,10 @@ export const generateProposalPDF = async (data: ProposalData) => {
             '/assets/pdf/page1.jpg',
             '/assets/pdf/page2.jpg',
             '/assets/pdf/page3.jpg',
-            '/assets/pdf/page4.jpg',
-            '/assets/pdf/page5.jpg'
+            '/assets/pdf/pag4.jpg', // Updated filename
+            '/assets/pdf/page5.jpg',
+            '/assets/pdf/page6.jpg',
+            '/assets/pdf/page7.jpg'
         ];
 
         // Load all images
@@ -87,9 +89,8 @@ export const generateProposalPDF = async (data: ProposalData) => {
         doc.addPage();
         doc.addImage(images[3], 'JPEG', 0, 0, pageWidth, pageHeight);
 
-        // Background has "Confirmación de Medidas" and "Basado en tu descrição, cubriremos:"
-        // We start lower to avoid overlap (Basado... is at ~65mm)
-        let currentY = 90;
+        // Background was cleaned, we can start higher if needed, but keeping it safe at 70mm
+        let currentY = 70;
 
         doc.setTextColor(BRAND.PRIMARY_COLOR);
         doc.setFontSize(9); // More compact for many items
@@ -120,7 +121,7 @@ export const generateProposalPDF = async (data: ProposalData) => {
         ]);
 
         autoTable(doc, {
-            startY: 68, // Slightly higher to fit more items and leave room for Total
+            startY: 60, // Cleaned background allows starting higher
             margin: { left: 15, right: pageWidth / 2 + 10 },
             head: [['Descrição', 'Área', 'Valor']],
             body: tableData,
@@ -148,6 +149,14 @@ export const generateProposalPDF = async (data: ProposalData) => {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(BRAND.PRIMARY_COLOR);
         doc.text(`TOTAL DO INVESTIMENTO: € ${data.total.toFixed(2)}`, 15, finalY);
+
+        // --- PAGE 6: PHOTOS 1 ---
+        doc.addPage();
+        doc.addImage(images[5], 'JPEG', 0, 0, pageWidth, pageHeight);
+
+        // --- PAGE 7: PHOTOS 2 ---
+        doc.addPage();
+        doc.addImage(images[6], 'JPEG', 0, 0, pageWidth, pageHeight);
 
         // Save the PDF
         doc.save(`Proposta_Preventiva_${data.clientName.replace(/\s+/g, '_')}.pdf`);
