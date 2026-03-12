@@ -165,12 +165,12 @@ export default function SuccessPage() {
 
                 <div className="space-y-2">
                     <h1 className="text-3xl font-black text-navy tracking-tight">Proposta Criada!</h1>
-                    <p className="text-gray-500 font-medium">O orçamento para <span className="text-navy font-bold">{data.clientName}</span> está pronto para envio.</p>
+                    <p className="text-gray-600 font-medium">O orçamento para <span className="text-navy font-bold">{data.clientName}</span> está pronto para envio.</p>
                 </div>
 
                 <div className="bg-navy p-8 rounded-2xl shadow-inner text-white relative group">
-                    <p className="text-[10px] font-black uppercase text-white/50 tracking-widest mb-1">Investimento Total</p>
-                    <p className="text-4xl font-black text-accent tracking-tighter">€ {data.total.toFixed(2)} <span className="text-sm">+ IVA</span></p>
+                    <p className="text-[10px] font-black uppercase text-white/60 tracking-widest mb-1">Investimento Total</p>
+                    <p className="text-4xl font-black text-accent tracking-tighter">€ {data.total.toFixed(2)} <span className="text-sm opacity-80">+ IVA</span></p>
                     <div className="absolute -right-2 -bottom-2 opacity-10 group-hover:rotate-12 transition-transform">
                         <Share2 size={80} />
                     </div>
@@ -180,9 +180,9 @@ export default function SuccessPage() {
                     <Button
                         onClick={handleWhatsApp}
                         className="w-full h-16 text-lg font-black gap-3 bg-green-500 hover:bg-green-600 hover:shadow-lg hover:shadow-green-200 text-white rounded-2xl transition-all"
-                        disabled={!pdfUrl && uploading}
+                        disabled={uploading}
                     >
-                        {(!pdfUrl && uploading) ? (
+                        {uploading ? (
                             <Loader2 className="h-6 w-6 animate-spin" />
                         ) : (
                             <MessageCircle className="h-6 w-6" />
@@ -196,7 +196,7 @@ export default function SuccessPage() {
                             Versão PDF
                         </Button>
 
-                        <Button variant="ghost" onClick={() => router.push('/dashboard')} className="h-14 font-bold rounded-xl text-gray-500 hover:text-navy hover:bg-gray-100">
+                        <Button variant="ghost" onClick={() => router.push('/dashboard')} className="h-14 font-bold rounded-xl text-gray-600 hover:text-navy hover:bg-gray-100">
                             <Home className="h-5 w-5 mr-2" />
                             Página Inicial
                         </Button>
@@ -211,8 +211,9 @@ export default function SuccessPage() {
                     </Button>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100">
-                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Próximo Passo: Aguardar confirmação para agendar</p>
+                <div className="pt-4 border-t border-gray-100 flex flex-col items-center gap-2">
+                    <p className="text-[10px] font-black uppercase text-gray-600 tracking-[0.2em]">Próximo Passo: Aguardar confirmação para agendar</p>
+                    <span className="text-[8px] text-gray-300">v1.1.1-force-refresh</span>
                 </div>
             </div>
         </div>
