@@ -169,8 +169,8 @@ export default function SuccessPage() {
                 </div>
 
                 <div className="bg-navy p-8 rounded-2xl shadow-inner text-white relative group">
-                    <p className="text-[10px] font-black uppercase text-white/40 tracking-widest mb-1">Investimento Total</p>
-                    <p className="text-4xl font-black text-accent tracking-tighter">€ {data.total.toFixed(2)}</p>
+                    <p className="text-[10px] font-black uppercase text-white/50 tracking-widest mb-1">Investimento Total</p>
+                    <p className="text-4xl font-black text-accent tracking-tighter">€ {data.total.toFixed(2)} <span className="text-sm">+ IVA</span></p>
                     <div className="absolute -right-2 -bottom-2 opacity-10 group-hover:rotate-12 transition-transform">
                         <Share2 size={80} />
                     </div>
@@ -196,15 +196,23 @@ export default function SuccessPage() {
                             Versão PDF
                         </Button>
 
-                        <Button variant="ghost" onClick={() => router.push('/dashboard/presupuestos')} className="h-14 font-bold rounded-xl text-gray-400 hover:text-navy">
+                        <Button variant="ghost" onClick={() => router.push('/dashboard')} className="h-14 font-bold rounded-xl text-gray-500 hover:text-navy hover:bg-gray-100">
                             <Home className="h-5 w-5 mr-2" />
-                            Lista Geral
+                            Página Inicial
                         </Button>
                     </div>
+                    
+                    <Button 
+                        variant="ghost" 
+                        onClick={() => router.push('/dashboard/presupuestos')} 
+                        className="w-full h-12 font-bold rounded-xl text-gray-500 hover:text-navy opacity-80"
+                    >
+                        Lista Geral de Presupuestos
+                    </Button>
                 </div>
 
-                <div className="pt-4 border-t border-gray-50">
-                    <p className="text-[10px] font-black uppercase text-gray-300 tracking-[0.2em]">Próximo Passo: Aguardar confirmação para agendar</p>
+                <div className="pt-4 border-t border-gray-100">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Próximo Passo: Aguardar confirmação para agendar</p>
                 </div>
             </div>
         </div>

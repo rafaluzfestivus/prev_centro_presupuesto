@@ -11,7 +11,8 @@ import {
     endOfWeek,
     isSameMonth,
     isSameDay,
-    eachDayOfInterval
+    eachDayOfInterval,
+    parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck } from 'lucide-react';
@@ -82,10 +83,11 @@ const CalendarView = () => {
     const handleAppointmentClick = (e: React.MouseEvent, apt: any) => {
         e.stopPropagation();
         setSelectedAppointment(apt);
+        const aptDate = apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date());
         setFormData({
             client_name: apt.clients?.name || '',
             whatsapp: apt.clients?.whatsapp || '',
-            date_start: format(new Date(apt.date_start || apt.scheduled_at), "yyyy-MM-dd'T'HH:mm"),
+            date_start: format(aptDate, "yyyy-MM-dd'T'HH:mm"),
             status: apt.status,
             attachment_url: apt.attachment_url || ''
         });
@@ -257,7 +259,10 @@ const CalendarView = () => {
                     const isSelected = isSameDay(day, selectedDate);
                     const isCurrentMonth = isSameMonth(day, monthStart);
                     const isToday = isSameDay(day, new Date());
-                    const dayAppointments = appointments.filter(apt => isSameDay(new Date(apt.date_start || apt.scheduled_at), day));
+                    const dayAppointments = appointments.filter(apt => {
+                        const d = apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : null);
+                        return d && isSameDay(d, day);
+                    });
 
                     return (
                         <div
@@ -278,10 +283,10 @@ const CalendarView = () => {
                                         onClick={(e) => handleAppointmentClick(e, apt)}
                                         className={`text-[10px] p-1.5 rounded flex flex-col border-l-2 transition-transform hover:scale-105 ${apt.status === 'pending' ? 'bg-gray-100 border-gray-400' : 'bg-bg-dark border-accent'
                                             }`}
-                                        title={`${format(new Date(apt.date_start || apt.scheduled_at), 'HH:mm')} - ${apt.clients?.name || 'Cliente'}`}
+                                        title={`${format(apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date()), 'HH:mm')} - ${apt.clients?.name || 'Cliente'}`}
                                     >
                                         <div className="flex justify-between items-center">
-                                            <span className="font-bold text-navy">{format(new Date(apt.date_start || apt.scheduled_at), 'HH:mm')}</span>
+                                            <span className="font-bold text-navy">{format(apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date()), 'HH:mm')}</span>
                                             {apt.attachment_url && <ShieldCheck size={10} className="text-accent" />}
                                         </div>
                                         <span className="truncate opacity-70 font-medium">{apt.clients?.name || 'Cliente'}</span>

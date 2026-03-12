@@ -85,16 +85,16 @@ export const generateProposalPDF = async (data: ProposalData) => {
         // Page 4: Right Side (Mockups) - Dark Background
         // Starting higher to allow vertical stacking
         const rightColX = 160;
-        let rightColY = 50; // Adjusted for new height (was 60)
+        let rightColY = 35; // Moved up to better fit the dark "vinho" section (was 50)
 
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
-        doc.text("Mockups:", rightColX, rightColY);
+        doc.text("Design / Mockup:", rightColX, rightColY);
 
         rightColY += 8;
         doc.setFont("courier", "normal");
-        doc.setFontSize(10); // Reduced monospace size to fit 16:9
+        doc.setFontSize(9); // Slightly smaller to ensure fit
 
         // Split mockup text to fit the right column (~130mm wide)
         const splitMockup = doc.splitTextToSize(data.mockup, 130);
@@ -204,16 +204,16 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob | n
 
         // Page 4: Right Side (Mockups)
         const rightColX = 160;
-        let rightColY = 50;
+        let rightColY = 35; // Consistent with generateProposalPDF
 
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(14);
-        doc.text("Mockups:", rightColX, rightColY);
+        doc.text("Design / Mockup:", rightColX, rightColY);
 
         rightColY += 8;
         doc.setFont("courier", "normal");
-        doc.setFontSize(10);
+        doc.setFontSize(9);
 
         const splitMockup = doc.splitTextToSize(data.mockup, 130);
         doc.text(splitMockup, rightColX, rightColY);
