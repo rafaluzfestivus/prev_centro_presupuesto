@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus, Download } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home } from 'lucide-react'
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
@@ -182,6 +182,23 @@ export default function ReviewPage() {
     generateProposalPDF(data)
   }
 
+  const handleWhatsApp = async () => {
+    if (!data) return
+
+    let message = `*Preventiva Centro - Presupuesto Técnico*\n\n`
+    message += `Hola ${data.clientName || 'Cliente'},\n\n`
+    message += `Te paso el presupuesto. Mira si las medidas están bien y si necesitas cualquier cambio me dices, vale?\n\n`
+    message += `*Detalles de la inversión:*\n`
+    message += `• Valor Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
+
+    message += `¿Deseas que agendemos la instalación para esta semana?`
+
+    const encoded = encodeURIComponent(message)
+    const whatsappNumber = data.whatsapp?.replace(/\D/g, '')
+    const baseUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}` : `https://wa.me/`
+    window.open(`${baseUrl}?text=${encoded}`, '_blank')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -206,6 +223,10 @@ export default function ReviewPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => router.push('/dashboard')} className="hidden md:flex font-bold text-gray-500 hover:text-navy">
+              <Home className="w-4 h-4 mr-2" />
+              Inicio
+            </Button>
             <Button variant="outline" onClick={() => setIsEditing(!isEditing)} className="hidden md:flex">
               {isEditing ? 'Cancelar Edición' : 'Editar Manualmente'}
             </Button>
@@ -216,6 +237,10 @@ export default function ReviewPage() {
             <Button onClick={handleConfirm} disabled={isConfirming} className="bg-navy hover:bg-navy/90 text-white font-bold px-6">
               {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar Cambios
+            </Button>
+            <Button onClick={handleWhatsApp} className="bg-green-500 hover:bg-green-600 text-white font-extrabold px-6">
+              <MessageCircle className="w-4 h-4 mr-2" />
+              WhatsApp
             </Button>
             <Button onClick={handleCloseSale} disabled={isConfirming} className="bg-accent hover:shadow-accent/20 hover:shadow-lg text-navy font-extrabold px-6">
               <Send className="w-4 h-4 mr-2" />
