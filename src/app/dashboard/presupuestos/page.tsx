@@ -122,15 +122,15 @@ function ProposalsContent() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Cliente</Label>
-                                <Input required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex: Ana Garcia" className="p-4 bg-bg-dark border-none rounded-xl" />
+                                <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex: Ana Garcia" className="p-4 bg-bg-dark border-none rounded-xl" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Cidade</Label>
-                                <Input required value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex: Madrid" className="p-4 bg-bg-dark border-none rounded-xl" />
+                                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex: Madrid" className="p-4 bg-bg-dark border-none rounded-xl" />
                             </div>
                             <div className="space-y-2">
                                 <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">WhatsApp</Label>
-                                <Input required value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex: 34600000000" className="p-4 bg-bg-dark border-none rounded-xl" />
+                                <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex: 34600000000" className="p-4 bg-bg-dark border-none rounded-xl" />
                             </div>
                         </div>
 

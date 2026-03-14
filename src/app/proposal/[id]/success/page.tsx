@@ -121,15 +121,13 @@ export default function SuccessPage() {
 
     let message = `*Preventiva Centro - Presupuesto Técnico*\n\n`
     message += `Hola ${data.clientName},\n\n`
-    message += `Adjunto tu presupuesto para redes de protección en *${data.city}*.\n\n`
+    message += `Te paso el presupuesto. Mira si las medidas están bien y si necesitas cualquier cambio me dices, vale?\n\n`
     message += `*Detalles de la inversión:*\n`
     message += `• Valor Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
 
     if (pdfUrl) {
       message += `📥 Descarga tu propuesta detallada aquí:\n${pdfUrl}\n\n`
     }
-
-    message += `¿Deseas que agendemos la instalación para esta semana?`
 
     const encoded = encodeURIComponent(message)
     const whatsappNumber = data.whatsapp?.replace(/\D/g, '')
