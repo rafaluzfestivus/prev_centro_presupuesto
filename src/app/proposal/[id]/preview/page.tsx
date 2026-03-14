@@ -88,10 +88,6 @@ export default function PreviewPage() {
     }
 
     const handleConfirm = () => {
-        if (!clientName.trim()) {
-            alert('Por favor, informe o nome do cliente.')
-            return
-        }
         // Save items and client info
         localStorage.setItem(`confirmed_items_${id}`, JSON.stringify(items))
         localStorage.setItem(`client_info_${id}`, JSON.stringify({ clientName, whatsapp }))

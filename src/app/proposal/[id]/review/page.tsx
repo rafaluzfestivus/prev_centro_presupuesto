@@ -121,7 +121,7 @@ export default function ReviewPage() {
     try {
       const result = await confirmProposalAction(id, data.total, data.items)
       if (result.success) {
-        alert('¡Cambios guardados con éxito!')
+        router.push(`/proposal/${id}/success`)
       } else {
         alert('Error al guardar: ' + result.error)
       }

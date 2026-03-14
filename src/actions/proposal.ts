@@ -158,7 +158,14 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
                 1. USA EXACTAMENTE ESTOS ÍTEMS. NO CAMBIES LOS NOMBRES, NI LAS MEDIDAS, NI LOS ELIMINES.
                 2. IGNORA CUALQUIER REGLA DE NORMALIZACIÓN ANTERIOR (como 'ancho siempre mayor que alto').
                 3. CALCULA EL PRECIO DE CADA ÍTEM (MÁXIMO ENTRE 28€/m² O MÍNIMO DE 80€).
-                4. GENERA UN NUEVO MOCKUP ASCII QUE REPRESENTE ESTOS ÍTEMS EXACTAMENTE, INCLUYENDO ETIQUETAS DE CARAS Y SUS MEDIDAS (Ancho x Alto).
+                4. GENERA UN NUEVO MOCKUP ASCII QUE REPRESENTE ESTOS ÍTEMS EXACTAMENTE. 
+                   CADA CARA DEBE TENER SUS MEDIDAS (Ancho x Alto) ESCRITAS CLARAMENTE DENTRO O JUNTO AL DIBUJO.
+                   FORMATO OBLIGATORIO PARA CADA CARA:
+                   +-------------------+
+                   |   NOMBRE CARA     |
+                   |   3.50m x 2.10m   |
+                   +-------------------+
+                   ¡ES CRÍTICO QUE LAS MEDIDAS APAREZCAN EN EL DIBUJO!
                 5. SI UN ÍTEM TIENE MEDIDAS 0, DESCÁRTALO O AVISA EN 'missing_info'.
                 6. NO USES EL EJEMPLO DEL PROMPT DEL SISTEMA. USA ESTOS DATOS REALES A CONTINUACIÓN.
                 
