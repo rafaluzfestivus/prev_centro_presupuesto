@@ -117,7 +117,7 @@ const CalendarView = () => {
         e.preventDefault();
 
         const cleanWhatsApp = formData.whatsapp.replace(/\D/g, '');
-        if (!cleanWhatsApp) return alert('Por favor, insira um WhatsApp válido.');
+        if (!cleanWhatsApp) return alert('Por favor, inserte un WhatsApp válido.');
 
         // 1. Manage Client
         let clientId;
@@ -145,14 +145,17 @@ const CalendarView = () => {
 
         // 2. Insert or Update Appointment
         let error;
+        // Ensure ISO format for DB
+        const isoDate = formData.date_start ? new Date(formData.date_start).toISOString() : new Date().toISOString();
+
         if (selectedAppointment) {
             const { error: updateError } = await supabase
                 .from('appointments')
                 .update({
                     client_id: clientId,
-                    date_start: formData.date_start || new Date().toISOString(),
-                    date_end: formData.date_start || new Date().toISOString(),
-                    scheduled_at: formData.date_start || new Date().toISOString(),
+                    date_start: isoDate,
+                    date_end: isoDate,
+                    scheduled_at: isoDate,
                     status: formData.status,
                     attachment_url: formData.attachment_url
                 })
@@ -163,9 +166,9 @@ const CalendarView = () => {
                 .from('appointments')
                 .insert({
                     client_id: clientId,
-                    date_start: formData.date_start || new Date().toISOString(),
-                    date_end: formData.date_start || new Date().toISOString(),
-                    scheduled_at: formData.date_start || new Date().toISOString(),
+                    date_start: isoDate,
+                    date_end: isoDate,
+                    scheduled_at: isoDate,
                     status: formData.status,
                     attachment_url: formData.attachment_url
                 });

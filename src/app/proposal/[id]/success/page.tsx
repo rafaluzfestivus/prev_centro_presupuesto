@@ -5,13 +5,13 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Download, MessageCircle, Home, Loader2, Share2, ArrowLeft } from 'lucide-react'
 import { generateProposalPDF, generateProposalBlob, ProposalData, ProposalItem } from '@/services/pdfGenerator'
+import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal'
+import { createClient } from '@/lib/supabase/client'
 
+// Extend ProposalData if needed for local state
 interface ExtendedProposalData extends ProposalData {
   whatsapp?: string;
 }
-
-import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal'
-import { createClient } from '@/lib/supabase/client'
 
 export default function SuccessPage() {
   const router = useRouter()
@@ -26,11 +26,16 @@ export default function SuccessPage() {
     const loadData = async () => {
       setLoading(true)
       const result = await getProposalDetailsAction(id)
+
       if (result.success && result.data) {
         const { proposal, items, processing } = result.data
+
+        // Use existing PDF URL if available
         if (proposal.pdf_gerado) {
           setPdfUrl(proposal.pdf_gerado)
         }
+
+        // Map DB items to PDF structure
         const mappedItems: ProposalItem[] = items.map(item => ({
           name: item.nome_ambiente,
           width: item.largura,
@@ -39,6 +44,7 @@ export default function SuccessPage() {
           price: item.valor_total,
           price_rule: 'Calculado'
         }))
+
         setData({
           clientName: proposal.cliente_nome,
           city: proposal.cidade,
@@ -50,39 +56,59 @@ export default function SuccessPage() {
       }
       setLoading(false)
     }
+
     loadData()
   }, [id])
 
+  // Generate and Upload PDF if not already present
   useEffect(() => {
     const generateAndUpload = async () => {
       if (!data || pdfUrl || uploading) return
       setUploading(true)
+
       try {
         const blob = await generateProposalBlob(data)
-        if (!blob) throw new Error("Error al generar PDF")
+        if (!blob) throw new Error("Fallo al generar PDF")
+
         const supabase = createClient()
         const fileName = `${id}_${Date.now()}.pdf`
+
         const { error: uploadError } = await supabase.storage
           .from('proposals')
-          .upload(fileName, blob, { contentType: 'application/pdf', upsert: true })
+          .upload(fileName, blob, {
+            contentType: 'application/pdf',
+            upsert: true
+          })
+
         if (uploadError) throw uploadError
-        const { data: { publicUrl } } = supabase.storage.from('proposals').getPublicUrl(fileName)
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('proposals')
+          .getPublicUrl(fileName)
+
         setPdfUrl(publicUrl)
+
+        // Save URL to DB (Background)
         try {
           await updateProposalAction(id, { pdf_gerado: publicUrl })
         } catch (err) {
-          console.error("Error al guardar enlace PDF en BD:", err)
+          console.error("Error saving PDF link to DB:", err)
         }
+
+        console.log("PDF Uploaded and Persisted:", publicUrl)
+
       } catch (error) {
         console.error("Error al subir el PDF:", error)
       } finally {
         setUploading(false)
       }
     }
+
     if (data && !pdfUrl) {
       generateAndUpload()
     }
   }, [data, pdfUrl, id, uploading])
+
 
   const handleDownload = async () => {
     if (data) {
@@ -92,15 +118,19 @@ export default function SuccessPage() {
 
   const handleWhatsApp = async () => {
     if (!data) return
+
     let message = `*Preventiva Centro - Presupuesto Técnico*\n\n`
     message += `Hola ${data.clientName},\n\n`
     message += `Adjunto tu presupuesto para redes de protección en *${data.city}*.\n\n`
     message += `*Detalles de la inversión:*\n`
-    message += `• Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
+    message += `• Valor Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
+
     if (pdfUrl) {
       message += `📥 Descarga tu propuesta detallada aquí:\n${pdfUrl}\n\n`
     }
-    message += `¿Deseas que agendemos la instalación esta semana?`
+
+    message += `¿Deseas que agendemos la instalación para esta semana?`
+
     const encoded = encodeURIComponent(message)
     const whatsappNumber = data.whatsapp?.replace(/\D/g, '')
     const baseUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}` : `https://wa.me/`
@@ -113,11 +143,12 @@ export default function SuccessPage() {
     </div>
   )
 
-  if (!data) return <div className="p-8 text-center">No se encontraron datos del presupuesto.</div>
+  if (!data) return <div className="p-8 text-center">Datos del presupuesto no encontrados.</div>
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 p-10 rounded-[2rem] shadow-2xl max-w-lg w-full text-center space-y-8 border-none relative overflow-hidden">
+        {/* Decoration */}
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-accent to-navy" />
 
         <div className="flex justify-center">
@@ -128,7 +159,7 @@ export default function SuccessPage() {
 
         <div className="space-y-2">
           <h1 className="text-3xl font-black text-navy tracking-tight">¡Presupuesto Creado!</h1>
-          <p className="text-gray-600 font-medium">El presupuesto para <span className="text-navy font-bold">{data.clientName}</span> está listo para enviar.</p>
+          <p className="text-gray-600 font-medium">El presupuesto para <span className="text-navy font-bold">{data.clientName}</span> está listo para ser enviado.</p>
         </div>
 
         <div className="bg-navy p-8 rounded-2xl shadow-inner text-white relative group">
@@ -150,40 +181,34 @@ export default function SuccessPage() {
             ) : (
               <MessageCircle className="h-6 w-6" />
             )}
-            Enviar al Cliente por WhatsApp
+            Enviar al Cliente
           </Button>
 
           <div className="grid grid-cols-2 gap-3">
-            <Button
-              onClick={handleDownload}
-              variant="outline"
-              className="h-14 font-bold border-2 rounded-xl gap-2 hover:bg-gray-50 border-gray-100 text-navy"
-            >
+            <Button onClick={handleDownload} variant="outline" className="h-14 font-bold border-2 rounded-xl gap-2 hover:bg-gray-50 border-gray-100 text-navy">
               <Download className="h-5 w-5" />
-              Descargar PDF
+              Versión PDF
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => router.push('/dashboard')}
-              className="h-14 font-bold rounded-xl text-gray-600 hover:text-navy hover:bg-gray-100"
-            >
+
+            <Button variant="ghost" onClick={() => router.push('/dashboard')} className="h-14 font-bold rounded-xl text-gray-600 hover:text-navy hover:bg-gray-100">
               <Home className="h-5 w-5 mr-2" />
-              Inicio
+              Ir al Inicio
             </Button>
           </div>
 
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => router.push('/dashboard/presupuestos')}
-            className="w-full h-12 font-bold rounded-xl text-navy border-2 border-accent/30 hover:bg-accent/10"
+            className="w-full h-12 font-bold rounded-xl text-gray-500 hover:text-navy opacity-80"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver a Presupuestos
+            Lista General de Presupuestos
           </Button>
         </div>
 
         <div className="pt-4 border-t border-gray-100 flex flex-col items-center gap-2">
-          <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em]">Próximo paso: Confirmar instalación con el cliente</p>
+          <p className="text-[10px] font-black uppercase text-gray-600 tracking-[0.2em]">Próximo Paso: Esperar confirmación para agendar</p>
+          <span className="text-[8px] text-gray-300">v1.1.2-resolved</span>
         </div>
       </div>
     </div>

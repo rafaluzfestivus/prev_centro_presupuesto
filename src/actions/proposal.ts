@@ -232,7 +232,7 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
 
         if (!result.items || !Array.isArray(result.items)) {
             console.error(`[AI] ERROR: result.items is missing or not an array`, result);
-            throw new Error("La IA no generó os ítems correctamente. Verifique si as medidas estão claras no pedido.");
+            throw new Error("La IA no generó los ítems correctamente. Verifique si las medidas están claras en el pedido.");
         }
 
         // Apply pricing minimums manually if AI forgets, or let AI do it. 
