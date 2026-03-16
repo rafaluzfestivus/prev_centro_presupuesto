@@ -24,58 +24,71 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
 
         // 2 & 3. Page 4: Text Instruction & Mockup
         if (zip.file('ppt/slides/slide4.xml')) {
-            let slide4 = await zip.file('ppt/slides/slide4.xml')!.async('string');
-            
-            // Build text describing the items taking the place of the static instruction
-            // Use standard PPTX XML escaping mapping to not break strings
-            const itemsText = data.items.map(item => 
-                `• ${item.name}: ${item.width.toFixed(2)}x${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`
-            ).join('\\n');
-            const instructionsText = `Superficies a proteger:\\n${itemsText}`;
-            
-            // Replaces "Esto es exactamente lo que necesitas."
-            // PPTX text blocks are inside <a:t>. We will inject multiple <a:p> lines for multi-line.
-            slide4 = slide4.replace('Esto es exactamente lo que necesitas.', itemsText.replace(/\\n/g, '</a:t></a:r></a:p><a:p><a:r><a:rPr sz="1800" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>'));
-            
-            // Mockup text replacements (line by line)
-            // PPTX uses <a:p><a:r><a:t>Line 1</a:t></a:r></a:p> for newlines. 
-            // The mockup is monospace, so we should map the string safely.
-            if (data.mockup) {
-                const mockupLines = data.mockup.split('\n').map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-                const mockupXml = mockupLines.join('</a:t></a:r></a:p><a:p><a:r><a:rPr sz="1200" b="0"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>');
-                
-                // Replace "Vista del Proyecto" with the mockup itself, adjusting text styling if possible.
-                slide4 = slide4.replace('Vista del Proyecto', 'Vista del Proyecto</a:t></a:r></a:p><a:p><a:r><a:t>  </a:t></a:r></a:p><a:p><a:r><a:rPr sz="1200" b="0"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>' + mockupXml);
-            }
+            let slide4 = await zip.file('ppt/slides/slide4.xml')?.async('string');
+            if (slide4) {
+                let textItems = data.items.map(item => `
+<a:p>
+    <a:pPr algn="l"><a:lnSpc><a:spcPts val="1200"/></a:lnSpc></a:pPr>
+    <a:r>
+        <a:rPr sz="1400" b="1"><a:solidFill><a:srgbClr val="F3F4F6"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr>
+        <a:t>• ${item.name}: ${Number(item.width).toFixed(2)}x${Number(item.height).toFixed(2)}m (${Number(item.area).toFixed(2)}m²)</a:t>
+    </a:r>
+</a:p>`).join('');
 
-            // Background Image replacement (slide4 background image is image2.jpeg)
-            if (data.imageUrl) {
-                try {
-                    console.log("Fetching image for PPTX...", data.imageUrl);
-                    // Use a proxy or direct fetch depending on CORS. Assuming direct fetch works for Supabase URLs.
-                    const imgRes = await fetch(data.imageUrl);
-                    if (imgRes.ok) {
-                        const imgBlob = await imgRes.blob();
-                        zip.file('ppt/media/image2.jpeg', imgBlob);
-                    } else {
-                        console.error("Failed to fetch image for PPTX", imgRes.status);
-                    }
-                } catch (e) {
-                    console.error("Error fetching background image", e);
+                // Remove the old instruction text
+                slide4 = slide4.replace('Esto es exactamente lo que necesitas.', '');
+
+                // Inject the white items into the SUPERFICIE A PROTEGER dark box
+                slide4 = slide4.replace(
+                    'SUPERFICIE A PROTEGER</a:t></a:r></a:p>',
+                    'SUPERFICIE A PROTEGER</a:t></a:r></a:p><a:p><a:r><a:t>  </a:t></a:r></a:p>' + textItems.replace(/\n/g, '')
+                );
+
+                let mockupXml = '';
+                if (data.mockup) {
+                    mockupXml = data.mockup.split('\n').map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('</a:t></a:r></a:p><a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="900" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr><a:t>');
                 }
-            }
+                
+                if (mockupXml) {
+                    slide4 = slide4.replace(
+                        'Vista del Proyecto</a:t></a:r></a:p>',
+                        'Vista del Proyecto</a:t></a:r></a:p><a:p><a:r><a:t>  </a:t></a:r></a:p><a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="900" b="1"><a:solidFill><a:srgbClr val="A3E635"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr><a:t>' + mockupXml + '</a:t></a:r></a:p>'
+                    );
+                }
 
-            zip.file('ppt/slides/slide4.xml', slide4);
+                // Background Image replacement (slide4 background image is image2.jpeg)
+                if (data.imageUrl) {
+                    try {
+                        console.log("Fetching image for PPTX...", data.imageUrl);
+                        // Use a proxy or direct fetch depending on CORS. Assuming direct fetch works for Supabase URLs.
+                        const imgRes = await fetch(data.imageUrl);
+                        if (imgRes.ok) {
+                            const imgBlob = await imgRes.blob();
+                            zip.file('ppt/media/image2.jpeg', imgBlob);
+                        } else {
+                            console.error("Failed to fetch image for PPTX", imgRes.status);
+                        }
+                    } catch (e) {
+                        console.error("Error fetching background image", e);
+                    }
+                }
+
+                zip.file('ppt/slides/slide4.xml', slide4);
+            }
         }
 
         // 4. Page 5: Total M2 and Total Price
         if (zip.file('ppt/slides/slide5.xml')) {
-            let slide5 = await zip.file('ppt/slides/slide5.xml')!.async('string');
-            slide5 = slide5.replace('\\[PRECIO\\]', data.total.toFixed(2));
-            
-            const totalM2 = data.items.reduce((acc, current) => acc + current.area, 0);
-            slide5 = slide5.replace('\\[X\\]', totalM2.toFixed(1));
-            zip.file('ppt/slides/slide5.xml', slide5);
+            let slide5 = await zip.file('ppt/slides/slide5.xml')?.async('string');
+            if (slide5) {
+                const totalPrice = Number(data.total || 0).toFixed(2);
+                const totalArea = Object.values(data.items).reduce((acc, item) => acc + Number(item.area || 0), 0).toFixed(2);
+                
+                // Replace [PRECIO] safely checking for potential splitting
+                slide5 = slide5.replace(/\[PRECIO\]/g, totalPrice);
+                slide5 = slide5.replace(/\[X\]/g, totalArea);
+                zip.file('ppt/slides/slide5.xml', slide5);
+            }
         }
 
         // Return generated Blob
