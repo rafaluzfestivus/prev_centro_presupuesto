@@ -9,7 +9,7 @@ import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus, Download, Mess
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
-import { generateProposalPDF } from '@/lib/pdf'
+import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator'
 
 type ProposalItem = {
   id: string
@@ -29,6 +29,7 @@ type ProposalData = {
   logic: string
   total: number
   whatsapp: string
+  imageUrl?: string
 }
 
 export default function ReviewPage() {
@@ -64,7 +65,8 @@ export default function ReviewPage() {
         mockup: processing?.mockup_ascii || '',
         logic: processing?.logica_calculo || '',
         total: Number(proposal.total_geral || processing?.total_calculado || 0),
-        whatsapp: proposal.whatsapp || ''
+        whatsapp: proposal.whatsapp || '',
+        imageUrl: proposal.input_image_url
       })
     }
     setLoading(false)
@@ -177,9 +179,9 @@ export default function ReviewPage() {
     }
   }
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPPTX = () => {
     if (!data) return
-    generateProposalPDF(data)
+    downloadProposalPPTX(data)
   }
 
   const handleWhatsApp = async () => {
@@ -230,9 +232,9 @@ export default function ReviewPage() {
             <Button variant="outline" onClick={() => setIsEditing(!isEditing)} className="hidden md:flex">
               {isEditing ? 'Cancelar Edición' : 'Editar Manualmente'}
             </Button>
-            <Button onClick={handleDownloadPDF} className="bg-gray-100 hover:bg-gray-200 text-navy font-bold px-4">
+            <Button onClick={handleDownloadPPTX} className="bg-gray-100 hover:bg-gray-200 text-navy font-bold px-4">
               <Download className="w-4 h-4 mr-2" />
-              Generar PDF
+              Generar PPTX
             </Button>
             <Button onClick={handleConfirm} disabled={isConfirming} className="bg-navy hover:bg-navy/90 text-white font-bold px-6">
               {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

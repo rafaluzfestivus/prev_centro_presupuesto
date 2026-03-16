@@ -4,14 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Download, MessageCircle, Home, Loader2, Share2, ArrowLeft } from 'lucide-react'
-import { generateProposalPDF, generateProposalBlob, ProposalData, ProposalItem } from '@/services/pdfGenerator'
+import { generateProposalPPTX, downloadProposalPPTX, ProposalDataPPTX as ExtendedProposalData } from '@/services/pptxGenerator'
+import { ProposalItem } from '@/services/pdfGenerator'
 import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal'
 import { createClient } from '@/lib/supabase/client'
 
-// Extend ProposalData if needed for local state
-interface ExtendedProposalData extends ProposalData {
-  whatsapp?: string;
-}
+
 
 export default function SuccessPage() {
   const router = useRouter()
@@ -19,7 +17,7 @@ export default function SuccessPage() {
   const id = params.id as string
   const [data, setData] = useState<ExtendedProposalData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pptxUrl, setPptxUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
@@ -30,9 +28,9 @@ export default function SuccessPage() {
       if (result.success && result.data) {
         const { proposal, items, processing } = result.data
 
-        // Use existing PDF URL if available
+        // Use existing PPTX URL if available
         if (proposal.pdf_gerado) {
-          setPdfUrl(proposal.pdf_gerado)
+          setPptxUrl(proposal.pdf_gerado)
         }
 
         // Map DB items to PDF structure
@@ -51,7 +49,8 @@ export default function SuccessPage() {
           items: mappedItems,
           total: Number(proposal.total_geral || 0),
           mockup: processing?.mockup_ascii || '',
-          whatsapp: proposal.whatsapp
+          whatsapp: proposal.whatsapp,
+          imageUrl: proposal.input_image_url
         })
       }
       setLoading(false)
@@ -60,23 +59,23 @@ export default function SuccessPage() {
     loadData()
   }, [id])
 
-  // Generate and Upload PDF if not already present
+  // Generate and Upload PPTX if not already present
   useEffect(() => {
     const generateAndUpload = async () => {
-      if (!data || pdfUrl || uploading) return
+      if (!data || pptxUrl || uploading) return
       setUploading(true)
 
       try {
-        const blob = await generateProposalBlob(data)
-        if (!blob) throw new Error("Fallo al generar PDF")
+        const blob = await generateProposalPPTX(data)
+        if (!blob) throw new Error("Fallo al generar PPTX")
 
         const supabase = createClient()
-        const fileName = `${id}_${Date.now()}.pdf`
+        const fileName = `${id}_${Date.now()}.pptx`
 
         const { error: uploadError } = await supabase.storage
           .from('proposals')
           .upload(fileName, blob, {
-            contentType: 'application/pdf',
+            contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             upsert: true
           })
 
@@ -86,33 +85,34 @@ export default function SuccessPage() {
           .from('proposals')
           .getPublicUrl(fileName)
 
-        setPdfUrl(publicUrl)
+        setPptxUrl(publicUrl)
 
         // Save URL to DB (Background)
         try {
+          // Re-using the pdf_gerado field to avoid DB migrations, but containing the PPTX link
           await updateProposalAction(id, { pdf_gerado: publicUrl })
         } catch (err) {
-          console.error("Error saving PDF link to DB:", err)
+          console.error("Error saving PPTX link to DB:", err)
         }
 
-        console.log("PDF Uploaded and Persisted:", publicUrl)
+        console.log("PPTX Uploaded and Persisted:", publicUrl)
 
       } catch (error) {
-        console.error("Error al subir el PDF:", error)
+        console.error("Error al subir el PPTX:", error)
       } finally {
         setUploading(false)
       }
     }
 
-    if (data && !pdfUrl) {
+    if (data && !pptxUrl) {
       generateAndUpload()
     }
-  }, [data, pdfUrl, id, uploading])
+  }, [data, pptxUrl, id, uploading])
 
 
   const handleDownload = async () => {
     if (data) {
-      await generateProposalPDF(data)
+      await downloadProposalPPTX(data)
     }
   }
 
@@ -125,8 +125,8 @@ export default function SuccessPage() {
     message += `*Detalles de la inversión:*\n`
     message += `• Valor Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
 
-    if (pdfUrl) {
-      message += `📥 Descarga tu propuesta detallada aquí:\n${pdfUrl}\n\n`
+    if (pptxUrl) {
+      message += `📥 Descarga tu presentación propuesta aquí:\n${pptxUrl}\n\n`
     }
 
     const encoded = encodeURIComponent(message)
@@ -185,7 +185,7 @@ export default function SuccessPage() {
           <div className="grid grid-cols-2 gap-3">
             <Button onClick={handleDownload} variant="outline" className="h-14 font-bold border-2 rounded-xl gap-2 hover:bg-gray-50 border-gray-100 text-navy">
               <Download className="h-5 w-5" />
-              Versión PDF
+              Versión Presentación
             </Button>
 
             <Button variant="ghost" onClick={() => router.push('/dashboard')} className="h-14 font-bold rounded-xl text-gray-600 hover:text-navy hover:bg-gray-100">
