@@ -32,7 +32,7 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
                 // 1. Text Items Xml
                 let textItemsXml = data.items.map(item => `
 <a:p>
-    <a:pPr algn="l"><a:lnSpc><a:spcPts val="1200"/></a:lnSpc></a:pPr>
+    <a:pPr algn="l"><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr>
     <a:r>
         <a:rPr sz="2000" b="1"><a:solidFill><a:srgbClr val="F3F4F6"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr>
         <a:t>• ${item.name}: ${Number(item.width).toFixed(2)}x${Number(item.height).toFixed(2)}m (${Number(item.area).toFixed(2)}m²)</a:t>
@@ -43,7 +43,7 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
 <p:sp>
   <p:nvSpPr><p:cNvPr id="900" name="InsertedTextItems"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
   <p:spPr>
-    <a:xfrm><a:off x="1188720" y="4200000"/><a:ext cx="8000000" cy="4000000"/></a:xfrm>
+    <a:xfrm><a:off x="1188720" y="4600000"/><a:ext cx="8000000" cy="4000000"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>
   </p:spPr>
   <p:txBody>
@@ -55,18 +55,18 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
                 // 2. Mockup Xml
                 let mockupXml = '';
                 if (data.mockup) {
-                    let mockupLinesXml = data.mockup.split('\\n').map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('</a:t></a:r></a:p><a:p><a:pPr algn="ctr"><a:lnSpc><a:spcPts val="1200"/></a:lnSpc></a:pPr><a:r><a:rPr sz="1400" b="1"><a:solidFill><a:srgbClr val="A3E635"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr><a:t>');
+                    let mockupLinesXml = data.mockup.split('\\n').map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('</a:t></a:r></a:p><a:p><a:pPr algn="ctr"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr><a:r><a:rPr sz="1400" b="1"><a:solidFill><a:srgbClr val="A3E635"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr><a:t>');
                     mockupXml = `
 <p:sp>
   <p:nvSpPr><p:cNvPr id="901" name="InsertedMockup"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
   <p:spPr>
-    <a:xfrm><a:off x="9509760" y="4400000"/><a:ext cx="7863840" cy="4000000"/></a:xfrm>
+    <a:xfrm><a:off x="9509760" y="4600000"/><a:ext cx="7863840" cy="4000000"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>
   </p:spPr>
   <p:txBody>
     <a:bodyPr wrap="square" rtlCol="0"/><a:lstStyle/>
     <a:p>
-        <a:pPr algn="ctr"><a:lnSpc><a:spcPts val="1200"/></a:lnSpc></a:pPr>
+        <a:pPr algn="ctr"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr>
         <a:r>
             <a:rPr sz="1400" b="1"><a:solidFill><a:srgbClr val="A3E635"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr>
             <a:t>${mockupLinesXml}</a:t>
