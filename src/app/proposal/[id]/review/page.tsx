@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home, AlertCircle } from 'lucide-react'
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
@@ -41,6 +41,7 @@ export default function ReviewPage() {
   const [isReprocessing, setIsReprocessing] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [id])
 
@@ -120,16 +121,17 @@ export default function ReviewPage() {
   const handleConfirm = async () => {
     if (!data) return
     setIsConfirming(true)
+    setActionError(null)
     try {
       const result = await confirmProposalAction(id, data.total, data.items)
       if (result.success) {
         router.push(`/proposal/${id}/success`)
       } else {
-        alert('Error al guardar: ' + result.error)
+        setActionError(result.error || 'Error al guardar el presupuesto')
       }
     } catch (error) {
       console.error(error)
-      alert('Error al guardar presupuesto')
+      setActionError('Error al guardar presupuesto')
     } finally {
       setIsConfirming(false)
     }
@@ -139,6 +141,7 @@ export default function ReviewPage() {
   const handleReprocess = async () => {
     if (!aiInstruction.trim()) return
     setIsReprocessing(true)
+    setActionError(null)
     try {
       const result = await processProposalWithAIAction(id, aiInstruction, data)
       if (!result.success || !result.data) {
@@ -153,9 +156,9 @@ export default function ReviewPage() {
         total: newData.total
       }))
       setAiInstruction('')
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      alert('Error al reajustar con IA')
+      setActionError(error.message || 'Error al reajustar con IA')
     } finally {
       setIsReprocessing(false)
     }
@@ -164,16 +167,17 @@ export default function ReviewPage() {
   const handleCloseSale = async () => {
     if (!confirm('¿Deseas cerrar esta venta y generar el agendamiento?')) return
     setIsConfirming(true)
+    setActionError(null)
     try {
       const result = await closeSaleAction(id)
       if (result.success) {
         router.push('/dashboard/citas')
       } else {
-        alert('Error al cerrar venta: ' + result.error)
+        setActionError(result.error || 'Error al cerrar venta')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error)
-      alert('Error al cerrar venta')
+      setActionError(error.message || 'Error al cerrar venta')
     } finally {
       setIsConfirming(false)
     }
@@ -253,6 +257,13 @@ export default function ReviewPage() {
       </header>
 
       <main className="max-w-6xl mx-auto p-4 lg:p-8 space-y-8 mt-4">
+        {actionError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+            <p className="text-red-700 text-sm font-medium flex-1">{actionError}</p>
+            <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 font-bold text-lg leading-none">×</button>
+          </div>
+        )}
         <div className="flex items-center justify-center gap-2 mb-8 uppercase text-[10px] font-black tracking-tighter text-gray-400">
           <span className="text-navy">1. Pedido</span>
           <div className="h-[2px] w-8 bg-gray-200" />
@@ -314,12 +325,12 @@ export default function ReviewPage() {
                 </Button>
               </div>
               <div className="space-y-4">
-                {data.items.map((item) => (
+                {data.items.map((item, idx) => (
                   <div key={item.id} className="group p-6 bg-white hover:bg-gray-50 dark:bg-gray-700/30 rounded-2xl border-2 border-gray-50 hover:border-accent/10 transition-all">
                     <div className="flex flex-col md:flex-row justify-between gap-4">
                       <div className="flex-1 space-y-4">
                         <div className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-full bg-accent/20 text-navy font-black flex items-center justify-center text-xs">A</span>
+                          <span className="w-8 h-8 rounded-full bg-accent/20 text-navy font-black flex items-center justify-center text-xs">{idx + 1}</span>
                           <Input
                             className="font-black text-navy border-none shadow-none focus-visible:ring-1 focus-visible:ring-accent group-hover:bg-white text-lg p-0 h-auto"
                             value={item.name}

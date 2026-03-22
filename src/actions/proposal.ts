@@ -8,7 +8,7 @@ import { revalidatePath } from 'next/cache'
 import { OpenAI } from 'openai'
 import { SYSTEM_PROMPT } from '@/services/ai/prompt'
 import { EXTRACTION_SYSTEM_PROMPT } from '@/services/ai/extraction_prompt'
-import { PRICING } from '@/lib/constants'
+import { parseAIResponseContent, normalizeAIItems } from '@/lib/pricing'
 
 export async function createProposalAction(data: CreateProposalInput) {
     try {
@@ -51,7 +51,7 @@ export async function getProposalDetailsAction(id: string) {
     }
 }
 
-export async function interpretProposalAction(id: string) {
+export async function interpretProposalAction(id: string, extraContext?: string) {
     try {
         console.log(`[AI] Interpreting proposal ${id}...`)
         const proposal = await getProposalById(id)
@@ -68,6 +68,13 @@ export async function interpretProposalAction(id: string) {
             { type: "text", text: `--- INTERPRETANDO PEDIDO ID: ${id} ---` },
             { type: "text", text: `INPUT ORIGINAL: ${proposal.medidas_input || 'Imagen adjunta'}` }
         ]
+
+        if (extraContext) {
+            userContent.push({
+                type: "text",
+                text: `ACLARACIÓN DEL CLIENTE: ${extraContext}`
+            })
+        }
 
         if (proposal.input_image_url) {
             userContent.push({
@@ -206,60 +213,19 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
 
         let result;
         try {
-            // More robust cleaning: only split if looks like markdown
-            let cleanContent = content.trim();
-            if (cleanContent.startsWith('```')) {
-                const parts = cleanContent.split('```');
-                // find the part that looks like JSON
-                const jsonPart = parts.find(p => p.includes('{') && p.includes('}'));
-                if (jsonPart) {
-                    cleanContent = jsonPart.replace(/^(json|)\n/, '').trim();
-                }
-            }
-
-            result = JSON.parse(cleanContent);
+            result = parseAIResponseContent(content)
         } catch (parseError) {
             console.error('[AI] JSON Parse Error:', parseError, content);
             const preview = content.substring(0, 50).replace(/\n/g, ' ');
             throw new Error(`La IA devolvió un formato inválido. (${preview}...)`);
         }
 
-        // Support both "items" and "components" (from newer prompts)
-        if (!result.items && result.components) {
-            console.log(`[AI] Mapping 'components' to 'items'`);
-            result.items = result.components.map((comp: any) => ({
-                name: comp.face || comp.name || "Elemento",
-                width: comp.dimensions?.width_or_depth || comp.width || 0,
-                height: comp.dimensions?.height || comp.height || 0,
-                description: comp.description || "",
-                price: comp.price,
-                price_rule: comp.price_rule
-            }));
+        try {
+            result = normalizeAIItems(result)
+        } catch (normError: any) {
+            console.error('[AI] ERROR: items normalization failed', result);
+            throw new Error(normError.message || 'La IA no generó los ítems correctamente.');
         }
-
-        if (!result.items || !Array.isArray(result.items)) {
-            console.error(`[AI] ERROR: result.items is missing or not an array`, result);
-            throw new Error("La IA no generó los ítems correctamente. Verifique si las medidas están claras en el pedido.");
-        }
-
-        // Apply pricing minimums manually if AI forgets, or let AI do it. 
-        // The system prompt should handle it, but let's ensure.
-        result.items = result.items.map((item: any) => {
-            const width = parseFloat(String(item.width).replace(',', '.'));
-            const height = parseFloat(String(item.height).replace(',', '.'));
-            const area = width * height;
-            const calculatedPrice = area * PRICING.PRICE_PER_M2;
-            const finalPrice = Math.max(calculatedPrice, PRICING.MIN_PRICE_PER_ITEM);
-            return {
-                ...item,
-                width,
-                height,
-                area: parseFloat(area.toFixed(2)),
-                price: item.price || parseFloat(finalPrice.toFixed(2)),
-                price_rule: item.price_rule || (finalPrice === PRICING.MIN_PRICE_PER_ITEM ? 'Minimo' : 'Calculado')
-            }
-        });
-        result.total = result.items.reduce((sum: number, item: any) => sum + item.price, 0);
 
         // Save to DB
         console.log(`[AI] Saving processing result to DB...`)
