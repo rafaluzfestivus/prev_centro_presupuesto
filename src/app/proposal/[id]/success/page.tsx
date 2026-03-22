@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Download, MessageCircle, Home, Loader2, Share2, ArrowLeft } from 'lucide-react'
 import { generateProposalPPTX, downloadProposalPPTX, ProposalDataPPTX as ExtendedProposalData } from '@/services/pptxGenerator'
-import { ProposalItem } from '@/services/pdfGenerator'
+import { ProposalItem, generateProposalBlob } from '@/services/pdfGenerator'
 import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal'
 import { createClient } from '@/lib/supabase/client'
 
@@ -19,6 +19,7 @@ export default function SuccessPage() {
   const [loading, setLoading] = useState(true)
   const [pptxUrl, setPptxUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [pdfStatus, setPdfStatus] = useState<'idle' | 'generating' | 'done' | 'error'>('idle')
 
   useEffect(() => {
     const loadData = async () => {
@@ -108,6 +109,35 @@ export default function SuccessPage() {
       generateAndUpload()
     }
   }, [data, pptxUrl, id, uploading])
+
+  // Auto-generate and download PDF after approval
+  useEffect(() => {
+    const autoDownloadPDF = async () => {
+      if (!data || pdfStatus !== 'idle') return
+      setPdfStatus('generating')
+      try {
+        const blob = await generateProposalBlob(data)
+        if (!blob) throw new Error('No se pudo generar el PDF')
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        const safeName = data.clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+        link.download = `Preventiva_Presupuesto_${safeName}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+        setPdfStatus('done')
+      } catch (err) {
+        console.error('Error al generar PDF automático:', err)
+        setPdfStatus('error')
+      }
+    }
+
+    if (data && pdfStatus === 'idle') {
+      autoDownloadPDF()
+    }
+  }, [data, pdfStatus])
 
 
   const handleDownload = async () => {
@@ -205,8 +235,22 @@ export default function SuccessPage() {
         </div>
 
         <div className="pt-4 border-t border-gray-100 flex flex-col items-center gap-2">
+          {pdfStatus === 'generating' && (
+            <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" /> Guardando PDF...
+            </p>
+          )}
+          {pdfStatus === 'done' && (
+            <p className="text-[10px] font-black uppercase text-green-600 tracking-[0.2em] flex items-center gap-2">
+              <CheckCircle2 className="h-3 w-3" /> PDF guardado en descargas
+            </p>
+          )}
+          {pdfStatus === 'error' && (
+            <p className="text-[10px] font-black uppercase text-orange-500 tracking-[0.2em]">
+              PDF no disponible — descárgalo manualmente
+            </p>
+          )}
           <p className="text-[10px] font-black uppercase text-gray-600 tracking-[0.2em]">Próximo Paso: Esperar confirmación para agendar</p>
-          <span className="text-[8px] text-gray-300">v1.1.2-resolved</span>
         </div>
       </div>
     </div>
