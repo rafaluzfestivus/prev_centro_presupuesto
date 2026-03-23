@@ -373,10 +373,11 @@ export async function getSalesAction() {
     try {
         const supabase = await createClient()
 
-        // Sales = scheduled visits (appointments), joined with client data
+        // Sales = only appointments created by closeSaleAction (have proposal link in notes)
         const { data: appointments, error: aptError } = await supabase
             .from('appointments')
             .select('*, clients(id, name, whatsapp, location)')
+            .like('notes', '%Venta cerrada desde presupuesto%')
             .order('scheduled_at', { ascending: false })
 
         if (aptError) throw aptError
