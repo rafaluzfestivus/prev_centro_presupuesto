@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProposalAction, getProposalsAction, deleteProposalAction } from '@/actions/proposal'
 import { Proposal } from '@/lib/types'
-import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw, Calendar } from 'lucide-react'
+import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw, Calendar, ClipboardList } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
@@ -201,6 +201,15 @@ function ProposalsContent() {
                                         >
                                             <Calendar size={16} />
                                         </button>
+                                        {p.status === 'Confirmada' && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); router.push(`/proposal/${p.id}/report`) }}
+                                                className="p-2 text-navy bg-navy/5 opacity-0 group-hover:opacity-100 hover:bg-navy hover:text-white rounded-lg transition-all"
+                                                title="Ver Ficha de Instalación"
+                                            >
+                                                <ClipboardList size={16} />
+                                            </button>
+                                        )}
                                         <button onClick={(e) => handleDeleteProposal(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><Trash2 size={16} /></button>
                                     </div>
                                 </div>

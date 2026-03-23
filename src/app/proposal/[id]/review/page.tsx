@@ -5,11 +5,12 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, RefreshCw, Save, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home, AlertCircle } from 'lucide-react'
-import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction } from '@/actions/proposal'
+import { ArrowLeft, RefreshCw, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home, AlertCircle, MapPin, Camera, X, FileText } from 'lucide-react'
+import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction, InstallationData } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
 import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator'
+import { createClient } from '@/lib/supabase/client'
 
 type ProposalItem = {
   id: string
@@ -42,6 +43,14 @@ export default function ReviewPage() {
   const [isConfirming, setIsConfirming] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  // Close-sale modal
+  const [showCloseModal, setShowCloseModal] = useState(false)
+  const [installAddress, setInstallAddress] = useState('')
+  const [installNotes, setInstallNotes] = useState('')
+  const [beforePhotoFiles, setBeforePhotoFiles] = useState<File[]>([])
+  const [beforePhotoUrls, setBeforePhotoUrls] = useState<string[]>([])
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
 
   useEffect(() => { loadData() }, [id])
 
@@ -164,22 +173,61 @@ export default function ReviewPage() {
     }
   }
 
+  const handleBeforePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return
+    const newFiles = Array.from(e.target.files)
+    setBeforePhotoFiles(prev => [...prev, ...newFiles])
+    const newPreviews = newFiles.map(f => URL.createObjectURL(f))
+    setBeforePhotoUrls(prev => [...prev, ...newPreviews])
+  }
+
+  const removeBeforePhoto = (index: number) => {
+    setBeforePhotoFiles(prev => prev.filter((_, i) => i !== index))
+    setBeforePhotoUrls(prev => prev.filter((_, i) => i !== index))
+  }
+
   const handleCloseSale = async () => {
-    if (!confirm('¿Deseas cerrar esta venta y generar el agendamiento?')) return
     setIsConfirming(true)
     setActionError(null)
     try {
-      const result = await closeSaleAction(id)
+      let uploadedPhotoUrls: string[] = []
+
+      // Upload before photos to Supabase storage
+      if (beforePhotoFiles.length > 0) {
+        setUploadingPhotos(true)
+        const supabase = createClient()
+        for (const file of beforePhotoFiles) {
+          const ext = file.name.split('.').pop()
+          const fileName = `${id}/before/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+          const { error } = await supabase.storage.from('proposals').upload(fileName, file)
+          if (!error) {
+            const { data: { publicUrl } } = supabase.storage.from('proposals').getPublicUrl(fileName)
+            uploadedPhotoUrls.push(publicUrl)
+          }
+        }
+        setUploadingPhotos(false)
+      }
+
+      const installation: InstallationData = {
+        address: installAddress || undefined,
+        notes: installNotes || undefined,
+        beforePhotos: uploadedPhotoUrls.length ? uploadedPhotoUrls : undefined,
+      }
+
+      const result = await closeSaleAction(id, installation)
       if (result.success) {
         router.push('/dashboard/citas')
       } else {
         setActionError(result.error || 'Error al cerrar venta')
+        setShowCloseModal(false)
       }
     } catch (error: any) {
       console.error(error)
       setActionError(error.message || 'Error al cerrar venta')
+      setShowCloseModal(false)
     } finally {
       setIsConfirming(false)
+      setUploadingPhotos(false)
     }
   }
 
@@ -248,7 +296,11 @@ export default function ReviewPage() {
               <MessageCircle className="w-4 h-4 mr-2" />
               WhatsApp
             </Button>
-            <Button onClick={handleCloseSale} disabled={isConfirming} className="bg-accent hover:shadow-accent/20 hover:shadow-lg text-navy font-extrabold px-6">
+            <Button onClick={() => router.push(`/proposal/${id}/report`)} variant="ghost" className="hidden md:flex font-bold text-gray-500 hover:text-navy">
+              <FileText className="w-4 h-4 mr-2" />
+              Ver Ficha
+            </Button>
+            <Button onClick={() => setShowCloseModal(true)} disabled={isConfirming} className="bg-accent hover:shadow-accent/20 hover:shadow-lg text-navy font-extrabold px-6">
               <Send className="w-4 h-4 mr-2" />
               Cerrar Venta
             </Button>
@@ -401,6 +453,113 @@ export default function ReviewPage() {
           </div>
         </div>
       </main>
+
+      {/* Close Sale Modal */}
+      {showCloseModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] p-8 max-w-lg w-full space-y-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-accent/20 rounded-full flex items-center justify-center">
+                  <Send className="w-5 h-5 text-navy" />
+                </div>
+                <div>
+                  <h2 className="font-black text-navy uppercase tracking-tight">Cerrar Venta</h2>
+                  <p className="text-[10px] text-gray-400 font-bold">Datos de instalación para el equipo</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCloseModal(false)} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Address */}
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-navy/60 flex items-center gap-1">
+                <MapPin className="w-3 h-3" /> Dirección de instalación
+              </Label>
+              <Input
+                placeholder="Calle, número, piso, código postal, ciudad..."
+                className="h-12 bg-gray-50 border-none rounded-xl font-medium text-navy focus-visible:ring-2 focus-visible:ring-accent"
+                value={installAddress}
+                onChange={e => setInstallAddress(e.target.value)}
+              />
+            </div>
+
+            {/* Before Photos */}
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase text-navy/60 flex items-center gap-1">
+                <Camera className="w-3 h-3" /> Fotos del lugar (antes de la instalación)
+              </Label>
+              <div
+                className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-accent/50 hover:bg-accent/5 transition-colors"
+                onClick={() => document.getElementById('before-photos-input')?.click()}
+              >
+                <Camera className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm font-bold text-gray-400">Clic para subir fotos</p>
+                <p className="text-[10px] text-gray-300">Múltiples imágenes permitidas</p>
+                <input
+                  id="before-photos-input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleBeforePhotoSelect}
+                />
+              </div>
+              {beforePhotoUrls.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {beforePhotoUrls.map((url, i) => (
+                    <div key={i} className="relative rounded-xl overflow-hidden aspect-square">
+                      <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => removeBeforePhoto(i)}
+                        className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white hover:bg-red-500 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Installer Notes */}
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-navy/60">Notas para el instalador</Label>
+              <textarea
+                placeholder="Acceso al edificio, horarios, dificultades previstas..."
+                className="w-full min-h-[80px] p-4 bg-gray-50 border-none rounded-xl text-sm font-medium text-navy resize-none focus:ring-2 focus:ring-accent/30 outline-none"
+                value={installNotes}
+                onChange={e => setInstallNotes(e.target.value)}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={handleCloseSale}
+                disabled={isConfirming}
+                className="flex-1 h-14 bg-accent hover:bg-accent/90 text-navy font-black rounded-xl shadow-lg hover:shadow-xl"
+              >
+                {(isConfirming || uploadingPhotos) ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />{uploadingPhotos ? 'Subiendo fotos...' : 'Cerrando...'}</>
+                ) : (
+                  <><Send className="w-4 h-4 mr-2" />Confirmar y Cerrar Venta</>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowCloseModal(false)}
+                disabled={isConfirming}
+                className="h-14 px-6 text-gray-500 font-bold rounded-xl hover:bg-gray-100"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

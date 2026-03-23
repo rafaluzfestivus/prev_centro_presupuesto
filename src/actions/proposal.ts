@@ -288,7 +288,13 @@ export async function confirmProposalAction(id: string, total: number, items: an
     }
 }
 
-export async function closeSaleAction(id: string) {
+export interface InstallationData {
+    address?: string
+    notes?: string
+    beforePhotos?: string[]
+}
+
+export async function closeSaleAction(id: string, installation?: InstallationData) {
     try {
         const supabase = await createClient()
         const proposal = await getProposalById(id)
@@ -297,14 +303,12 @@ export async function closeSaleAction(id: string) {
 
         const whatsapp = proposal.whatsapp?.replace(/\D/g, '')
 
-        // 1. Update Proposal Status to Closed
-        await updateProposal(id, {
-            status: 'Confirmada', // Assuming 'Confirmada' means closed/won in the current schema
-            // If we have a 'Fechada' status, we should use it. 
-            // Checking Proposta.status check constraint from previous tool call:
-            // ARRAY['Rascunho'::text, 'Processada'::text, 'Confirmada'::text]
-            // We'll stick to 'Confirmada' but we could use a field like 'closed_at' if it existed.
-        })
+        // 1. Update Proposal Status + Installation Data
+        const updates: Record<string, any> = { status: 'Confirmada' }
+        if (installation?.address) updates.installation_address = installation.address
+        if (installation?.notes) updates.installation_notes = installation.notes
+        if (installation?.beforePhotos?.length) updates.before_photos = installation.beforePhotos
+        await updateProposal(id, updates)
 
         // 2. Ensure Client exists and Create Appointment
         if (whatsapp) {
@@ -313,7 +317,7 @@ export async function closeSaleAction(id: string) {
                 .upsert({
                     name: proposal.cliente_nome,
                     whatsapp: whatsapp,
-                    location: proposal.cidade,
+                    location: installation?.address || proposal.cidade,
                     source: 'proposta',
                     status: 'customer'
                 }, { onConflict: 'whatsapp' })
@@ -321,13 +325,20 @@ export async function closeSaleAction(id: string) {
                 .single()
 
             if (client) {
+                const notes = [
+                    `Venta cerrada desde presupuesto ${id}.`,
+                    `Total: €${proposal.total_geral}`,
+                    installation?.address ? `Dirección: ${installation.address}` : '',
+                    installation?.notes ? `Notas: ${installation.notes}` : ''
+                ].filter(Boolean).join(' | ')
+
                 const { error: aptError } = await supabase
                     .from('appointments')
                     .insert({
                         client_id: client.id,
                         scheduled_at: new Date().toISOString(),
                         status: 'pending',
-                        notes: `Venta cerrada desde presupuesto ${id}. Total: €${proposal.total_geral}`
+                        notes
                     })
 
                 if (aptError) throw aptError
@@ -342,6 +353,19 @@ export async function closeSaleAction(id: string) {
     } catch (error: any) {
         console.error('Failed to close sale:', error)
         return { success: false, error: error.message || 'Error al cerrar venta' }
+    }
+}
+
+export async function addAfterPhotosAction(id: string, photoUrls: string[]) {
+    try {
+        const proposal = await getProposalById(id)
+        const existing = proposal.after_photos || []
+        await updateProposal(id, { after_photos: [...existing, ...photoUrls] })
+        revalidatePath(`/proposal/${id}/report`)
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to add after photos:', error)
+        return { success: false, error: error.message || 'Error al guardar fotos' }
     }
 }
 
