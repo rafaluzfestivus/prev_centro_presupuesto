@@ -16,6 +16,11 @@ export interface Proposal {
     prompts?: any[]; // JSON array
     input_image_url?: string;
     whatsapp?: string;
+    // Installation fields (added via migration 001_add_installation_fields.sql)
+    installation_address?: string;
+    installation_notes?: string;
+    before_photos?: string[];
+    after_photos?: string[];
 }
 
 export interface ProposalItem {

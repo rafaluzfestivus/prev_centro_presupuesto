@@ -12,7 +12,8 @@ import {
     LogOut,
     Calendar,
     Users,
-    FileText
+    FileText,
+    TrendingUp
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -21,6 +22,7 @@ const Sidebar = () => {
     const menuItems = [
         { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: '/dashboard/presupuestos', label: 'Presupuestos IA', icon: FileText },
+        { id: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp },
         { id: '/dashboard/clientes', label: 'Leads del Sitio', icon: Users },
         { id: '/dashboard/citas', label: 'Agenda', icon: Calendar },
         { id: '/dashboard/conversaciones', label: 'Conversaciones', icon: MessageSquare },

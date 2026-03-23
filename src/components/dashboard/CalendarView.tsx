@@ -15,7 +15,7 @@ import {
     parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
 
@@ -29,6 +29,8 @@ const CalendarView = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+    const [formError, setFormError] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -77,6 +79,8 @@ const CalendarView = () => {
         const dateStr = format(day, "yyyy-MM-dd");
         setFormData({ ...formData, date_start: `${dateStr}T09:00` });
         setSelectedAppointment(null);
+        setFormError('');
+        setShowDeleteConfirm(false);
         setIsModalOpen(true);
     };
 
@@ -91,6 +95,8 @@ const CalendarView = () => {
             status: apt.status,
             attachment_url: apt.attachment_url || ''
         });
+        setFormError('');
+        setShowDeleteConfirm(false);
         setIsModalOpen(true);
     };
 
@@ -99,13 +105,14 @@ const CalendarView = () => {
         if (!file) return;
 
         setUploading(true);
+        setFormError('');
         const fileName = `${Date.now()}-${file.name}`;
         const { data, error } = await supabase.storage
             .from('attachments')
             .upload(fileName, file);
 
         if (error) {
-            alert('Error en la carga: ' + error.message);
+            setFormError('Error al subir el archivo: ' + error.message);
         } else {
             const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
             setFormData({ ...formData, attachment_url: publicUrl });
@@ -115,9 +122,13 @@ const CalendarView = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setFormError('');
 
         const cleanWhatsApp = formData.whatsapp.replace(/\D/g, '');
-        if (!cleanWhatsApp) return alert('Por favor, inserte un WhatsApp válido.');
+        if (!cleanWhatsApp) {
+            setFormError('Por favor, inserte un WhatsApp válido.');
+            return;
+        }
 
         // 1. Manage Client
         let clientId;
@@ -137,11 +148,17 @@ const CalendarView = () => {
                 source: 'manual'
             }).select('id').single();
 
-            if (insertError) return alert('Error al crear cliente: ' + insertError.message);
+            if (insertError) {
+                setFormError('Error al crear cliente: ' + insertError.message);
+                return;
+            }
             clientId = newClient?.id;
         }
 
-        if (!clientId) return alert('Error al identificar cliente.');
+        if (!clientId) {
+            setFormError('Error al identificar cliente.');
+            return;
+        }
 
         // 2. Insert or Update Appointment
         let error;
@@ -176,7 +193,7 @@ const CalendarView = () => {
         }
 
         if (error) {
-            alert('Error: ' + error.message);
+            setFormError('Error: ' + error.message);
         } else {
             setIsModalOpen(false);
             resetForm();
@@ -185,7 +202,11 @@ const CalendarView = () => {
     };
 
     const handleDelete = async () => {
-        if (!selectedAppointment || !confirm('¿Estás seguro de que quieres cancelar esta cita?')) return;
+        if (!selectedAppointment) return;
+        if (!showDeleteConfirm) {
+            setShowDeleteConfirm(true);
+            return;
+        }
 
         const { error } = await supabase
             .from('appointments')
@@ -193,7 +214,8 @@ const CalendarView = () => {
             .eq('id', selectedAppointment.id);
 
         if (error) {
-            alert('Error al cancelar: ' + error.message);
+            setFormError('Error al cancelar: ' + error.message);
+            setShowDeleteConfirm(false);
         } else {
             setIsModalOpen(false);
             resetForm();
@@ -210,6 +232,8 @@ const CalendarView = () => {
             attachment_url: ''
         });
         setSelectedAppointment(null);
+        setFormError('');
+        setShowDeleteConfirm(false);
     };
 
     const renderHeader = () => {
@@ -327,6 +351,15 @@ const CalendarView = () => {
                                 <X size={24} />
                             </button>
                         </div>
+
+                        {formError && (
+                            <div className="mb-5 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                                <span>{formError}</span>
+                                <button onClick={() => setFormError('')} className="ml-auto shrink-0 text-red-400 hover:text-red-600"><X size={14} /></button>
+                            </div>
+                        )}
+
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <div>
                                 <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">Nombre del Cliente</label>
@@ -399,7 +432,7 @@ const CalendarView = () => {
                                     {selectedAppointment ? 'Actualizar Cita' : 'Confirmar Cita'}
                                 </button>
 
-                                {selectedAppointment && (
+                                {selectedAppointment && !showDeleteConfirm && (
                                     <button
                                         type="button"
                                         onClick={handleDelete}
@@ -407,6 +440,28 @@ const CalendarView = () => {
                                     >
                                         Cancelar / Eliminar Cita
                                     </button>
+                                )}
+
+                                {selectedAppointment && showDeleteConfirm && (
+                                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
+                                        <p className="text-sm text-red-700 font-bold text-center">¿Confirmar eliminación?</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDeleteConfirm(false)}
+                                                className="flex-1 py-2 bg-white border border-border text-navy font-bold rounded-lg text-sm"
+                                            >
+                                                Volver
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleDelete}
+                                                className="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <Trash2 size={14} /> Eliminar
+                                            </button>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </form>
