@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProposalAction, getProposalsAction, deleteProposalAction } from '@/actions/proposal'
 import { Proposal } from '@/lib/types'
-import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw, Calendar, ClipboardList } from 'lucide-react'
+import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw, Calendar, ClipboardList, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
@@ -26,6 +26,8 @@ function ProposalsContent() {
     const [loading, setLoading] = useState(false)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
+    const [formError, setFormError] = useState('')
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -67,6 +69,7 @@ function ProposalsContent() {
 
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault()
+        setFormError('')
         setLoading(true)
         try {
             let imageUrl = ''
@@ -81,11 +84,21 @@ function ProposalsContent() {
                 imageUrl = publicUrl
                 setUploading(false)
             }
-            if (!measurements && !imageUrl) { alert('Por favor, insira as medidas ou envie uma imagem.'); setLoading(false); return; }
+            if (!measurements && !imageUrl) {
+                setFormError('Por favor, insira as medidas ou envie uma imagem.')
+                setLoading(false)
+                return
+            }
             const result = await createProposalAction({ clientName, city, measurements, observations, imageUrl, whatsapp })
             if (result.success && result.id) router.push(`/proposal/${result.id}/preview`)
-            else alert('Erro ao criar orçamento: ' + (result.error || 'Erro desconhecido'))
-        } catch (error) { console.error(error); alert('Erro ao criar orçamento') } finally { setLoading(false); setUploading(false) }
+            else setFormError('Erro ao criar orçamento: ' + (result.error || 'Erro desconhecido'))
+        } catch (error) {
+            console.error(error)
+            setFormError('Erro ao criar orçamento')
+        } finally {
+            setLoading(false)
+            setUploading(false)
+        }
     }
 
     const clearFile = () => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }
@@ -96,12 +109,21 @@ function ProposalsContent() {
         router.push(`/dashboard/citas?client=${encodeURIComponent(clientName)}`)
     }
 
-    const handleDeleteProposal = async (e: React.MouseEvent, id: string) => {
+    const handleDeleteClick = (e: React.MouseEvent, id: string) => {
         e.stopPropagation()
-        if (confirm('Tem certeza que deseja excluir este orçamento?')) {
-            const result = await deleteProposalAction(id)
-            if (result.success) loadProposals()
-            else alert('Erro ao excluir orçamento')
+        setPendingDeleteId(id)
+    }
+
+    const handleDeleteConfirm = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!pendingDeleteId) return
+        const result = await deleteProposalAction(pendingDeleteId)
+        if (result.success) {
+            setPendingDeleteId(null)
+            loadProposals()
+        } else {
+            setPendingDeleteId(null)
+            setFormError('Erro ao excluir orçamento')
         }
     }
 
@@ -118,6 +140,15 @@ function ProposalsContent() {
                         <Plus className="text-accent" />
                         Novo Orçamento
                     </h2>
+
+                    {formError && (
+                        <div className="mb-6 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                            <span>{formError}</span>
+                            <button onClick={() => setFormError('')} className="ml-auto shrink-0 text-red-400 hover:text-red-600"><X size={14} /></button>
+                        </div>
+                    )}
+
                     <form className="space-y-6" onSubmit={handleGenerate}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
@@ -210,7 +241,24 @@ function ProposalsContent() {
                                                 <ClipboardList size={16} />
                                             </button>
                                         )}
-                                        <button onClick={(e) => handleDeleteProposal(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><Trash2 size={16} /></button>
+                                        {pendingDeleteId === p.id ? (
+                                            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setPendingDeleteId(null); }}
+                                                    className="px-2 py-1 text-xs bg-white border border-border text-navy rounded-lg"
+                                                >
+                                                    Não
+                                                </button>
+                                                <button
+                                                    onClick={handleDeleteConfirm}
+                                                    className="px-2 py-1 text-xs bg-red-600 text-white rounded-lg font-bold"
+                                                >
+                                                    Sim
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button onClick={(e) => handleDeleteClick(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><Trash2 size={16} /></button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

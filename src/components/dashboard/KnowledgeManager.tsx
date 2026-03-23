@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Search, Trash2, FileText, Globe, RefreshCw, Plus, X, Save } from 'lucide-react';
+import { BookOpen, Search, Trash2, FileText, Globe, RefreshCw, Plus, X, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 const KnowledgeManager = () => {
@@ -12,6 +12,9 @@ const KnowledgeManager = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newDocContent, setNewDocContent] = useState('');
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [modalError, setModalError] = useState('');
+    const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
     const fetchDocs = async () => {
         setLoading(true);
@@ -28,25 +31,35 @@ const KnowledgeManager = () => {
         fetchDocs();
     }, []);
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('¿Estás seguro de que deseas eliminar este documento?')) return;
-        const { error } = await supabase.from('knowledge_base').delete().eq('id', id);
-        if (error) alert('Error al eliminar: ' + error.message);
-        else fetchDocs();
+    const handleDeleteClick = (id: string) => {
+        setPendingDeleteId(id);
+        setError('');
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!pendingDeleteId) return;
+        const { error: deleteError } = await supabase.from('knowledge_base').delete().eq('id', pendingDeleteId);
+        if (deleteError) {
+            setError('Error al eliminar: ' + deleteError.message);
+        } else {
+            fetchDocs();
+        }
+        setPendingDeleteId(null);
     };
 
     const handleAddDoc = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newDocContent.trim()) return;
+        setModalError('');
 
         setSaving(true);
-        const { error } = await supabase.from('knowledge_base').insert({
+        const { error: insertError } = await supabase.from('knowledge_base').insert({
             content: newDocContent,
             metadata: { source: 'manual', category: 'General' }
         });
 
-        if (error) {
-            alert('Error al guardar el documento: ' + error.message);
+        if (insertError) {
+            setModalError('Error al guardar el documento: ' + insertError.message);
         } else {
             setNewDocContent('');
             setIsModalOpen(false);
@@ -68,7 +81,7 @@ const KnowledgeManager = () => {
                 </div>
                 <div className="flex gap-4">
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => { setIsModalOpen(true); setModalError(''); }}
                         className="flex items-center gap-2 px-6 py-2.5 bg-accent text-navy font-bold rounded-xl hover:shadow-lg transition-all"
                     >
                         <Plus size={20} />
@@ -90,6 +103,34 @@ const KnowledgeManager = () => {
                 </div>
             </header>
 
+            {error && (
+                <div className="mb-6 flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                    <span>{error}</span>
+                    <button onClick={() => setError('')} className="ml-auto shrink-0 text-red-400 hover:text-red-600"><X size={14} /></button>
+                </div>
+            )}
+
+            {pendingDeleteId && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-sm text-red-700 font-bold mb-3">¿Estás seguro de que deseas eliminar este documento?</p>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setPendingDeleteId(null)}
+                            className="flex-1 py-2 bg-white border border-border text-navy font-bold rounded-lg text-sm"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleDeleteConfirm}
+                            className="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2"
+                        >
+                            <Trash2 size={14} /> Eliminar
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="glass-card overflow-hidden border-none shadow-sm">
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -105,7 +146,7 @@ const KnowledgeManager = () => {
                             <tr><td colSpan={4} className="p-10 text-center text-text-muted">Cargando conocimiento...</td></tr>
                         ) : filteredDocs.length > 0 ? (
                             filteredDocs.map((doc) => (
-                                <tr key={doc.id} className="border-b border-border hover:bg-white/80 transition-colors">
+                                <tr key={doc.id} className={`border-b border-border hover:bg-white/80 transition-colors ${pendingDeleteId === doc.id ? 'bg-red-50/50' : ''}`}>
                                     <td className="p-5">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 bg-navy/5 rounded-lg text-navy">
@@ -127,8 +168,8 @@ const KnowledgeManager = () => {
                                     </td>
                                     <td className="p-5 text-right">
                                         <button
-                                            onClick={() => handleDelete(doc.id)}
-                                            className="p-2.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all"
+                                            onClick={() => handleDeleteClick(doc.id)}
+                                            className={`p-2.5 rounded-xl transition-all ${pendingDeleteId === doc.id ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-600 hover:text-white'}`}
                                             title="Eliminar documento"
                                         >
                                             <Trash2 size={18} />
@@ -152,6 +193,15 @@ const KnowledgeManager = () => {
                                 <X size={24} />
                             </button>
                         </div>
+
+                        {modalError && (
+                            <div className="mb-5 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                                <span>{modalError}</span>
+                                <button onClick={() => setModalError('')} className="ml-auto shrink-0 text-red-400 hover:text-red-600"><X size={14} /></button>
+                            </div>
+                        )}
+
                         <form onSubmit={handleAddDoc} className="space-y-6">
                             <div>
                                 <label className="block text-sm font-bold text-navy mb-2">Contenido del Documento</label>

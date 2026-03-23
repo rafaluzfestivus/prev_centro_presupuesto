@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, ArrowRightLeft, Copy, Check } from 'lucide-react'
+import { Loader2, ArrowRightLeft, Copy, Check, AlertCircle } from 'lucide-react'
 import { translateAction } from '@/actions/translate'
 
 export function Translator() {
@@ -12,21 +12,23 @@ export function Translator() {
     const [output, setOutput] = useState('')
     const [loading, setLoading] = useState(false)
     const [copied, setCopied] = useState(false)
+    const [error, setError] = useState('')
 
     const handleTranslate = async () => {
         if (!input.trim()) return
 
         setLoading(true)
+        setError('')
         try {
             const result = await translateAction(input)
             if (result.success && result.data) {
                 setOutput(result.data)
             } else {
-                alert('Error al traducir')
+                setError('Error al traducir. Por favor, inténtalo de nuevo.')
             }
-        } catch (error) {
-            console.error(error)
-            alert('Error al traducir')
+        } catch (err) {
+            console.error(err)
+            setError('Error al traducir. Por favor, inténtalo de nuevo.')
         } finally {
             setLoading(false)
         }
@@ -71,6 +73,13 @@ export function Translator() {
                     {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     {loading ? 'Traduciendo...' : 'Traducir / Adaptar'}
                 </Button>
+
+                {error && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                )}
 
                 <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-md p-3 relative group min-h-[100px]">
                     {output ? (

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react';
-import { Save, RotateCcw, Trash2, Zap, Shield } from 'lucide-react';
+import { Save, RotateCcw, Trash2, Zap, Shield, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { SYSTEM_PROMPT } from '@/services/ai/prompt';
 
@@ -13,6 +13,11 @@ const PromptEditor = () => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [cleaning, setCleaning] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [saveMessage, setSaveMessage] = useState('');
+    const [cleanupStatus, setCleanupStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [cleanupMessage, setCleanupMessage] = useState('');
+    const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
 
     useEffect(() => {
         fetchPrompt();
@@ -28,23 +33,41 @@ const PromptEditor = () => {
 
     const handleSave = async () => {
         setSaving(true);
+        setSaveStatus('idle');
         const { error } = await supabase.from('config').upsert({ key: 'system_prompt', value: prompt }, { onConflict: 'key' });
-        if (error) alert('Error al guardar: ' + error.message);
-        else alert('¡Cerebro IA actualizado!');
+        if (error) {
+            setSaveStatus('error');
+            setSaveMessage('Error al guardar: ' + error.message);
+        } else {
+            setSaveStatus('success');
+            setSaveMessage('¡Cerebro IA actualizado correctamente!');
+            setTimeout(() => setSaveStatus('idle'), 4000);
+        }
         setSaving(false);
     };
 
-    const handleCleanup = async () => {
-        if (!confirm('ATENCIÓN: ¿Limpiar todos los Leads, Conversaciones y Citas?')) return;
+    const handleCleanupClick = () => {
+        setShowCleanupConfirm(true);
+        setCleanupStatus('idle');
+    };
+
+    const handleCleanupConfirm = async () => {
+        setShowCleanupConfirm(false);
         setCleaning(true);
+        setCleanupStatus('idle');
         try {
             await Promise.all([
                 supabase.from('appointments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
                 supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
                 supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000')
             ]);
-            alert('¡Limpieza concluida!');
-        } catch (e: any) { alert('Error: ' + e.message); }
+            setCleanupStatus('success');
+            setCleanupMessage('¡Limpieza concluida!');
+            setTimeout(() => setCleanupStatus('idle'), 4000);
+        } catch (e: any) {
+            setCleanupStatus('error');
+            setCleanupMessage('Error: ' + e.message);
+        }
         setCleaning(false);
     };
 
@@ -73,11 +96,26 @@ const PromptEditor = () => {
                                 disabled={loading}
                                 placeholder="Define aquí cómo debe comportarse la IA..."
                             />
+
+                            {saveStatus === 'success' && (
+                                <div className="mt-4 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
+                                    <CheckCircle size={16} className="shrink-0" />
+                                    <span>{saveMessage}</span>
+                                </div>
+                            )}
+                            {saveStatus === 'error' && (
+                                <div className="mt-4 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                                    <span>{saveMessage}</span>
+                                    <button onClick={() => setSaveStatus('idle')} className="ml-auto shrink-0 text-red-400 hover:text-red-600"><X size={14} /></button>
+                                </div>
+                            )}
+
                             <div className="mt-8 flex gap-4">
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="flex-1 py-4 bg-accent text-navy font-extrabold rounded-xl hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg"
+                                    className="flex-1 py-4 bg-accent text-navy font-extrabold rounded-xl hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg disabled:opacity-50"
                                 >
                                     <Save size={20} />
                                     {saving ? 'Guardando...' : 'Guardar Cambios'}
@@ -103,14 +141,50 @@ const PromptEditor = () => {
                         <p className="text-xs text-text-muted mb-6 leading-relaxed">
                             Usa esta herramienta para limpiar todos los datos de ejemplo (Leads, Citas y Conversaciones) antes de entrar en producción.
                         </p>
-                        <button
-                            onClick={handleCleanup}
-                            disabled={cleaning}
-                            className="w-full py-4 bg-red-50 text-red-600 border border-red-100 font-extrabold rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-3"
-                        >
-                            <Trash2 size={20} />
-                            {cleaning ? 'Limpiando...' : 'Limpiar Todo'}
-                        </button>
+
+                        {cleanupStatus === 'success' && (
+                            <div className="mb-4 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
+                                <CheckCircle size={16} className="shrink-0" />
+                                <span>{cleanupMessage}</span>
+                            </div>
+                        )}
+                        {cleanupStatus === 'error' && (
+                            <div className="mb-4 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                                <span>{cleanupMessage}</span>
+                                <button onClick={() => setCleanupStatus('idle')} className="ml-auto shrink-0 text-red-400 hover:text-red-600"><X size={14} /></button>
+                            </div>
+                        )}
+
+                        {showCleanupConfirm ? (
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
+                                <p className="text-xs text-red-700 font-bold text-center">ATENCIÓN: ¿Limpiar todos los Leads, Conversaciones y Citas?</p>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setShowCleanupConfirm(false)}
+                                        className="flex-1 py-2 bg-white border border-border text-navy font-bold rounded-lg text-sm"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleCleanupConfirm}
+                                        disabled={cleaning}
+                                        className="flex-1 py-2 bg-red-600 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-1 disabled:opacity-50"
+                                    >
+                                        <Trash2 size={14} /> Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={handleCleanupClick}
+                                disabled={cleaning}
+                                className="w-full py-4 bg-red-50 text-red-600 border border-red-100 font-extrabold rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                            >
+                                <Trash2 size={20} />
+                                {cleaning ? 'Limpiando...' : 'Limpiar Todo'}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
