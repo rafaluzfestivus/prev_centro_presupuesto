@@ -373,24 +373,43 @@ export async function getSalesAction() {
     try {
         const supabase = await createClient()
 
-        // Fetch all confirmed proposals
-        const { data: proposals, error: propError } = await supabase
-            .from('Proposta')
-            .select('*')
-            .eq('status', 'Confirmada')
-            .order('data_confirmacao', { ascending: false })
+        // Sales = scheduled visits (appointments), joined with client data
+        const { data: appointments, error: aptError } = await supabase
+            .from('appointments')
+            .select('*, clients(id, name, whatsapp, location)')
+            .order('scheduled_at', { ascending: false })
 
-        if (propError) throw propError
+        if (aptError) throw aptError
 
-        // Fetch items for all confirmed proposals
-        const ids = (proposals || []).map((p: any) => p.id)
+        // Extract proposal IDs from appointment notes ("Venta cerrada desde presupuesto {uuid}.")
+        const proposalIdRegex = /presupuesto ([0-9a-f-]{36})/i
+        const proposalIds: string[] = []
+        const aptToProposalId: Record<string, string> = {}
+
+        for (const apt of appointments || []) {
+            const match = (apt.notes || '').match(proposalIdRegex)
+            if (match) {
+                aptToProposalId[apt.id] = match[1]
+                proposalIds.push(match[1])
+            }
+        }
+
+        // Fetch linked proposals
+        let proposalMap: Record<string, any> = {}
         let itemsByProposal: Record<string, any[]> = {}
 
-        if (ids.length > 0) {
+        if (proposalIds.length > 0) {
+            const { data: proposals } = await supabase
+                .from('Proposta')
+                .select('*')
+                .in('id', proposalIds)
+
+            for (const p of proposals || []) proposalMap[p.id] = p
+
             const { data: items } = await supabase
                 .from('ItemProposta')
                 .select('*')
-                .in('proposta_id', ids)
+                .in('proposta_id', proposalIds)
 
             for (const item of items || []) {
                 if (!itemsByProposal[item.proposta_id]) itemsByProposal[item.proposta_id] = []
@@ -398,11 +417,28 @@ export async function getSalesAction() {
             }
         }
 
-        const sales = (proposals || []).map((p: any) => {
-            const items = itemsByProposal[p.id] || []
+        const sales = (appointments || []).map((apt: any) => {
+            const proposalId = aptToProposalId[apt.id]
+            const proposal = proposalId ? proposalMap[proposalId] : null
+            const items = proposalId ? (itemsByProposal[proposalId] || []) : []
             const totalM2 = items.reduce((sum: number, i: any) => sum + (Number(i.area_m2) || 0), 0)
-            const totalItems = items.length
-            return { ...p, items, totalM2, totalItems }
+            return {
+                // Appointment fields
+                appointmentId: apt.id,
+                appointmentStatus: apt.status,
+                scheduledAt: apt.date_start || apt.scheduled_at,
+                // Client fields
+                cliente_nome: apt.clients?.name || proposal?.cliente_nome || '',
+                whatsapp: apt.clients?.whatsapp || proposal?.whatsapp || '',
+                cidade: apt.clients?.location || proposal?.cidade || '',
+                // Proposal fields (may be null for manual appointments)
+                proposalId: proposalId || null,
+                installation_address: proposal?.installation_address || '',
+                total_geral: proposal?.total_geral || 0,
+                items,
+                totalM2,
+                totalItems: items.length,
+            }
         })
 
         return { success: true, data: sales }
