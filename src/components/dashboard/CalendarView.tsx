@@ -55,6 +55,15 @@ const CalendarView = () => {
         }
     }, [searchParams]);
 
+    // Open specific appointment from URL ?apt=<id>
+    useEffect(() => {
+        const aptParam = searchParams.get('apt');
+        if (aptParam && appointments.length > 0 && !isModalOpen) {
+            const apt = appointments.find((a: any) => a.id === aptParam);
+            if (apt) openAppointmentForEdit(apt);
+        }
+    }, [searchParams, appointments]);
+
     const fetchAppointments = async () => {
         setLoading(true);
         const { data, error } = await supabase
@@ -84,8 +93,7 @@ const CalendarView = () => {
         setIsModalOpen(true);
     };
 
-    const handleAppointmentClick = (e: React.MouseEvent, apt: any) => {
-        e.stopPropagation();
+    const openAppointmentForEdit = (apt: any) => {
         setSelectedAppointment(apt);
         const aptDate = apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date());
         setFormData({
@@ -98,6 +106,11 @@ const CalendarView = () => {
         setFormError('');
         setShowDeleteConfirm(false);
         setIsModalOpen(true);
+    };
+
+    const handleAppointmentClick = (e: React.MouseEvent, apt: any) => {
+        e.stopPropagation();
+        openAppointmentForEdit(apt);
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
