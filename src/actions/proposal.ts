@@ -332,13 +332,23 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                     installation?.notes ? `Notas: ${installation.notes}` : ''
                 ].filter(Boolean).join(' | ')
 
+                // Calculate total m² from proposal items
+                const { data: proposalItems } = await supabase
+                    .from('ItemProposta')
+                    .select('area_m2')
+                    .eq('proposta_id', id)
+                const totalM2 = (proposalItems || []).reduce((sum: number, i: any) => sum + (Number(i.area_m2) || 0), 0)
+
                 const { error: aptError } = await supabase
                     .from('appointments')
                     .insert({
                         client_id: client.id,
                         scheduled_at: new Date().toISOString(),
                         status: 'pending',
-                        notes
+                        notes,
+                        installation_address: installation?.address || null,
+                        total_value: proposal.total_geral || null,
+                        total_m2: totalM2 || null,
                     })
 
                 if (aptError) throw aptError
@@ -421,7 +431,7 @@ export async function getSalesAction() {
             const proposalId = aptToProposalId[apt.id]
             const proposal = proposalId ? proposalMap[proposalId] : null
             const items = proposalId ? (itemsByProposal[proposalId] || []) : []
-            const totalM2 = items.reduce((sum: number, i: any) => sum + (Number(i.area_m2) || 0), 0)
+            const totalM2FromItems = items.reduce((sum: number, i: any) => sum + (Number(i.area_m2) || 0), 0)
             return {
                 // Appointment fields
                 appointmentId: apt.id,
@@ -431,12 +441,12 @@ export async function getSalesAction() {
                 cliente_nome: apt.clients?.name || proposal?.cliente_nome || '',
                 whatsapp: apt.clients?.whatsapp || proposal?.whatsapp || '',
                 cidade: apt.clients?.location || proposal?.cidade || '',
-                // Proposal fields (may be null for manual appointments)
+                // Sale data: appointment fields take priority over proposal fields
                 proposalId: proposalId || null,
-                installation_address: proposal?.installation_address || '',
-                total_geral: proposal?.total_geral || 0,
+                installation_address: apt.installation_address || proposal?.installation_address || '',
+                total_geral: apt.total_value || proposal?.total_geral || 0,
                 items,
-                totalM2,
+                totalM2: apt.total_m2 || totalM2FromItems || 0,
                 totalItems: items.length,
             }
         })
