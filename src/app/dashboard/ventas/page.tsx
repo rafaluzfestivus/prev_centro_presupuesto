@@ -7,7 +7,7 @@ import { getSalesAction } from '@/actions/proposal'
 import {
     TrendingUp, Euro, Layers, Users, ClipboardList,
     RefreshCw, MapPin, Phone, Calendar, Search,
-    AlertCircle, X
+    AlertCircle, X, Pencil
 } from 'lucide-react'
 
 interface SaleRow {
@@ -211,7 +211,7 @@ export default function VentasPage() {
                             <th className="p-4 font-bold text-right">Total</th>
                             <th className="p-4 font-bold text-center">Visita</th>
                             <th className="p-4 font-bold text-center">Estado</th>
-                            <th className="p-4 font-bold text-center">Ficha</th>
+                            <th className="p-4 font-bold text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white/50">
@@ -228,7 +228,7 @@ export default function VentasPage() {
                                 const status = STATUS_LABELS[sale.appointmentStatus] || { label: sale.appointmentStatus, cls: 'bg-gray-100 text-gray-500' }
                                 return (
                                     <tr key={sale.appointmentId}
-                                        className="border-b border-border hover:bg-white transition-colors cursor-pointer group"
+                                        className={`border-b border-border hover:bg-white transition-colors group ${sale.proposalId ? 'cursor-pointer' : ''}`}
                                         onClick={() => sale.proposalId && router.push(`/proposal/${sale.proposalId}/report`)}>
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
@@ -274,14 +274,22 @@ export default function VentasPage() {
                                             </span>
                                         </td>
                                         <td className="p-4 text-center">
-                                            {sale.proposalId && (
+                                            <div className="flex items-center justify-center gap-1">
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); router.push(`/proposal/${sale.proposalId}/report`) }}
-                                                    className="p-2 bg-navy/5 text-navy rounded-lg hover:bg-navy hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                                                    title="Ver Ficha de Instalación">
-                                                    <ClipboardList size={15} />
+                                                    onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/citas?apt=${sale.appointmentId}`) }}
+                                                    className="p-2 bg-accent/10 text-accent rounded-lg hover:bg-accent hover:text-navy transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Editar Cita">
+                                                    <Pencil size={15} />
                                                 </button>
-                                            )}
+                                                {sale.proposalId && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); router.push(`/proposal/${sale.proposalId}/report`) }}
+                                                        className="p-2 bg-navy/5 text-navy rounded-lg hover:bg-navy hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Ver Ficha de Instalación">
+                                                        <ClipboardList size={15} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 )
