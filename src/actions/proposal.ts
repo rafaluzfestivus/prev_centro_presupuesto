@@ -369,6 +369,49 @@ export async function addAfterPhotosAction(id: string, photoUrls: string[]) {
     }
 }
 
+export async function getSalesAction() {
+    try {
+        const supabase = await createClient()
+
+        // Fetch all confirmed proposals
+        const { data: proposals, error: propError } = await supabase
+            .from('Proposta')
+            .select('*')
+            .eq('status', 'Confirmada')
+            .order('data_confirmacao', { ascending: false })
+
+        if (propError) throw propError
+
+        // Fetch items for all confirmed proposals
+        const ids = (proposals || []).map((p: any) => p.id)
+        let itemsByProposal: Record<string, any[]> = {}
+
+        if (ids.length > 0) {
+            const { data: items } = await supabase
+                .from('ItemProposta')
+                .select('*')
+                .in('proposta_id', ids)
+
+            for (const item of items || []) {
+                if (!itemsByProposal[item.proposta_id]) itemsByProposal[item.proposta_id] = []
+                itemsByProposal[item.proposta_id].push(item)
+            }
+        }
+
+        const sales = (proposals || []).map((p: any) => {
+            const items = itemsByProposal[p.id] || []
+            const totalM2 = items.reduce((sum: number, i: any) => sum + (Number(i.area_m2) || 0), 0)
+            const totalItems = items.length
+            return { ...p, items, totalM2, totalItems }
+        })
+
+        return { success: true, data: sales }
+    } catch (error: any) {
+        console.error('Failed to fetch sales:', error)
+        return { success: false, error: error.message || 'Error al obtener ventas' }
+    }
+}
+
 export async function updateProposalAction(id: string, updates: any) {
     try {
         await updateProposal(id, updates)
