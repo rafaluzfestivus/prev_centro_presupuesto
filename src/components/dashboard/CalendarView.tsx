@@ -15,12 +15,14 @@ import {
     parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2, MapPin, Euro, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2, MapPin, Euro, Layers, ClipboardList } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
 
 const CalendarView = () => {
     const supabase = createClient();
+    const router = useRouter();
     const searchParams = useSearchParams();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -481,6 +483,16 @@ const CalendarView = () => {
                             </div>
 
                             <div className="pt-2 flex flex-col gap-3">
+                                {selectedAppointment && (
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(`/dashboard/citas/${selectedAppointment.id}/report`)}
+                                        className="w-full py-3 bg-navy/5 text-navy font-bold rounded-xl hover:bg-navy hover:text-white transition-all text-sm border border-navy/10 flex items-center justify-center gap-2"
+                                    >
+                                        <ClipboardList size={16} /> Ver Ficha de Instalación
+                                    </button>
+                                )}
+
                                 <button
                                     type="submit"
                                     disabled={uploading}
