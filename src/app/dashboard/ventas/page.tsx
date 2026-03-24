@@ -228,8 +228,8 @@ export default function VentasPage() {
                                 const status = STATUS_LABELS[sale.appointmentStatus] || { label: sale.appointmentStatus, cls: 'bg-gray-100 text-gray-500' }
                                 return (
                                     <tr key={sale.appointmentId}
-                                        className={`border-b border-border hover:bg-white transition-colors group ${sale.proposalId ? 'cursor-pointer' : ''}`}
-                                        onClick={() => sale.proposalId && router.push(`/proposal/${sale.proposalId}/report`)}>
+                                        className="border-b border-border hover:bg-white transition-colors group cursor-pointer"
+                                        onClick={() => router.push(`/dashboard/citas/${sale.appointmentId}/report`)}>
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 bg-accent/10 text-accent rounded-full flex items-center justify-center font-black text-sm shrink-0">
@@ -281,14 +281,12 @@ export default function VentasPage() {
                                                     title="Editar Cita">
                                                     <Pencil size={15} />
                                                 </button>
-                                                {sale.proposalId && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); router.push(`/proposal/${sale.proposalId}/report`) }}
-                                                        className="p-2 bg-navy/5 text-navy rounded-lg hover:bg-navy hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                                                        title="Ver Ficha de Instalación">
-                                                        <ClipboardList size={15} />
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/citas/${sale.appointmentId}/report`) }}
+                                                    className="p-2 bg-navy/5 text-navy rounded-lg hover:bg-navy hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Ver Ficha de Instalación">
+                                                    <ClipboardList size={15} />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

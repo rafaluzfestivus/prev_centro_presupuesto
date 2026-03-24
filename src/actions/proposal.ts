@@ -469,6 +469,71 @@ export async function updateProposalAction(id: string, updates: any) {
     }
 }
 
+export async function getAppointmentReportAction(id: string) {
+    try {
+        const supabase = await createClient()
+
+        const { data: apt, error } = await supabase
+            .from('appointments')
+            .select('*, clients(id, name, whatsapp, location)')
+            .eq('id', id)
+            .single()
+
+        if (error || !apt) throw new Error('Cita no encontrada')
+
+        // Try to find linked proposal from notes
+        const proposalIdRegex = /presupuesto ([0-9a-f-]{36})/i
+        const match = (apt.notes || '').match(proposalIdRegex)
+        let proposal = null
+        let items: any[] = []
+        let processing = null
+
+        if (match) {
+            const proposalId = match[1]
+            try {
+                proposal = await getProposalById(proposalId)
+                items = await getProposalItems(proposalId)
+                processing = await getLatestAIProcessing(proposalId)
+            } catch {
+                // proposal may have been deleted
+            }
+        }
+
+        return { success: true, data: { appointment: apt, proposal, items, processing } }
+    } catch (error: any) {
+        console.error('Failed to fetch appointment report:', error)
+        return { success: false, error: error.message || 'Error al obtener la ficha' }
+    }
+}
+
+export async function addAppointmentAfterPhotosAction(id: string, photoUrls: string[]) {
+    try {
+        const supabase = await createClient()
+
+        const { data: apt, error: fetchError } = await supabase
+            .from('appointments')
+            .select('after_photos')
+            .eq('id', id)
+            .single()
+
+        if (fetchError) throw fetchError
+
+        const existing: string[] = apt?.after_photos || []
+        const { error } = await supabase
+            .from('appointments')
+            .update({ after_photos: [...existing, ...photoUrls] })
+            .eq('id', id)
+
+        if (error) throw error
+
+        revalidatePath(`/dashboard/citas/${id}/report`)
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to add after photos to appointment:', error)
+        return { success: false, error: error.message || 'Error al guardar fotos' }
+    }
+}
+
 export async function deleteProposalAction(id: string) {
     try {
         await deleteProposal(id)
