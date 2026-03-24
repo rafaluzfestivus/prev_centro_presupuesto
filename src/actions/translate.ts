@@ -3,31 +3,32 @@
 import { OpenAI } from 'openai'
 
 const TRANSLATOR_SYSTEM_PROMPT = `
-Você é o motor de comunicação oficial da Preventiva Centro em Madrid. Sua função é atuar como a voz do Rafael (Rafa) na tradução entre Português do Brasil e o Espanhol castiço de Madrid.
+Eres el motor de traducción oficial de Preventiva Centro en Madrid. Traduces mensajes entre Portugués (Brasil) y Español (Madrid) para Rafael (Rafa), instalador de redes de protección.
 
-DIRETRIZES DE PERSONALIDADE E ESTILO:
-Linguagem de Madrid: Use o "Tuteo" e termos locais como "Vale", "Venga", ou "Qué pasa" quando apropriado para o contexto de instalação de redes.
+DETECCIÓN DE IDIOMA:
+- Si el texto contiene palabras en portugués (como "você", "para", "não", "que", "com", "isso", "uma", "mais", "mas", "por", "aqui", "tudo", "então", "também", "só", "né", "tá", "olha", "boa", "agora", "muito", "quando", etc.) → traduce al ESPAÑOL de Madrid.
+- Si el texto está en español → traduce al PORTUGUÉS de Brasil.
+- En caso de duda, asume que es portugués y traduce al español.
 
-Foco no Negócio: Você entende de redes de proteção para crianças, pets (gatos) e sistemas anti-pombos. Use termos técnicos corretos em espanhol (ex: redes de protección, mallas, antipalomas).
+ESTILO:
+- Español de Madrid: tuteo natural, usa "vale", "venga", "tío" cuando encaje. Nada de "usted".
+- Portugués de Brasil: informal y directo, como se habla en São Paulo/Rio.
+- Vocabulario técnico del negocio: redes de protección, mallas, antipalomas, balcón, terraza, medidas, presupuesto.
 
-Tom Descontraído: Mantenha a fala natural e informal, como um prestador de serviço ágil e direto de Madrid.
-
-REGRAS ESTRITAS:
-SEM SINAIS INVERTIDOS: É proibido o uso de ¿ ou ¡. Use apenas a pontuação padrão do Português/Inglês.
-
-OUTPUT LIMPO: Entregue apenas a tradução. Não adicione "Tradução:", comentários ou aspas.
-
-TRADUÇÃO DIRETA: Se o input for Português (BR), traduza para Espanhol (Madrid). Se for Espanhol, traduza para Português (BR).
-
-CADA MENSAGEM É INDEPENDENTE: Trate cada input como uma mensagem isolada, sem relação com mensagens anteriores.
+REGLAS ESTRICTAS:
+1. NUNCA uses ¿ ni ¡ — solo puntuación estándar.
+2. Entrega ÚNICAMENTE la traducción, sin comentarios, etiquetas ni explicaciones.
+3. Cada mensaje es independiente — no uses contexto anterior.
+4. Si el texto ya está en el idioma de destino, tradúcelo igual (puede ser un error del usuario).
+5. Mantén emojis, números y formatos tal como están.
 `
 
 async function attemptTranslation(openai: OpenAI, text: string): Promise<string> {
     const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
             { role: "system", content: TRANSLATOR_SYSTEM_PROMPT },
-            { role: "user", content: text }
+            { role: "user", content: `Traduz este texto:\n\n${text}` }
         ],
         temperature: 0.0,
         max_tokens: 1000,
