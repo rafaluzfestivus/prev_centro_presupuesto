@@ -15,7 +15,7 @@ import {
     parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2, MapPin, Euro, Layers } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
 
@@ -38,7 +38,10 @@ const CalendarView = () => {
         whatsapp: '',
         date_start: '',
         status: 'confirmed',
-        attachment_url: ''
+        attachment_url: '',
+        installation_address: '',
+        total_value: '',
+        total_m2: ''
     });
 
     // Handle pre-fill from URL
@@ -101,7 +104,10 @@ const CalendarView = () => {
             whatsapp: apt.clients?.whatsapp || '',
             date_start: format(aptDate, "yyyy-MM-dd'T'HH:mm"),
             status: apt.status,
-            attachment_url: apt.attachment_url || ''
+            attachment_url: apt.attachment_url || '',
+            installation_address: apt.installation_address || '',
+            total_value: apt.total_value ? String(apt.total_value) : '',
+            total_m2: apt.total_m2 ? String(apt.total_m2) : ''
         });
         setFormError('');
         setShowDeleteConfirm(false);
@@ -178,30 +184,28 @@ const CalendarView = () => {
         // Ensure ISO format for DB
         const isoDate = formData.date_start ? new Date(formData.date_start).toISOString() : new Date().toISOString();
 
+        const aptPayload: any = {
+            client_id: clientId,
+            date_start: isoDate,
+            date_end: isoDate,
+            scheduled_at: isoDate,
+            status: formData.status,
+            attachment_url: formData.attachment_url,
+            installation_address: formData.installation_address || null,
+            total_value: formData.total_value ? parseFloat(formData.total_value) : null,
+            total_m2: formData.total_m2 ? parseFloat(formData.total_m2) : null,
+        };
+
         if (selectedAppointment) {
             const { error: updateError } = await supabase
                 .from('appointments')
-                .update({
-                    client_id: clientId,
-                    date_start: isoDate,
-                    date_end: isoDate,
-                    scheduled_at: isoDate,
-                    status: formData.status,
-                    attachment_url: formData.attachment_url
-                })
+                .update(aptPayload)
                 .eq('id', selectedAppointment.id);
             error = updateError;
         } else {
             const { error: insertError } = await supabase
                 .from('appointments')
-                .insert({
-                    client_id: clientId,
-                    date_start: isoDate,
-                    date_end: isoDate,
-                    scheduled_at: isoDate,
-                    status: formData.status,
-                    attachment_url: formData.attachment_url
-                });
+                .insert(aptPayload);
             error = insertError;
         }
 
@@ -242,7 +246,10 @@ const CalendarView = () => {
             whatsapp: '',
             date_start: '',
             status: 'confirmed',
-            attachment_url: ''
+            attachment_url: '',
+            installation_address: '',
+            total_value: '',
+            total_m2: ''
         });
         setSelectedAppointment(null);
         setFormError('');
@@ -413,6 +420,43 @@ const CalendarView = () => {
                                         <option value="completed">Completada</option>
                                         <option value="cancelled">Cancelada</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">
+                                    <span className="flex items-center gap-1.5"><MapPin size={12} />Dirección de Instalación</span>
+                                </label>
+                                <input
+                                    type="text" value={formData.installation_address}
+                                    onChange={e => setFormData({ ...formData, installation_address: e.target.value })}
+                                    placeholder="Calle, número, ciudad…"
+                                    className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">
+                                        <span className="flex items-center gap-1.5"><Euro size={12} />Valor Total (€)</span>
+                                    </label>
+                                    <input
+                                        type="number" min="0" step="0.01" value={formData.total_value}
+                                        onChange={e => setFormData({ ...formData, total_value: e.target.value })}
+                                        placeholder="0.00"
+                                        className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-tight">
+                                        <span className="flex items-center gap-1.5"><Layers size={12} />Total m²</span>
+                                    </label>
+                                    <input
+                                        type="number" min="0" step="0.01" value={formData.total_m2}
+                                        onChange={e => setFormData({ ...formData, total_m2: e.target.value })}
+                                        placeholder="0.00"
+                                        className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
+                                    />
                                 </div>
                             </div>
 
