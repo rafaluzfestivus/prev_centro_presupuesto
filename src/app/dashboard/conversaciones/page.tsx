@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -10,6 +10,7 @@ import {
     type ConversationContact,
     type Message,
 } from '@/actions/conversations'
+import NextImage from 'next/image'
 import {
     Search, Send, MessageSquare, Phone, ArrowLeft,
     Check, CheckCheck, Image as ImageIcon, RefreshCw, Wifi, WifiOff
@@ -34,7 +35,7 @@ function MessageBubble({ msg }: { msg: Message }) {
                 : 'bg-white text-gray-800 rounded-bl-sm'
                 }`}>
                 {msg.mediaType === 'image' && msg.mediaUrl && (
-                    <img src={msg.mediaUrl} alt="imagem" className="rounded-lg mb-1 max-w-full" />
+                    <NextImage src={msg.mediaUrl} alt="imagem" width={300} height={200} className="rounded-lg mb-1 max-w-full" />
                 )}
                 {msg.mediaType === 'document' && (
                     <div className="flex items-center gap-2 text-blue-600 mb-1">
@@ -91,7 +92,6 @@ function ContactItem({ contact, active, onClick }: { contact: ConversationContac
 export default function ConversacionesPage() {
     const supabase = createClient()
     const [contacts, setContacts] = useState<ConversationContact[]>([])
-    const [filtered, setFiltered] = useState<ConversationContact[]>([])
     const [search, setSearch] = useState('')
     const [selected, setSelected] = useState<ConversationContact | null>(null)
     const [messages, setMessages] = useState<Message[]>([])
@@ -109,7 +109,6 @@ export default function ConversacionesPage() {
         const res = await getContactsWithLastMessageAction()
         if (res.success && res.data) {
             setContacts(res.data)
-            setFiltered(res.data)
         }
         setLoadingContacts(false)
     }, [])
@@ -127,23 +126,23 @@ export default function ConversacionesPage() {
         setLoadingMessages(false)
     }, [])
 
-    useEffect(() => { loadContacts() }, [loadContacts])
+    useEffect(() => { loadContacts() }, [loadContacts]) // eslint-disable-line react-hooks/set-state-in-effect
 
     // Check Evolution API connection status
     useEffect(() => {
         fetch('/api/wa/status')
-            .then(r => r.json())
+            .then(r => r.json() as Promise<{ connected: boolean }>)
             .then(d => setConnected(d.connected))
             .catch(() => setConnected(false))
     }, [])
 
-    // Filter contacts by search
-    useEffect(() => {
-        if (!search.trim()) { setFiltered(contacts); return }
-        const q = search.toLowerCase()
-        setFiltered(contacts.filter(c =>
+    // Filter contacts by search (derived state via useMemo)
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase()
+        if (!q) return contacts
+        return contacts.filter(c =>
             c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.lastMessage.toLowerCase().includes(q)
-        ))
+        )
     }, [search, contacts])
 
     // Scroll to bottom on new messages
@@ -156,7 +155,7 @@ export default function ConversacionesPage() {
         const channel = supabase
             .channel('conversations-realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, (payload) => {
-                const row = payload.new as any
+                const row = payload.new as Record<string, string>
                 // Update contacts list
                 loadContacts()
                 // If this message belongs to the selected contact, add it
