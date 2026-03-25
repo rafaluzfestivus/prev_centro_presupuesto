@@ -41,14 +41,14 @@ export async function getContactsWithLastMessageAction(): Promise<{ success: boo
     // Agrupar por cliente e pegar só a última mensagem
     const map = new Map<string, ConversationContact>()
     for (const row of (data ?? [])) {
-        const client = row.clients as any
+        const client = row.clients as { id: string; name: string; whatsapp: string } | null
         const clientId = client?.id ?? row.phone ?? 'unknown'
         if (map.has(clientId)) continue // já tem a última (está ordenado desc)
 
         map.set(clientId, {
             clientId,
-            name: client?.name ?? row.phone ?? '?',
-            phone: client?.whatsapp ?? row.phone ?? '',
+            name: (client?.name ?? row.phone) ?? '?',
+            phone: (client?.whatsapp ?? row.phone) ?? '',
             lastMessage: row.message ?? '',
             lastMessageAt: row.created_at,
             lastDirection: row.direction as 'inbound' | 'outbound',
@@ -127,8 +127,9 @@ export async function sendMessageAction(clientId: string, phone: string, text: s
         })
 
         return { success: true }
-    } catch (err: any) {
+    } catch (err) {
         console.error('[sendMessageAction]', err)
-        return { success: false, error: err?.message ?? 'Erro ao enviar mensagem' }
+        const msg = err instanceof Error ? err.message : 'Erro ao enviar mensagem'
+        return { success: false, error: msg }
     }
 }
