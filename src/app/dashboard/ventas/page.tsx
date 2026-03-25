@@ -126,8 +126,8 @@ export default function VentasPage() {
             </header>
 
             {/* Filter bar */}
-            <div className="bg-white border border-border rounded-2xl p-4 mb-8 flex flex-wrap gap-4 items-end">
-                <div className="flex-1 min-w-[200px]">
+            <div className="bg-white border border-border rounded-2xl p-4 mb-8 flex flex-col sm:flex-row flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-0 w-full sm:w-auto sm:min-w-[200px]">
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1.5">Buscar</label>
                     <div className="relative">
                         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
@@ -191,7 +191,7 @@ export default function VentasPage() {
             )}
 
             {/* Table */}
-            <div className="glass-card overflow-hidden border-none shadow-sm">
+            <div className="glass-card overflow-hidden border-none shadow-sm overflow-x-auto">
                 {(search.trim() || preset !== 'all') && (
                     <div className="px-4 py-2.5 bg-accent/5 border-b border-border flex items-center gap-2 text-xs text-accent font-bold">
                         <Search size={12} />

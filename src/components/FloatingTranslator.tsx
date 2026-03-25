@@ -9,9 +9,9 @@ export function FloatingTranslator() {
     const [isOpen, setIsOpen] = useState(false)
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-4">
             {isOpen && (
-                <div className="w-[350px] shadow-2xl rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 animate-in slide-in-from-bottom-10 fade-in duration-200">
+                <div className="w-[calc(100vw-2rem)] sm:w-[350px] shadow-2xl rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 animate-in slide-in-from-bottom-10 fade-in duration-200">
                     <div className="bg-white dark:bg-gray-800 relative">
                         <Button
                             size="icon"

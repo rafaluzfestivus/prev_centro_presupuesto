@@ -69,9 +69,9 @@ const DashboardHome = () => {
 
     return (
         <DashboardLayout>
-            <header className="mb-10">
-                <h1 className="text-4xl font-extrabold mb-2 text-navy">Bienvenido, <span className="accent-text">Rafael</span></h1>
-                <p className="text-text-muted text-lg">Tu centro integrado de presupuestos y atención.</p>
+            <header className="mb-8">
+                <h1 className="text-2xl sm:text-4xl font-extrabold mb-2 text-navy">Bienvenido, <span className="accent-text">Rafael</span></h1>
+                <p className="text-text-muted text-sm sm:text-lg">Tu centro integrado de presupuestos y atención.</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -79,7 +79,7 @@ const DashboardHome = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="glass-card p-10 bg-white border-none shadow-sm">
+                <div className="glass-card p-6 sm:p-10 bg-white border-none shadow-sm">
                     <h2 className="text-xl font-bold mb-8 text-navy uppercase tracking-widest flex items-center gap-3">
                         <Users className="text-accent" />
                         Leads Recientes (Sitio)
@@ -121,7 +121,7 @@ const DashboardHome = () => {
                     </div>
                 </div>
 
-                <div className="glass-card p-10 bg-white border-none shadow-sm">
+                <div className="glass-card p-6 sm:p-10 bg-white border-none shadow-sm">
                     <h2 className="text-xl font-bold mb-8 text-navy uppercase tracking-widest flex items-center gap-3">
                         <ShieldCheck className="text-accent" />
                         Estado del Sistema
