@@ -163,7 +163,7 @@ export default function ConversacionesPage() {
                     const newMsg: Message = {
                         id: row.id,
                         message: row.message ?? '',
-                        direction: row.direction,
+                        direction: row.direction as 'inbound' | 'outbound',
                         status: row.status,
                         createdAt: row.created_at,
                         mediaUrl: row.media_url ?? null,
