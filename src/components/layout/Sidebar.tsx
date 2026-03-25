@@ -13,10 +13,16 @@ import {
     Calendar,
     Users,
     FileText,
-    TrendingUp
+    TrendingUp,
+    X
 } from 'lucide-react';
 
-const Sidebar = () => {
+interface SidebarProps {
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
+const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
     const pathname = usePathname();
 
     const menuItems = [
@@ -31,7 +37,15 @@ const Sidebar = () => {
     ];
 
     return (
-        <aside className="w-64 bg-navy h-screen fixed left-0 top-0 flex flex-col p-6 z-50">
+        <aside className={`w-64 bg-navy h-screen fixed left-0 top-0 flex flex-col p-6 z-50 transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+            {/* Close button - mobile only */}
+            <button
+                onClick={onClose}
+                className="md:hidden absolute top-4 right-4 p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+            >
+                <X size={20} />
+            </button>
+
             <div className="px-2 mb-8 flex flex-col items-center gap-2">
                 <Image src="/icon.png" alt="Preventiva Logo" width={60} height={60} className="mb-2" />
                 <div className="text-center">
@@ -49,6 +63,7 @@ const Sidebar = () => {
                         <Link
                             key={item.id}
                             href={item.id}
+                            onClick={onClose}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
                                 ? 'bg-accent/10 border border-accent/20'
                                 : 'hover:bg-white/5'
