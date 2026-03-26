@@ -41,7 +41,9 @@ export async function getContactsWithLastMessageAction(): Promise<{ success: boo
     // Agrupar por cliente e pegar só a última mensagem
     const map = new Map<string, ConversationContact>()
     for (const row of (data ?? [])) {
-        const client = row.clients as { id: string; name: string; whatsapp: string } | null
+        type ClientRow = { id: string; name: string; whatsapp: string }
+        const rawClient = row.clients
+        const client = (Array.isArray(rawClient) ? rawClient[0] : rawClient) as ClientRow | null
         const clientId = client?.id ?? row.phone ?? 'unknown'
         if (map.has(clientId)) continue // já tem a última (está ordenado desc)
 
