@@ -19,19 +19,20 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
 
-        // Only process incoming messages
-        if (body.event !== 'messages.upsert') {
+        // Evolution API v2 usa MESSAGES_UPSERT (maiúsculas)
+        if (body.event !== 'MESSAGES_UPSERT') {
             return NextResponse.json({ ok: true })
         }
 
         const msg = body.data
-        if (!msg || msg.key?.fromMe) {
+        if (!msg) {
             return NextResponse.json({ ok: true })
         }
 
-        // Extract phone (remove @s.whatsapp.net or @g.us)
+        // Extract phone (remove @s.whatsapp.net ou @g.us)
         const remoteJid: string = msg.key?.remoteJid ?? ''
         const phone = remoteJid.split('@')[0]
+        const isFromMe: boolean = msg.key?.fromMe === true
 
         // Skip group messages
         if (remoteJid.endsWith('@g.us')) {
@@ -80,12 +81,12 @@ export async function POST(req: NextRequest) {
             clientId = newClient?.id ?? null
         }
 
-        // Save message
+        // Save message — fromMe = outbound (mensagens do Rafael)
         await supabase.from('conversations').insert({
             client_id:     clientId,
             message:       text,
-            direction:     'inbound',
-            status:        'received',
+            direction:     isFromMe ? 'outbound' : 'inbound',
+            status:        isFromMe ? 'sent' : 'received',
             wa_message_id: waMessageId,
             phone,
             media_url:     mediaUrl,

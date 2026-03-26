@@ -1,58 +1,89 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { normalizePhone } from '@/lib/evolution'
+
+export const maxDuration = 60 // Vercel: até 60s para planos Pro, 10s para hobby
 
 const BASE_URL = process.env.EVOLUTION_API_URL?.replace(/\/$/, '') ?? ''
 const API_KEY  = process.env.EVOLUTION_API_KEY ?? ''
 const INSTANCE = process.env.EVOLUTION_INSTANCE ?? 'preventiva'
 
-const headers = { 'Content-Type': 'application/json', apikey: API_KEY }
+const evoHeaders = { 'Content-Type': 'application/json', apikey: API_KEY }
 
-/**
- * Importa o histórico de mensagens do WhatsApp via Evolution API.
- * Chama GET /api/wa/import para disparar a importação.
- */
-export async function GET() {
+export async function GET(req: NextRequest) {
+    // Verifica env vars
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return NextResponse.json({ ok: false, error: 'SUPABASE_SERVICE_ROLE_KEY não configurado na Vercel' }, { status: 500 })
+    }
+    if (!BASE_URL || !API_KEY) {
+        return NextResponse.json({ ok: false, error: 'EVOLUTION_API_URL ou EVOLUTION_API_KEY não configurados na Vercel' }, { status: 500 })
+    }
+
     const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
     )
 
+    // Parâmetro opcional: quantos chats importar (default 30)
+    const url = new URL(req.url)
+    const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '30'), 100)
+
     try {
-        // 1. Busca todos os chats da instância
-        const chatsRes = await fetch(`${BASE_URL}/chat/findChats/${INSTANCE}`, { headers })
+        // 1. Busca lista de chats (Evolution API v2 usa POST)
+        const chatsRes = await fetch(`${BASE_URL}/chat/findChats/${INSTANCE}`, {
+            method: 'POST',
+            headers: evoHeaders,
+            body: JSON.stringify({}),
+        })
         if (!chatsRes.ok) {
-            return NextResponse.json({ ok: false, error: `Evolution API: ${chatsRes.status}` }, { status: 500 })
+            const txt = await chatsRes.text()
+            return NextResponse.json({ ok: false, error: `Evolution API (findChats) ${chatsRes.status}: ${txt.slice(0, 200)}` }, { status: 500 })
         }
-        const chats: { id: string; name?: string }[] = await chatsRes.json()
+
+        const allChats = await chatsRes.json() as { id: string; name?: string }[]
+        if (!Array.isArray(allChats)) {
+            return NextResponse.json({ ok: false, error: 'Evolution API retornou formato inesperado em findChats' }, { status: 500 })
+        }
+
+        // Filtra grupos e limita quantidade
+        const chats = allChats
+            .filter(c => c.id && !c.id.includes('@g.us'))
+            .slice(0, limit)
 
         let totalImported = 0
         let totalSkipped  = 0
 
         for (const chat of chats) {
-            // Ignora grupos (@g.us)
-            if (!chat.id || chat.id.includes('@g.us')) continue
-
             const phone = chat.id.split('@')[0]
 
-            // 2. Busca mensagens do chat (últimas 50)
-            const msgsRes = await fetch(`${BASE_URL}/chat/fetchMessages/${INSTANCE}`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ number: chat.id, count: 50 }),
-            })
-            if (!msgsRes.ok) continue
-
-            const msgs: {
-                key: { id: string; fromMe: boolean }
+            // 2. Busca mensagens do chat
+            let msgs: {
+                key: { id: string; fromMe: boolean; remoteJid: string }
                 message?: { conversation?: string; extendedTextMessage?: { text: string } }
                 messageTimestamp: number
                 pushName?: string
-            }[] = await msgsRes.json()
+            }[] = []
 
-            if (!Array.isArray(msgs) || msgs.length === 0) continue
+            try {
+                const msgsRes = await fetch(`${BASE_URL}/chat/fetchMessages/${INSTANCE}`, {
+                    method: 'POST',
+                    headers: evoHeaders,
+                    body: JSON.stringify({
+                        where: { key: { remoteJid: chat.id } },
+                        limit: 40,
+                    }),
+                })
+                if (msgsRes.ok) {
+                    const json = await msgsRes.json()
+                    msgs = Array.isArray(json) ? json : (json?.messages ?? [])
+                }
+            } catch {
+                continue // skip este chat se falhar
+            }
 
-            // 3. Encontra ou cria o cliente
+            if (!msgs.length) continue
+
+            // 3. Encontra ou cria cliente
             const normalizedPhone = normalizePhone(phone)
             let clientId: string | null = null
 
@@ -61,36 +92,29 @@ export async function GET() {
                 .select('id')
                 .or(`whatsapp.eq.${phone},whatsapp.eq.${normalizedPhone}`)
                 .limit(1)
-                .single()
+                .maybeSingle()
 
             if (existing?.id) {
                 clientId = existing.id
             } else {
                 const { data: newClient } = await supabase
                     .from('clients')
-                    .insert({
-                        name: chat.name || phone,
-                        whatsapp: phone,
-                        source: 'whatsapp',
-                        status: 'new',
-                    })
+                    .insert({ name: chat.name || phone, whatsapp: phone, source: 'whatsapp', status: 'new' })
                     .select('id')
                     .single()
                 clientId = newClient?.id ?? null
             }
 
-            // 4. Insere mensagens que ainda não existem
+            // 4. Insere mensagens sem duplicar
             for (const msg of msgs) {
                 const waId = msg.key?.id
                 if (!waId) continue
 
-                // Verifica se já existe no banco
                 const { data: dup } = await supabase
                     .from('conversations')
                     .select('id')
                     .eq('wa_message_id', waId)
-                    .limit(1)
-                    .single()
+                    .maybeSingle()
 
                 if (dup?.id) { totalSkipped++; continue }
 
@@ -101,17 +125,16 @@ export async function GET() {
 
                 if (!text) continue
 
-                const createdAt = new Date(msg.messageTimestamp * 1000).toISOString()
-
+                const isFromMe = msg.key.fromMe === true
                 await supabase.from('conversations').insert({
                     client_id:     clientId,
                     message:       text,
-                    direction:     msg.key.fromMe ? 'outbound' : 'inbound',
-                    status:        msg.key.fromMe ? 'sent' : 'received',
+                    direction:     isFromMe ? 'outbound' : 'inbound',
+                    status:        isFromMe ? 'sent' : 'received',
                     wa_message_id: waId,
                     phone,
                     push_name:     msg.pushName ?? null,
-                    created_at:    createdAt,
+                    created_at:    new Date(msg.messageTimestamp * 1000).toISOString(),
                 })
                 totalImported++
             }
@@ -121,7 +144,7 @@ export async function GET() {
             ok: true,
             imported: totalImported,
             skipped: totalSkipped,
-            chats: chats.filter(c => !c.id?.includes('@g.us')).length,
+            chats: chats.length,
         })
 
     } catch (err) {
