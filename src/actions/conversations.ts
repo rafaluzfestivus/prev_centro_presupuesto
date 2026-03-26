@@ -77,14 +77,26 @@ export async function getContactsWithLastMessageAction(): Promise<{ success: boo
 }
 
 /** Mensagens de um cliente específico */
-export async function getClientMessagesAction(clientId: string): Promise<{ success: boolean; data?: Message[]; error?: string }> {
+export async function getClientMessagesAction(clientId: string, phone?: string): Promise<{ success: boolean; data?: Message[]; error?: string }> {
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    // Busca por client_id (UUID) ou fallback por telefone
+    const isUUID = /^[0-9a-f-]{36}$/i.test(clientId)
+    let query = supabase
         .from('conversations')
         .select('id, message, direction, status, created_at, media_url, media_type, push_name')
-        .eq('client_id', clientId)
         .order('created_at', { ascending: true })
+
+    if (isUUID) {
+        query = query.eq('client_id', clientId)
+    } else if (phone) {
+        // clientId não é UUID — busca por telefone
+        query = query.eq('phone', phone)
+    } else {
+        query = query.eq('phone', clientId)
+    }
+
+    const { data, error } = await query
 
     if (error) return { success: false, error: error.message }
 
