@@ -29,8 +29,12 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '30'), 100)
 
     try {
-        // 1. Busca lista de chats
-        const chatsRes = await fetch(`${BASE_URL}/chat/findChats/${INSTANCE}`, { headers: evoHeaders })
+        // 1. Busca lista de chats (Evolution API v2 usa POST)
+        const chatsRes = await fetch(`${BASE_URL}/chat/findChats/${INSTANCE}`, {
+            method: 'POST',
+            headers: evoHeaders,
+            body: JSON.stringify({}),
+        })
         if (!chatsRes.ok) {
             const txt = await chatsRes.text()
             return NextResponse.json({ ok: false, error: `Evolution API (findChats) ${chatsRes.status}: ${txt.slice(0, 200)}` }, { status: 500 })
@@ -121,11 +125,12 @@ export async function GET(req: NextRequest) {
 
                 if (!text) continue
 
+                const isFromMe = msg.key.fromMe === true
                 await supabase.from('conversations').insert({
                     client_id:     clientId,
                     message:       text,
-                    direction:     msg.key.fromMe ? 'outbound' : 'inbound',
-                    status:        msg.key.fromMe ? 'sent' : 'received',
+                    direction:     isFromMe ? 'outbound' : 'inbound',
+                    status:        isFromMe ? 'sent' : 'received',
                     wa_message_id: waId,
                     phone,
                     push_name:     msg.pushName ?? null,
