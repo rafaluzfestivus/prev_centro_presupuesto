@@ -65,20 +65,24 @@ export async function GET(req: NextRequest) {
             }[] = []
 
             try {
-                const msgsRes = await fetch(`${BASE_URL}/chat/fetchMessages/${INSTANCE}`, {
+                // Evolution API v2: endpoint é findMessages com where em dot notation
+                const msgsRes = await fetch(`${BASE_URL}/chat/findMessages/${INSTANCE}`, {
                     method: 'POST',
                     headers: evoHeaders,
                     body: JSON.stringify({
-                        where: { key: { remoteJid: chat.id } },
-                        limit: 40,
+                        where: { 'key.remoteJid': chat.id },
+                        limit: 50,
                     }),
                 })
                 if (msgsRes.ok) {
                     const json = await msgsRes.json()
-                    msgs = Array.isArray(json) ? json : (json?.messages ?? [])
+                    // Pode vir como array, { messages: [] }, ou { records: [] }
+                    if (Array.isArray(json)) msgs = json
+                    else if (Array.isArray(json?.messages)) msgs = json.messages
+                    else if (Array.isArray(json?.records)) msgs = json.records
                 }
             } catch {
-                continue // skip este chat se falhar
+                continue
             }
 
             if (!msgs.length) continue
