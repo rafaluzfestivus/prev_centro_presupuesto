@@ -19,80 +19,92 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
 
-        // Evolution API v2 usa MESSAGES_UPSERT (maiúsculas)
-        if (body.event !== 'MESSAGES_UPSERT') {
+        // Evolution API v2 usa MESSAGES_UPSERT — aceita ambos os formatos por segurança
+        const eventName: string = (body.event ?? '').toUpperCase().replace('.', '_')
+        if (eventName !== 'MESSAGES_UPSERT') {
             return NextResponse.json({ ok: true })
         }
 
-        const msg = body.data
-        if (!msg) {
-            return NextResponse.json({ ok: true })
-        }
+        // body.data pode ser um único objeto ou um array de mensagens
+        const rawData = body.data
+        if (!rawData) return NextResponse.json({ ok: true })
+        const msgs = Array.isArray(rawData) ? rawData : [rawData]
 
-        // Extract phone (remove @s.whatsapp.net ou @g.us)
-        const remoteJid: string = msg.key?.remoteJid ?? ''
-        const phone = remoteJid.split('@')[0]
-        const isFromMe: boolean = msg.key?.fromMe === true
+        for (const msg of msgs) {
+            // Extract phone (remove @s.whatsapp.net ou @g.us)
+            const remoteJid: string = msg.key?.remoteJid ?? ''
+            const phone = remoteJid.split('@')[0]
+            const isFromMe: boolean = msg.key?.fromMe === true
 
-        // Skip group messages
-        if (remoteJid.endsWith('@g.us')) {
-            return NextResponse.json({ ok: true })
-        }
+            // Skip group messages
+            if (remoteJid.endsWith('@g.us')) continue
+            if (!phone) continue
 
-        const waMessageId: string = msg.key?.id ?? ''
-        const pushName: string    = msg.pushName ?? ''
-        const text: string        =
-            msg.message?.conversation ??
-            msg.message?.extendedTextMessage?.text ??
-            msg.message?.imageMessage?.caption ??
-            msg.message?.documentMessage?.caption ??
-            ''
+            const waMessageId: string = msg.key?.id ?? ''
+            const pushName: string    = msg.pushName ?? ''
+            const text: string        =
+                msg.message?.conversation ??
+                msg.message?.extendedTextMessage?.text ??
+                msg.message?.imageMessage?.caption ??
+                msg.message?.documentMessage?.caption ??
+                ''
 
-        const mediaUrl: string | null  = msg.message?.imageMessage?.url ?? msg.message?.documentMessage?.url ?? null
-        const mediaType: string | null = msg.message?.imageMessage ? 'image' : msg.message?.documentMessage ? 'document' : null
+            const mediaUrl: string | null  = msg.message?.imageMessage?.url ?? msg.message?.documentMessage?.url ?? null
+            const mediaType: string | null = msg.message?.imageMessage ? 'image' : msg.message?.documentMessage ? 'document' : null
 
-        // Ignore empty messages
-        if (!text && !mediaUrl) return NextResponse.json({ ok: true })
+            // Ignore empty messages
+            if (!text && !mediaUrl) continue
 
-        // Find or create client by phone number
-        let clientId: string | null = null
+            // Avoid duplicates
+            if (waMessageId) {
+                const { data: dup } = await supabase
+                    .from('conversations')
+                    .select('id')
+                    .eq('wa_message_id', waMessageId)
+                    .maybeSingle()
+                if (dup?.id) continue
+            }
 
-        const { data: existing } = await supabase
-            .from('clients')
-            .select('id')
-            .or(`whatsapp.eq.${phone},whatsapp.eq.+${phone},whatsapp.eq.${phone.replace(/^34/, '')}`)
-            .limit(1)
-            .single()
+            // Find or create client by phone number
+            let clientId: string | null = null
 
-        if (existing?.id) {
-            clientId = existing.id
-        } else {
-            // Create new client from WhatsApp contact
-            const { data: newClient } = await supabase
+            const { data: existing } = await supabase
                 .from('clients')
-                .insert({
-                    name: pushName || phone,
-                    whatsapp: phone,
-                    source: 'whatsapp',
-                    status: 'new',
-                })
                 .select('id')
-                .single()
-            clientId = newClient?.id ?? null
-        }
+                .or(`whatsapp.eq.${phone},whatsapp.eq.+${phone},whatsapp.eq.${phone.replace(/^34/, '')}`)
+                .limit(1)
+                .maybeSingle()
 
-        // Save message — fromMe = outbound (mensagens do Rafael)
-        await supabase.from('conversations').insert({
-            client_id:     clientId,
-            message:       text,
-            direction:     isFromMe ? 'outbound' : 'inbound',
-            status:        isFromMe ? 'sent' : 'received',
-            wa_message_id: waMessageId,
-            phone,
-            media_url:     mediaUrl,
-            media_type:    mediaType,
-            push_name:     pushName,
-        })
+            if (existing?.id) {
+                clientId = existing.id
+            } else {
+                // Create new client from WhatsApp contact
+                const { data: newClient } = await supabase
+                    .from('clients')
+                    .insert({
+                        name: pushName || phone,
+                        whatsapp: phone,
+                        source: 'whatsapp',
+                        status: 'new',
+                    })
+                    .select('id')
+                    .single()
+                clientId = newClient?.id ?? null
+            }
+
+            // Save message — fromMe = outbound (mensagens do Rafael)
+            await supabase.from('conversations').insert({
+                client_id:     clientId,
+                message:       text,
+                direction:     isFromMe ? 'outbound' : 'inbound',
+                status:        isFromMe ? 'sent' : 'received',
+                wa_message_id: waMessageId,
+                phone,
+                media_url:     mediaUrl,
+                media_type:    mediaType,
+                push_name:     pushName,
+            })
+        }
 
         return NextResponse.json({ ok: true })
     } catch (err) {

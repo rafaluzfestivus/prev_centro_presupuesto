@@ -135,7 +135,7 @@ export default function ConversacionesPage() {
 
     const loadMessages = useCallback(async (contact: ConversationContact) => {
         setLoadingMessages(true)
-        const res = await getClientMessagesAction(contact.clientId)
+        const res = await getClientMessagesAction(contact.clientId, contact.phone)
         if (res.success && res.data) {
             setMessages(res.data)
             // Reset unread counter locally
