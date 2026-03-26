@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase admin client (service role) — bypasses RLS to write messages
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
-
 /**
  * Evolution API sends webhooks for every event.
  * We only care about "messages.upsert" with fromMe=false (incoming messages).
@@ -16,6 +10,12 @@ const supabase = createClient(
  *   Events: messages.upsert
  */
 export async function POST(req: NextRequest) {
+    // Criado dentro da função para evitar erro no build (env vars só existem em runtime)
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+
     try {
         const body = await req.json()
 
