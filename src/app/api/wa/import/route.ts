@@ -24,9 +24,10 @@ export async function GET(req: NextRequest) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
     )
 
-    // Parâmetro opcional: quantos chats importar (default 30)
+    // Parâmetros opcionais
     const url = new URL(req.url)
     const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '30'), 100)
+    const debug = url.searchParams.get('debug') === '1'
 
     try {
         // 1. Busca lista de chats (Evolution API v2 usa POST)
@@ -70,14 +71,19 @@ export async function GET(req: NextRequest) {
                     method: 'POST',
                     headers: evoHeaders,
                     body: JSON.stringify({
-                        where: { 'key.remoteJid': chat.id },
+                        where: { key: { remoteJid: chat.id } },
                         limit: 50,
                     }),
                 })
                 if (msgsRes.ok) {
                     const json = await msgsRes.json()
-                    // Pode vir como array, { messages: [] }, ou { records: [] }
+                    // Debug: retorna estrutura do primeiro chat
+                    if (debug && chats.indexOf(chat) === 0) {
+                        return NextResponse.json({ debug: true, chatId: chat.id, raw: json })
+                    }
+                    // Evolution API v2 retorna { messages: { records: [...], total, pages } }
                     if (Array.isArray(json)) msgs = json
+                    else if (Array.isArray(json?.messages?.records)) msgs = json.messages.records
                     else if (Array.isArray(json?.messages)) msgs = json.messages
                     else if (Array.isArray(json?.records)) msgs = json.records
                 }
@@ -149,6 +155,7 @@ export async function GET(req: NextRequest) {
             imported: totalImported,
             skipped: totalSkipped,
             chats: chats.length,
+            hint: totalImported === 0 ? 'Use ?debug=1 para ver a estrutura da resposta da Evolution API' : undefined,
         })
 
     } catch (err) {
