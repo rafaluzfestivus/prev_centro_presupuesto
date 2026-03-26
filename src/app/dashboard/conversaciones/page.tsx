@@ -13,7 +13,7 @@ import {
 import NextImage from 'next/image'
 import {
     Search, Send, MessageSquare, Phone, ArrowLeft,
-    Check, CheckCheck, Image as ImageIcon, RefreshCw, Wifi, WifiOff
+    Check, CheckCheck, Image as ImageIcon, RefreshCw, Wifi, WifiOff, Download
 } from 'lucide-react'
 
 function formatTime(iso: string) {
@@ -101,8 +101,28 @@ export default function ConversacionesPage() {
     const [loadingMessages, setLoadingMessages] = useState(false)
     const [showChat, setShowChat] = useState(false) // mobile: toggle between list/chat
     const [connected, setConnected] = useState<boolean | null>(null)
+    const [importing, setImporting] = useState(false)
+    const [importResult, setImportResult] = useState<string | null>(null)
     const bottomRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
+
+    const importHistory = async () => {
+        setImporting(true)
+        setImportResult(null)
+        try {
+            const res = await fetch('/api/wa/import')
+            const data = await res.json() as { ok: boolean; imported?: number; skipped?: number; chats?: number; error?: string }
+            if (data.ok) {
+                setImportResult(`✓ ${data.imported} mensagens importadas de ${data.chats} contatos`)
+                loadContacts()
+            } else {
+                setImportResult(`Erro: ${data.error}`)
+            }
+        } catch {
+            setImportResult('Erro ao conectar com a API')
+        }
+        setImporting(false)
+    }
 
     const loadContacts = useCallback(async () => {
         setLoadingContacts(true)
@@ -238,10 +258,27 @@ export default function ConversacionesPage() {
                             )}
                         </div>
                     </div>
-                    <button onClick={loadContacts} className="p-2 bg-white border border-border rounded-xl text-navy hover:bg-gray-50">
-                        <RefreshCw size={18} className={loadingContacts ? 'animate-spin' : ''} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={importHistory}
+                            disabled={importing}
+                            title="Importar histórico do WhatsApp"
+                            className="flex items-center gap-2 px-3 py-2 bg-[#25d366] hover:bg-[#20c45a] text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+                        >
+                            <Download size={15} className={importing ? 'animate-bounce' : ''} />
+                            <span className="hidden sm:inline">{importing ? 'Importando...' : 'Importar histórico'}</span>
+                        </button>
+                        <button onClick={loadContacts} className="p-2 bg-white border border-border rounded-xl text-navy hover:bg-gray-50">
+                            <RefreshCw size={18} className={loadingContacts ? 'animate-spin' : ''} />
+                        </button>
+                    </div>
                 </div>
+
+                {importResult && (
+                    <div className={`mb-3 px-4 py-2 rounded-xl text-sm font-medium ${importResult.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                        {importResult}
+                    </div>
+                )}
 
                 {/* Main chat layout */}
                 <div className="flex flex-1 rounded-2xl border border-border overflow-hidden bg-white shadow-sm min-h-0">
