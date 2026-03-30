@@ -534,6 +534,62 @@ export async function addAppointmentAfterPhotosAction(id: string, photoUrls: str
     }
 }
 
+export async function addAppointmentBeforePhotosAction(id: string, photoUrls: string[]) {
+    try {
+        const supabase = await createClient()
+
+        const { data: apt, error: fetchError } = await supabase
+            .from('appointments')
+            .select('before_photos')
+            .eq('id', id)
+            .single()
+
+        if (fetchError) throw fetchError
+
+        const existing: string[] = apt?.before_photos || []
+        const { error } = await supabase
+            .from('appointments')
+            .update({ before_photos: [...existing, ...photoUrls] })
+            .eq('id', id)
+
+        if (error) throw error
+
+        revalidatePath(`/dashboard/citas/${id}/report`)
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to add before photos to appointment:', error)
+        return { success: false, error: error.message || 'Error al guardar fotos' }
+    }
+}
+
+export async function deleteAppointmentPhotoAction(id: string, photoUrl: string, type: 'before' | 'after') {
+    try {
+        const supabase = await createClient()
+        const col = type === 'before' ? 'before_photos' : 'after_photos'
+
+        const { data: apt, error: fetchError } = await supabase
+            .from('appointments')
+            .select(col)
+            .eq('id', id)
+            .single()
+
+        if (fetchError) throw fetchError
+
+        const existing: string[] = (apt as any)?.[col] || []
+        const { error } = await supabase
+            .from('appointments')
+            .update({ [col]: existing.filter(u => u !== photoUrl) })
+            .eq('id', id)
+
+        if (error) throw error
+
+        revalidatePath(`/dashboard/citas/${id}/report`)
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message || 'Error al eliminar foto' }
+    }
+}
+
 export async function deleteProposalAction(id: string) {
     try {
         await deleteProposal(id)

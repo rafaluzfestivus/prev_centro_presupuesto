@@ -2,10 +2,14 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getAppointmentReportAction, addAppointmentAfterPhotosAction } from '@/actions/proposal'
-import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, User, Plus, CheckCircle2, Calendar, Euro, Layers, FileText, AlertTriangle } from 'lucide-react'
+import {
+    getAppointmentReportAction,
+    addAppointmentAfterPhotosAction,
+    addAppointmentBeforePhotosAction,
+    deleteAppointmentPhotoAction,
+} from '@/actions/proposal'
+import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, Plus, CheckCircle2, Calendar, Euro, Layers, FileText, AlertTriangle, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
     pending:   { label: 'Pendiente',  cls: 'bg-yellow-100 text-yellow-700' },
@@ -25,9 +29,13 @@ export default function AppointmentReportPage() {
     const [processing, setProcessing] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [uploadingAfter, setUploadingAfter] = useState(false)
+    const [uploadingBefore, setUploadingBefore] = useState(false)
     const [afterPhotoUrls, setAfterPhotoUrls] = useState<string[]>([])
-    const [uploadSuccess, setUploadSuccess] = useState(false)
+    const [beforePhotoUrls, setBeforePhotoUrls] = useState<string[]>([])
+    const [uploadError, setUploadError] = useState<string | null>(null)
+    const [uploadSuccess, setUploadSuccess] = useState<'before' | 'after' | null>(null)
     const afterInputRef = useRef<HTMLInputElement>(null)
+    const beforeInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         const load = async () => {
@@ -40,39 +48,76 @@ export default function AppointmentReportPage() {
                 setItems(it)
                 setProcessing(pr)
                 setAfterPhotoUrls(apt.after_photos || [])
+                setBeforePhotoUrls(apt.before_photos || [])
             }
             setLoading(false)
         }
         load()
     }, [id])
 
-    const handleAfterPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || !e.target.files.length) return
-        setUploadingAfter(true)
-        setUploadSuccess(false)
+    // Upload photos via API route (service role bypasses RLS)
+    const uploadPhotos = async (files: FileList, type: 'before' | 'after'): Promise<string[]> => {
+        const urls: string[] = []
+        for (const file of Array.from(files)) {
+            const ext = file.name.split('.').pop() || 'jpg'
+            const path = `apt-${id}/${type}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+            const form = new FormData()
+            form.append('file', file)
+            form.append('path', path)
+            form.append('bucket', 'proposals')
+            const res = await fetch('/api/upload', { method: 'POST', body: form })
+            const data = await res.json() as { url?: string; error?: string }
+            if (!res.ok || data.error) throw new Error(data.error || 'Erro ao fazer upload')
+            urls.push(data.url!)
+        }
+        return urls
+    }
+
+    const handleBeforePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return
+        setUploadingBefore(true)
+        setUploadError(null)
+        setUploadSuccess(null)
         try {
-            const supabase = createClient()
-            const newUrls: string[] = []
-            for (const file of Array.from(e.target.files)) {
-                const ext = file.name.split('.').pop()
-                const fileName = `apt-${id}/after/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-                const { error } = await supabase.storage.from('proposals').upload(fileName, file)
-                if (!error) {
-                    const { data: { publicUrl } } = supabase.storage.from('proposals').getPublicUrl(fileName)
-                    newUrls.push(publicUrl)
-                }
-            }
-            if (newUrls.length) {
-                await addAppointmentAfterPhotosAction(id, newUrls)
-                setAfterPhotoUrls(prev => [...prev, ...newUrls])
-                setUploadSuccess(true)
-                setTimeout(() => setUploadSuccess(false), 3000)
-            }
+            const newUrls = await uploadPhotos(e.target.files, 'before')
+            const res = await addAppointmentBeforePhotosAction(id, newUrls)
+            if (!res.success) throw new Error(res.error)
+            setBeforePhotoUrls(prev => [...prev, ...newUrls])
+            setUploadSuccess('before')
+            setTimeout(() => setUploadSuccess(null), 3000)
         } catch (err) {
-            console.error('Error uploading after photos:', err)
+            setUploadError(err instanceof Error ? err.message : 'Erro ao enviar foto')
+        } finally {
+            setUploadingBefore(false)
+            if (beforeInputRef.current) beforeInputRef.current.value = ''
+        }
+    }
+
+    const handleAfterPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.length) return
+        setUploadingAfter(true)
+        setUploadError(null)
+        setUploadSuccess(null)
+        try {
+            const newUrls = await uploadPhotos(e.target.files, 'after')
+            const res = await addAppointmentAfterPhotosAction(id, newUrls)
+            if (!res.success) throw new Error(res.error)
+            setAfterPhotoUrls(prev => [...prev, ...newUrls])
+            setUploadSuccess('after')
+            setTimeout(() => setUploadSuccess(null), 3000)
+        } catch (err) {
+            setUploadError(err instanceof Error ? err.message : 'Erro ao enviar foto')
         } finally {
             setUploadingAfter(false)
             if (afterInputRef.current) afterInputRef.current.value = ''
+        }
+    }
+
+    const handleDeletePhoto = async (url: string, type: 'before' | 'after') => {
+        const res = await deleteAppointmentPhotoAction(id, url, type)
+        if (res.success) {
+            if (type === 'before') setBeforePhotoUrls(prev => prev.filter(u => u !== url))
+            else setAfterPhotoUrls(prev => prev.filter(u => u !== url))
         }
     }
 
@@ -272,30 +317,66 @@ export default function AppointmentReportPage() {
                     </div>
                 )}
 
+                {/* Upload error banner */}
+                {uploadError && (
+                    <div className="flex items-center gap-3 px-5 py-3 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-medium print:hidden">
+                        <span className="flex-1">{uploadError}</span>
+                        <button onClick={() => setUploadError(null)}><X className="h-4 w-4" /></button>
+                    </div>
+                )}
+
                 {/* Before Photos */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100">
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                         <h2 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                             Fotos del Lugar — Antes de la Instalación
                         </h2>
+                        <div className="print:hidden flex items-center gap-2">
+                            {uploadSuccess === 'before' && (
+                                <span className="text-[10px] text-green-600 font-black uppercase flex items-center gap-1">
+                                    <CheckCircle2 className="h-3 w-3" /> Guardado
+                                </span>
+                            )}
+                            <Button
+                                size="sm"
+                                onClick={() => beforeInputRef.current?.click()}
+                                disabled={uploadingBefore}
+                                className="bg-accent/10 hover:bg-accent text-navy font-black text-[10px] uppercase rounded-full h-8 px-4 gap-1"
+                            >
+                                {uploadingBefore ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                Añadir fotos
+                            </Button>
+                            <input ref={beforeInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleBeforePhotoUpload} />
+                        </div>
                     </div>
                     <div className="p-6">
-                        {beforePhotos.length > 0 ? (
+                        {beforePhotoUrls.length > 0 ? (
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {beforePhotos.map((url: string, i: number) => (
-                                    <a key={i} href={url} target="_blank" rel="noreferrer" className="block">
-                                        <img
-                                            src={url}
-                                            alt={`Antes ${i + 1}`}
-                                            className="w-full aspect-square object-cover rounded-xl border border-gray-100 hover:opacity-90 transition-opacity"
-                                        />
-                                    </a>
+                                {beforePhotoUrls.map((url: string, i: number) => (
+                                    <div key={i} className="relative group">
+                                        <a href={url} target="_blank" rel="noreferrer" className="block">
+                                            <img src={url} alt={`Antes ${i + 1}`} className="w-full aspect-square object-cover rounded-xl border border-gray-100 hover:opacity-90 transition-opacity" />
+                                        </a>
+                                        <button
+                                            onClick={() => handleDeletePhoto(url, 'before')}
+                                            className="print:hidden absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-center text-gray-400 text-sm italic py-8">
-                                Sin fotos previas registradas.
-                            </p>
+                            <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl">
+                                <Camera className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+                                <p className="text-sm text-gray-400 font-medium">Sin fotos previas todavía</p>
+                                <button
+                                    onClick={() => beforeInputRef.current?.click()}
+                                    className="print:hidden mt-3 text-xs text-accent font-bold hover:underline"
+                                >
+                                    + Añadir fotos del antes
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -307,7 +388,7 @@ export default function AppointmentReportPage() {
                             Fotos — Después de la Instalación
                         </h2>
                         <div className="print:hidden flex items-center gap-2">
-                            {uploadSuccess && (
+                            {uploadSuccess === 'after' && (
                                 <span className="text-[10px] text-green-600 font-black uppercase flex items-center gap-1">
                                     <CheckCircle2 className="h-3 w-3" /> Guardado
                                 </span>
@@ -321,27 +402,24 @@ export default function AppointmentReportPage() {
                                 {uploadingAfter ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
                                 Añadir fotos
                             </Button>
-                            <input
-                                ref={afterInputRef}
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                className="hidden"
-                                onChange={handleAfterPhotoUpload}
-                            />
+                            <input ref={afterInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAfterPhotoUpload} />
                         </div>
                     </div>
                     <div className="p-6">
                         {afterPhotoUrls.length > 0 ? (
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                 {afterPhotoUrls.map((url: string, i: number) => (
-                                    <a key={i} href={url} target="_blank" rel="noreferrer" className="block">
-                                        <img
-                                            src={url}
-                                            alt={`Después ${i + 1}`}
-                                            className="w-full aspect-square object-cover rounded-xl border border-gray-100 hover:opacity-90 transition-opacity"
-                                        />
-                                    </a>
+                                    <div key={i} className="relative group">
+                                        <a href={url} target="_blank" rel="noreferrer" className="block">
+                                            <img src={url} alt={`Después ${i + 1}`} className="w-full aspect-square object-cover rounded-xl border border-gray-100 hover:opacity-90 transition-opacity" />
+                                        </a>
+                                        <button
+                                            onClick={() => handleDeletePhoto(url, 'after')}
+                                            className="print:hidden absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
                         ) : (
