@@ -15,7 +15,7 @@ import {
     parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2, MapPin, Euro, Layers, ClipboardList, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2, MapPin, Euro, Layers, ClipboardList, AlertTriangle, Lock, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -33,6 +33,18 @@ const CalendarView = () => {
     const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
     const [formError, setFormError] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Blocked periods state
+    const [blockedPeriods, setBlockedPeriods] = useState<any[]>([]);
+    const [showBlockModal, setShowBlockModal] = useState(false);
+    const [savingBlock, setSavingBlock] = useState(false);
+    const [blockForm, setBlockForm] = useState({
+        label: '',
+        time_from: '13:00',
+        time_to: '15:00',
+        days_of_week: [] as number[], // empty = todos os dias
+    });
+    const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
     // Form state
     const [formData, setFormData] = useState({
@@ -70,6 +82,28 @@ const CalendarView = () => {
         }
     }, [searchParams, appointments]);
 
+    const fetchBlockedPeriods = async () => {
+        const { data } = await supabase
+            .from('agenda_blocked_periods')
+            .select('*')
+            .order('time_from', { ascending: true });
+        setBlockedPeriods(data || []);
+    };
+
+    // Returns blocked periods applicable to a given day
+    const getApplicableBlocks = (day: Date) => {
+        const dow = day.getDay();
+        return blockedPeriods.filter(b => {
+            if (!b.is_active) return false;
+            if (!b.days_of_week || b.days_of_week.length === 0) return true;
+            return b.days_of_week.includes(dow);
+        });
+    };
+
+    // HH:MM string comparison helper
+    const timeInBlock = (hhmm: string, from: string, to: string) =>
+        hhmm >= from.slice(0, 5) && hhmm < to.slice(0, 5);
+
     const fetchAppointments = async () => {
         setLoading(true);
         const { data, error } = await supabase
@@ -84,6 +118,7 @@ const CalendarView = () => {
 
     useEffect(() => {
         fetchAppointments();
+        fetchBlockedPeriods();
     }, []);
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -151,6 +186,18 @@ const CalendarView = () => {
         if (!cleanWhatsApp) {
             setFormError('Por favor, inserte un WhatsApp válido.');
             return;
+        }
+
+        // Validate against blocked periods
+        if (formData.date_start) {
+            const aptDt = new Date(formData.date_start);
+            const hhmm = `${String(aptDt.getHours()).padStart(2, '0')}:${String(aptDt.getMinutes()).padStart(2, '0')}`;
+            const applicable = getApplicableBlocks(aptDt);
+            const hit = applicable.find(b => timeInBlock(hhmm, b.time_from, b.time_to));
+            if (hit) {
+                setFormError(`Horario bloqueado: "${hit.label}" (${hit.time_from.slice(0,5)} – ${hit.time_to.slice(0,5)}). Escolha outro horário.`);
+                return;
+            }
         }
 
         // 1. Manage Client
@@ -274,13 +321,28 @@ const CalendarView = () => {
                         <button onClick={nextMonth} className="p-2 bg-white border border-border rounded-lg hover:bg-gray-50 transition-colors"><ChevronRight size={20} /></button>
                     </div>
                 </div>
-                <button
-                    onClick={() => { resetForm(); setIsModalOpen(true); }}
-                    className="flex items-center gap-2 px-5 py-3 bg-accent text-navy font-bold rounded-xl hover:shadow-lg transition-all"
-                >
-                    <Plus size={20} />
-                    Agendar Visita
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShowBlockModal(true)}
+                        title="Fechar Agenda / Horários Bloqueados"
+                        className="flex items-center gap-2 px-4 py-3 bg-white border border-border text-navy font-bold rounded-xl hover:bg-gray-50 transition-all text-sm"
+                    >
+                        <Lock size={16} />
+                        <span className="hidden sm:inline">Fechar Agenda</span>
+                        {blockedPeriods.filter(b => b.is_active).length > 0 && (
+                            <span className="bg-red-500 text-white text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center">
+                                {blockedPeriods.filter(b => b.is_active).length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => { resetForm(); setIsModalOpen(true); }}
+                        className="flex items-center gap-2 px-5 py-3 bg-accent text-navy font-bold rounded-xl hover:shadow-lg transition-all"
+                    >
+                        <Plus size={20} />
+                        Agendar Visita
+                    </button>
+                </div>
             </div>
         );
     };
@@ -312,6 +374,7 @@ const CalendarView = () => {
                     const isSelected = isSameDay(day, selectedDate);
                     const isCurrentMonth = isSameMonth(day, monthStart);
                     const isToday = isSameDay(day, new Date());
+                    const dayBlocks = getApplicableBlocks(day);
                     const dayAppointments = appointments.filter(apt => {
                         const d = apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : null);
                         return d && isSameDay(d, day);
@@ -330,6 +393,15 @@ const CalendarView = () => {
                                 {format(day, 'd')}
                             </span>
                             <div className="space-y-1.5">
+                                {dayBlocks.map((b, idx) => (
+                                    <div key={`block-${idx}`}
+                                        className="text-[9px] px-1.5 py-1 rounded bg-red-50 border-l-2 border-red-400 text-red-600 font-bold flex items-center gap-1"
+                                        title={b.label}
+                                    >
+                                        <Lock size={8} className="shrink-0" />
+                                        <span className="truncate">{b.time_from.slice(0,5)}–{b.time_to.slice(0,5)}</span>
+                                    </div>
+                                ))}
                                 {dayAppointments.map((apt, idx) => {
                                     const aptTime = format(apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date()), 'HH:mm')
                                     const isSpecial = apt.special_attention === true
@@ -568,6 +640,169 @@ const CalendarView = () => {
                                 )}
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* Blocked periods modal */}
+            {showBlockModal && (
+                <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div className="glass-card w-full max-w-lg bg-white border-none shadow-2xl relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="flex justify-between items-center p-8 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                    <Lock size={18} className="text-red-500" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-navy">Fechar Agenda</h2>
+                                    <p className="text-xs text-gray-400">Bloqueia marcações em horários definidos</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowBlockModal(false)} className="text-text-muted hover:text-navy">
+                                <X size={22} />
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1 px-8 pb-8 space-y-6">
+                            {/* Add new block form */}
+                            <div className="bg-gray-50 rounded-2xl p-5 space-y-4">
+                                <p className="text-xs font-black text-navy uppercase tracking-wide flex items-center gap-1.5">
+                                    <Settings size={12} /> Novo bloqueio
+                                </p>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Nome / Motivo</label>
+                                    <input
+                                        type="text"
+                                        value={blockForm.label}
+                                        onChange={e => setBlockForm(f => ({ ...f, label: e.target.value }))}
+                                        placeholder="Ex: Almuerzo, Reunión, Vacaciones…"
+                                        className="w-full p-3 bg-white border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">De (hora)</label>
+                                        <input
+                                            type="time"
+                                            value={blockForm.time_from}
+                                            onChange={e => setBlockForm(f => ({ ...f, time_from: e.target.value }))}
+                                            className="w-full p-3 bg-white border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Até (hora)</label>
+                                        <input
+                                            type="time"
+                                            value={blockForm.time_to}
+                                            onChange={e => setBlockForm(f => ({ ...f, time_to: e.target.value }))}
+                                            className="w-full p-3 bg-white border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-red-300 outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2">Dias da semana</label>
+                                    <div className="flex gap-1.5 flex-wrap">
+                                        {DAY_LABELS.map((d, i) => {
+                                            const active = blockForm.days_of_week.length === 0
+                                                ? false
+                                                : blockForm.days_of_week.includes(i);
+                                            const allDays = blockForm.days_of_week.length === 0;
+                                            return (
+                                                <button
+                                                    key={i}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setBlockForm(f => {
+                                                            const cur = f.days_of_week;
+                                                            if (cur.includes(i)) return { ...f, days_of_week: cur.filter(x => x !== i) };
+                                                            return { ...f, days_of_week: [...cur, i].sort() };
+                                                        });
+                                                    }}
+                                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors ${active ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-border hover:border-navy'}`}
+                                                >
+                                                    {d}
+                                                </button>
+                                            );
+                                        })}
+                                        <button
+                                            type="button"
+                                            onClick={() => setBlockForm(f => ({ ...f, days_of_week: [] }))}
+                                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors ${blockForm.days_of_week.length === 0 ? 'bg-navy text-white border-navy' : 'bg-white text-gray-500 border-border hover:border-navy'}`}
+                                        >
+                                            Todos
+                                        </button>
+                                    </div>
+                                </div>
+                                <button
+                                    disabled={savingBlock || !blockForm.label || !blockForm.time_from || !blockForm.time_to}
+                                    onClick={async () => {
+                                        if (!blockForm.label || !blockForm.time_from || !blockForm.time_to) return;
+                                        setSavingBlock(true);
+                                        await supabase.from('agenda_blocked_periods').insert({
+                                            label: blockForm.label,
+                                            time_from: blockForm.time_from,
+                                            time_to: blockForm.time_to,
+                                            days_of_week: blockForm.days_of_week.length > 0 ? blockForm.days_of_week : null,
+                                            is_active: true,
+                                        });
+                                        setBlockForm({ label: '', time_from: '13:00', time_to: '15:00', days_of_week: [] });
+                                        await fetchBlockedPeriods();
+                                        setSavingBlock(false);
+                                    }}
+                                    className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors disabled:opacity-40 text-sm flex items-center justify-center gap-2"
+                                >
+                                    <Lock size={14} /> {savingBlock ? 'Guardando…' : 'Bloquear este horário'}
+                                </button>
+                            </div>
+
+                            {/* Existing blocks */}
+                            <div>
+                                <p className="text-xs font-black text-navy uppercase tracking-wide mb-3">
+                                    Bloqueios activos ({blockedPeriods.filter(b => b.is_active).length})
+                                </p>
+                                {blockedPeriods.length === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-4">Nenhum horário bloqueado</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {blockedPeriods.map(b => (
+                                            <div key={b.id} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-colors ${b.is_active ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-border opacity-50'}`}>
+                                                <Lock size={14} className={b.is_active ? 'text-red-400 shrink-0' : 'text-gray-400 shrink-0'} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-bold text-sm text-navy truncate">{b.label}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {b.time_from.slice(0,5)} – {b.time_to.slice(0,5)}
+                                                        {' · '}
+                                                        {!b.days_of_week || b.days_of_week.length === 0
+                                                            ? 'Todos os dias'
+                                                            : b.days_of_week.map((d: number) => DAY_LABELS[d]).join(', ')}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={async () => {
+                                                        await supabase.from('agenda_blocked_periods')
+                                                            .update({ is_active: !b.is_active })
+                                                            .eq('id', b.id);
+                                                        await fetchBlockedPeriods();
+                                                    }}
+                                                    className="text-xs font-bold px-2.5 py-1 rounded-lg border border-border bg-white text-gray-600 hover:bg-gray-100 shrink-0"
+                                                >
+                                                    {b.is_active ? 'Pausar' : 'Activar'}
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        await supabase.from('agenda_blocked_periods').delete().eq('id', b.id);
+                                                        await fetchBlockedPeriods();
+                                                    }}
+                                                    className="p-1.5 rounded-lg text-red-400 hover:bg-red-100 shrink-0"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
