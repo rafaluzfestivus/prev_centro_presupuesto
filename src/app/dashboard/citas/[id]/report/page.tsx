@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getAppointmentReportAction, addAppointmentAfterPhotosAction } from '@/actions/proposal'
-import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, User, Plus, CheckCircle2, Calendar, Euro, Layers, FileText } from 'lucide-react'
+import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, User, Plus, CheckCircle2, Calendar, Euro, Layers, FileText, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 
@@ -128,6 +128,12 @@ export default function AppointmentReportPage() {
                         <p className="text-gray-400 font-medium mt-1">Ref. #{id.slice(0, 8).toUpperCase()}</p>
                     </div>
                     <div className="text-right space-y-2">
+                        {appointment.special_attention && (
+                            <div className="flex items-center justify-end gap-2 px-4 py-2 bg-orange-100 border border-orange-300 rounded-xl mb-1">
+                                <AlertTriangle size={16} className="text-orange-500 shrink-0" />
+                                <span className="text-sm font-black text-orange-700 uppercase tracking-wide">Atención Especial</span>
+                            </div>
+                        )}
                         <div className={`inline-block px-4 py-2 rounded-full text-sm font-black uppercase tracking-wide ${status.cls}`}>
                             {status.label}
                         </div>

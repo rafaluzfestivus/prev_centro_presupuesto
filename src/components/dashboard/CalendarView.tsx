@@ -15,7 +15,7 @@ import {
     parseISO
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2, MapPin, Euro, Layers, ClipboardList } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCircle, Trash2, MapPin, Euro, Layers, ClipboardList, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -43,7 +43,8 @@ const CalendarView = () => {
         attachment_url: '',
         installation_address: '',
         total_value: '',
-        total_m2: ''
+        total_m2: '',
+        special_attention: false,
     });
 
     // Handle pre-fill from URL
@@ -109,7 +110,8 @@ const CalendarView = () => {
             attachment_url: apt.attachment_url || '',
             installation_address: apt.installation_address || '',
             total_value: apt.total_value ? String(apt.total_value) : '',
-            total_m2: apt.total_m2 ? String(apt.total_m2) : ''
+            total_m2: apt.total_m2 ? String(apt.total_m2) : '',
+            special_attention: apt.special_attention || false,
         });
         setFormError('');
         setShowDeleteConfirm(false);
@@ -196,6 +198,7 @@ const CalendarView = () => {
             installation_address: formData.installation_address || null,
             total_value: formData.total_value ? parseFloat(formData.total_value) : null,
             total_m2: formData.total_m2 ? parseFloat(formData.total_m2) : null,
+            special_attention: formData.special_attention,
         };
 
         if (selectedAppointment) {
@@ -251,7 +254,8 @@ const CalendarView = () => {
             attachment_url: '',
             installation_address: '',
             total_value: '',
-            total_m2: ''
+            total_m2: '',
+            special_attention: false,
         });
         setSelectedAppointment(null);
         setFormError('');
@@ -326,21 +330,32 @@ const CalendarView = () => {
                                 {format(day, 'd')}
                             </span>
                             <div className="space-y-1.5">
-                                {dayAppointments.map((apt, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={(e) => handleAppointmentClick(e, apt)}
-                                        className={`text-[10px] p-1.5 rounded flex flex-col border-l-2 transition-transform hover:scale-105 ${apt.status === 'pending' ? 'bg-gray-100 border-gray-400' : 'bg-bg-dark border-accent'
-                                            }`}
-                                        title={`${format(apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date()), 'HH:mm')} - ${apt.clients?.name || 'Cliente'}`}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-bold text-navy">{format(apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date()), 'HH:mm')}</span>
-                                            {apt.attachment_url && <ShieldCheck size={10} className="text-accent" />}
+                                {dayAppointments.map((apt, idx) => {
+                                    const aptTime = format(apt.date_start ? parseISO(apt.date_start) : (apt.scheduled_at ? parseISO(apt.scheduled_at) : new Date()), 'HH:mm')
+                                    const isSpecial = apt.special_attention === true
+                                    const cardClass = isSpecial
+                                        ? 'bg-orange-50 border-orange-500 text-orange-900'
+                                        : apt.status === 'pending'
+                                            ? 'bg-gray-100 border-gray-400'
+                                            : 'bg-bg-dark border-accent'
+                                    return (
+                                        <div
+                                            key={idx}
+                                            onClick={(e) => handleAppointmentClick(e, apt)}
+                                            className={`text-[10px] p-1.5 rounded flex flex-col border-l-2 transition-transform hover:scale-105 ${cardClass}`}
+                                            title={`${aptTime} - ${apt.clients?.name || 'Cliente'}${isSpecial ? ' ⚠ Atención especial' : ''}`}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold">{aptTime}</span>
+                                                <div className="flex items-center gap-0.5">
+                                                    {isSpecial && <AlertTriangle size={10} className="text-orange-500" />}
+                                                    {apt.attachment_url && <ShieldCheck size={10} className="text-accent" />}
+                                                </div>
+                                            </div>
+                                            <span className="truncate opacity-70 font-medium">{apt.clients?.name || 'Cliente'}</span>
                                         </div>
-                                        <span className="truncate opacity-70 font-medium">{apt.clients?.name || 'Cliente'}</span>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     );
@@ -460,6 +475,25 @@ const CalendarView = () => {
                                         className="w-full p-3.5 bg-bg-dark border border-border rounded-xl text-navy focus:ring-2 focus:ring-accent/50 outline-none"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Atenção especial */}
+                            <div>
+                                <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-colors ${formData.special_attention ? 'bg-orange-50 border-orange-400' : 'bg-bg-dark border-border hover:border-orange-300'}`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.special_attention}
+                                        onChange={e => setFormData({ ...formData, special_attention: e.target.checked })}
+                                        className="w-4 h-4 accent-orange-500 cursor-pointer"
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle size={15} className={formData.special_attention ? 'text-orange-500' : 'text-gray-400'} />
+                                        <div>
+                                            <p className={`text-sm font-bold ${formData.special_attention ? 'text-orange-700' : 'text-navy'}`}>Requer atenção especial</p>
+                                            <p className="text-[10px] text-gray-400">Marca na agenda con color naranja</p>
+                                        </div>
+                                    </div>
+                                </label>
                             </div>
 
                             <div>
