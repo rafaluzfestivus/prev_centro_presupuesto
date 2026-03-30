@@ -3,7 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import {
     LayoutDashboard,
     MessageSquare,
@@ -14,8 +15,9 @@ import {
     Users,
     FileText,
     TrendingUp,
-    X
+    X,
 } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 interface SidebarProps {
     isOpen?: boolean;
@@ -24,6 +26,14 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
     const pathname = usePathname();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push('/login');
+        router.refresh();
+    };
 
     const menuItems = [
         { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -83,7 +93,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
             </nav>
 
             <div className="pt-6 border-t border-white/10 mt-6">
-                <button className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-red-500/10 group w-full text-left">
+                <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-red-500/10 group w-full text-left">
                     <LogOut size={20} className="text-white/50 group-hover:text-red-400" />
                     <span className="text-sm font-semibold text-white/50 group-hover:text-red-400">Salir</span>
                 </button>
