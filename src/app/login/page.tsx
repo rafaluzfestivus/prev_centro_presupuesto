@@ -1,125 +1,130 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react'
+import Image from 'next/image'
 
-export default function LoginPage() {
+function LoginForm() {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         setError(null)
 
-        // ALLOW ANY LOGIN FOR TESTING
-        router.push('/painel')
-
-        /* 
-        // Original Logic
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'YOUR_SUPABASE_URL') {
-            if (email === 'admin@preventiva.com' && password === 'admin') {
-                router.push('/painel')
-                return
-            }
-        }
-
         const supabase = createClient()
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
 
         if (error) {
-            setError(error.message)
+            setError('Credenciales incorrectas. Verifica tu correo y contraseña.')
             setLoading(false)
         } else {
-            router.push('/painel')
+            const next = searchParams.get('next') || '/dashboard'
+            router.push(next)
+            router.refresh()
         }
-        */
     }
 
     return (
-        <div className="flex h-screen w-full items-center justify-center bg-gray-50 dark:bg-gray-900">
-            <div className="w-full max-w-md space-y-8 px-4">
-                <div className="text-center">
-                    {/* Logo placeholder */}
-                    <div className="mx-auto h-12 w-12 bg-[var(--color-primary)] rounded-full flex items-center justify-center text-white font-bold mb-4">
-                        P
+        <div className="min-h-screen bg-navy flex items-center justify-center p-4">
+            <div className="w-full max-w-sm">
+
+                {/* Logo / Brand */}
+                <div className="text-center mb-10">
+                    <div className="flex justify-center mb-4">
+                        <Image src="/icon.png" alt="Preventiva" width={64} height={64} className="rounded-2xl" />
                     </div>
-                    <h2 className="text-3xl font-bold tracking-tight text-[var(--color-secondary)]">
-                        Preventiva Propuestas IA
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Acceso interno equipo comercial
-                    </p>
+                    <h1 className="text-accent text-3xl font-extrabold tracking-tight">PREVENTIVA</h1>
+                    <p className="text-white/40 text-xs font-bold tracking-[0.25em] uppercase mt-1">Sistema Integrado</p>
                 </div>
 
-                <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-                    <div className="space-y-4 rounded-md shadow-sm">
-                        <div>
-                            <Label htmlFor="email">Correo electrónico</Label>
-                            <Input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="mt-1"
-                                placeholder="nome@preventiva.com"
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="password">Contraseña</Label>
-                            <Input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="mt-1"
-                            />
-                        </div>
+                {/* Card */}
+                <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-sm">
+                    <div className="flex items-center gap-2 mb-6">
+                        <ShieldCheck size={16} className="text-accent" />
+                        <span className="text-white/60 text-xs font-bold uppercase tracking-widest">Acceso restringido</span>
                     </div>
 
-                    {error && (
-                        <div className="text-red-500 text-sm text-center">
-                            {error}
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <label className="block text-[11px] font-bold text-white/50 uppercase tracking-widest mb-2">
+                                Correo electrónico
+                            </label>
+                            <input
+                                type="email"
+                                required
+                                autoComplete="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                placeholder="correo@preventiva.com"
+                                className="w-full bg-white/10 border border-white/15 text-white placeholder-white/25 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-transparent transition-all"
+                            />
                         </div>
-                    )}
 
-                    <div>
-                        <Button
+                        <div>
+                            <label className="block text-[11px] font-bold text-white/50 uppercase tracking-widest mb-2">
+                                Contraseña
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    required
+                                    autoComplete="current-password"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full bg-white/10 border border-white/15 text-white placeholder-white/25 rounded-xl px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-accent/60 focus:border-transparent transition-all"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(v => !v)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="px-4 py-3 bg-red-500/15 border border-red-500/30 rounded-xl text-red-400 text-sm font-medium">
+                                {error}
+                            </div>
+                        )}
+
+                        <button
                             type="submit"
-                            className="w-full"
                             disabled={loading}
+                            className="w-full py-3.5 bg-accent hover:bg-accent/90 text-navy font-extrabold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-2"
                         >
                             {loading ? (
-                                <span className="flex items-center gap-2">
-                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Iniciando sesión...
-                                </span>
+                                <><Loader2 size={16} className="animate-spin" /> Verificando...</>
                             ) : (
-                                "Iniciar sesión"
+                                'Iniciar sesión'
                             )}
-                        </Button>
-                    </div>
-                </form>
+                        </button>
+                    </form>
+                </div>
+
+                <p className="text-center text-white/20 text-[10px] mt-8">
+                    Preventiva Centro · Madrid · Uso interno
+                </p>
             </div>
         </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense>
+            <LoginForm />
+        </Suspense>
     )
 }
