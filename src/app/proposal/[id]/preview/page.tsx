@@ -112,6 +112,7 @@ export default function PreviewPage() {
 
     const handleConfirm = () => {
         localStorage.setItem(`confirmed_items_${id}`, JSON.stringify(items))
+        localStorage.setItem(`confirmed_mockup_${id}`, mockup)  // preserve mockup shown to user
         localStorage.setItem(`client_info_${id}`, JSON.stringify({ clientName, whatsapp }))
         router.push(`/proposal/${id}/processing?source=preview`)
     }

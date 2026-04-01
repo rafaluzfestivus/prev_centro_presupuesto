@@ -156,27 +156,34 @@ export async function processProposalWithAIAction(id: string, instruction?: stri
         }
 
         if (instruction === 'confirmed_items' && currentCtx) {
-            // Special case: we already have the items, just calc prices and generate mockup
+            // Support both old format (plain array) and new format ({ items, existingMockup })
+            const confirmedItems = Array.isArray(currentCtx) ? currentCtx : (currentCtx.items || currentCtx)
+            const existingMockup: string = Array.isArray(currentCtx) ? '' : (currentCtx.existingMockup || '')
+
             userContent.push({
                 type: "text",
-                text: `EL USUARIO HA REVISADO Y CONFIRMADO LOS SIGUIENTES ÍTEMS PARA EL PRESUPUESTO. 
-                
-                INSTRUCCIONES OBLIGATORIAS:
-                1. USA EXACTAMENTE ESTOS ÍTEMS. NO CAMBIES LOS NOMBRES, NI LAS MEDIDAS, NI LOS ELIMINES.
-                2. IGNORA CUALQUIER REGLA DE NORMALIZACIÓN ANTERIOR (como 'ancho siempre mayor que alto').
-                3. CALCULA EL PRECIO DE CADA ÍTEM (MÁXIMO ENTRE 28€/m² O MÍNIMO DE 80€).
-                4. GENERA UN NUEVO MOCKUP ASCII QUE REPRESENTE ESTOS ÍTEMS EXACTAMENTE. 
-                   CADA CARA DEBE TENER SUS MEDIDAS (Ancho x Alto) ESCRITAS CLARAMENTE DENTRO O JUNTO AL DIBUJO.
-                   FORMATO OBLIGATORIO PARA CADA CARA:
-                   +-------------------+
-                   |   NOMBRE CARA     |
-                   |   3.50m x 2.10m   |
-                   +-------------------+
-                   ¡ES CRÍTICO QUE LAS MEDIDAS APAREZCAN EN EL DIBUJO!
-                5. SI UN ÍTEM TIENE MEDIDAS 0, DESCÁRTALO O AVISA EN 'missing_info'.
-                6. NO USES EL EJEMPLO DEL PROMPT DEL SISTEMA. USA ESTOS DATOS REALES A CONTINUACIÓN.
-                
-                ÍTEMS REALES CONFIRMADOS POR EL USUARIO: ${JSON.stringify(currentCtx)}`
+                text: `EL USUARIO HA REVISADO Y CONFIRMADO LOS SIGUIENTES ÍTEMS PARA EL PRESUPUESTO.
+
+INSTRUCCIONES OBLIGATORIAS:
+1. USA EXACTAMENTE ESTOS ÍTEMS. NO CAMBIES LOS NOMBRES, NI LAS MEDIDAS, NI LOS ELIMINES.
+2. IGNORA CUALQUIER REGLA DE NORMALIZACIÓN ANTERIOR (como 'ancho siempre mayor que alto').
+3. CALCULA EL PRECIO DE CADA ÍTEM (MÁXIMO ENTRE 28€/m² O MÍNIMO DE 80€).
+4. PARA EL MOCKUP ASCII:${existingMockup
+    ? `
+   - El usuario YA APROBÓ el siguiente mockup en la pantalla de previsualización.
+   - CÓPIALO EXACTAMENTE TAL CUAL en el campo "ascii_mockup". NO lo regeneres ni cambies.
+   - Solo corrige si hay un error evidente (medidas incorrectas), y si lo haces, mantén el mismo estilo y proporciones.
+   MOCKUP APROBADO:
+\`\`\`
+${existingMockup}
+\`\`\``
+    : `
+   - Genera un mockup ASCII proporcional con el nombre y medidas de cada ítem claramente indicados.
+   - FORMATO: +---+ con | y ~, medidas dentro del rectángulo (ej: "3.50m x 2.10m").`}
+5. SI UN ÍTEM TIENE MEDIDAS 0, DESCÁRTALO O AVISA EN 'missing_info'.
+6. NO USES LOS EJEMPLOS DEL PROMPT DEL SISTEMA. USA ESTOS DATOS REALES:
+
+ÍTEMS CONFIRMADOS: ${JSON.stringify(confirmedItems)}`
             })
         } else if (currentCtx) {
             userContent.push({

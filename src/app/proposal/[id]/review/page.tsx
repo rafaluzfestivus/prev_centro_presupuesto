@@ -10,6 +10,7 @@ import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalA
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
 import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator'
+import { generateProposalPDF } from '@/services/pdfGenerator'
 import { createClient } from '@/lib/supabase/client'
 
 type ProposalItem = {
@@ -236,6 +237,23 @@ export default function ReviewPage() {
     downloadProposalPPTX(data)
   }
 
+  const [generatingPDF, setGeneratingPDF] = useState(false)
+  const handleDownloadPDF = async () => {
+    if (!data) return
+    setGeneratingPDF(true)
+    try {
+      await generateProposalPDF({
+        clientName: data.clientName,
+        city: data.city,
+        items: data.items,
+        total: data.total,
+        mockup: data.mockup,
+      })
+    } finally {
+      setGeneratingPDF(false)
+    }
+  }
+
   const handleWhatsApp = async () => {
     if (!data) return
 
@@ -284,9 +302,13 @@ export default function ReviewPage() {
             <Button variant="outline" onClick={() => setIsEditing(!isEditing)} className="hidden md:flex">
               {isEditing ? 'Cancelar Edición' : 'Editar Manualmente'}
             </Button>
+            <Button onClick={handleDownloadPDF} disabled={generatingPDF} className="bg-red-50 hover:bg-red-100 text-red-700 font-bold px-4 border border-red-200">
+              {generatingPDF ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+              PDF
+            </Button>
             <Button onClick={handleDownloadPPTX} className="bg-gray-100 hover:bg-gray-200 text-navy font-bold px-4">
               <Download className="w-4 h-4 mr-2" />
-              Generar PPTX
+              PPTX
             </Button>
             <Button onClick={handleConfirm} disabled={isConfirming} className="bg-navy hover:bg-navy/90 text-white font-bold px-6">
               {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
