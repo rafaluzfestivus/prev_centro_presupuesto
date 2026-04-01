@@ -37,11 +37,13 @@ export default function ProcessingPage() {
 
                 if (source === 'preview') {
                     const confirmedData = localStorage.getItem(`confirmed_items_${id}`)
+                    const confirmedMockup = localStorage.getItem(`confirmed_mockup_${id}`) || ''
                     if (confirmedData) {
                         const items = JSON.parse(confirmedData)
-                        // Use special 'confirmed_items' instruction to signal pricing only
-                        result = await processProposalWithAIAction(id, 'confirmed_items', items)
+                        // Pass items + existing mockup so AI preserves it instead of regenerating
+                        result = await processProposalWithAIAction(id, 'confirmed_items', { items, existingMockup: confirmedMockup })
                         localStorage.removeItem(`confirmed_items_${id}`)
+                        localStorage.removeItem(`confirmed_mockup_${id}`)
                     } else {
                         result = await processProposalWithAIAction(id)
                     }
