@@ -1,8 +1,6 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import { CONTACT, BRAND, PRICING } from '@/lib/constants';
+import { CONTACT } from '@/lib/constants';
 
-// Type definitions
 export interface ProposalItem {
     name: string;
     width: number;
@@ -20,245 +18,193 @@ export interface ProposalData {
     mockup: string;
 }
 
-const loadImage = (src: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.src = src;
-        img.onload = () => resolve(img);
-        img.onerror = (err) => reject(err);
-    });
-};
+// App color palette
+const NAVY   = '#1e293b'
+const ACCENT = '#EAB308'
+const WHITE  = '#FFFFFF'
+const LIGHT  = '#94a3b8'
 
-export const generateProposalPDF = async (data: ProposalData) => {
-    // Landscape orientation with custom 16:9 aspect ratio
-    // Width: 297mm (A4 width), Height: 167.1mm (to match 16:9 ratio of images)
-    const width = 297;
-    const height = 167.1;
+function hexToRgb(hex: string): [number, number, number] {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return [r, g, b]
+}
 
-    const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [width, height]
-    });
+function buildDoc(): jsPDF {
+    return new jsPDF({ orientation: 'landscape', unit: 'mm', format: [297, 167] })
+}
 
-    try {
-        // Load all images first
-        const [img1, img2, img3, img4, img5] = await Promise.all([
-            loadImage('/assets/pdf/page1.jpg'),
-            loadImage('/assets/pdf/page2.jpg'),
-            loadImage('/assets/pdf/page3.jpg'),
-            loadImage('/assets/pdf/page4.jpg'),
-            loadImage('/assets/pdf/page5.jpg'),
-        ]);
+function fillRect(doc: jsPDF, x: number, y: number, w: number, h: number, hex: string) {
+    const [r, g, b] = hexToRgb(hex)
+    doc.setFillColor(r, g, b)
+    doc.rect(x, y, w, h, 'F')
+}
 
-        // --- Page 1 ---
-        doc.addImage(img1, 'JPEG', 0, 0, width, height);
+function setColor(doc: jsPDF, hex: string) {
+    const [r, g, b] = hexToRgb(hex)
+    doc.setTextColor(r, g, b)
+}
 
-        // --- Page 2 ---
-        doc.addPage([width, height]);
-        doc.addImage(img2, 'JPEG', 0, 0, width, height);
+function buildPDF(data: ProposalData): jsPDF {
+    const doc = buildDoc()
+    const W = 297, H = 167
 
-        // --- Page 3 ---
-        doc.addPage([width, height]);
-        doc.addImage(img3, 'JPEG', 0, 0, width, height);
+    // ─── PAGE 1: Cover ───────────────────────────────────────────────────────
+    fillRect(doc, 0, 0, W, H, NAVY)
 
-        // --- Page 4 (Measurements & Mockup) ---
-        doc.addPage([width, height]);
-        doc.addImage(img4, 'JPEG', 0, 0, width, height);
+    // Accent left stripe
+    fillRect(doc, 0, 0, 6, H, ACCENT)
 
-        // Page 4: Left Side (Measurements) - White Background
-        doc.setTextColor(0, 0, 0); // Black text
+    // Logo text
+    setColor(doc, ACCENT)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.text('PREVENTIVA CENTRO', 18, 28)
 
-        // Lowered Y position to avoid overlap with background text (e.g. "Basado en...")
-        let yPos = 95; // Adjusted for new height (was 115)
+    // Divider
+    const [ar, ag, ab] = hexToRgb(ACCENT)
+    doc.setDrawColor(ar, ag, ab)
+    doc.setLineWidth(0.4)
+    doc.line(18, 31, 120, 31)
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(12); // Slightly smaller font to fit more items
+    // Tag
+    setColor(doc, LIGHT)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.text('Presupuesto Técnico de Instalación de Redes de Seguridad', 18, 38)
 
-        data.items.forEach(item => {
-            // [Confirmação de medidas]
-            const text = `• ${item.name}: ${item.width.toFixed(2)}x${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`;
-            doc.text(text, 15, yPos);
-            yPos += 8; // Reduced spacing
-        });
+    // Client name
+    setColor(doc, WHITE)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(32)
+    const nameLines = doc.splitTextToSize(data.clientName || '—', 180) as string[]
+    doc.text(nameLines, 18, 68)
 
-        // Page 4: Right Side (Mockups) - Dark Background
-        // Starting higher to allow vertical stacking
-        const rightColX = 160;
-        let rightColY = 35; // Moved up to better fit the dark "vinho" section (was 50)
+    // City + date
+    setColor(doc, ACCENT)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(12)
+    doc.text(`${data.city || 'Madrid'}  ·  ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}`, 18, 90)
 
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.text("Design / Mockup:", rightColX, rightColY);
+    // Contact footer
+    setColor(doc, LIGHT)
+    doc.setFontSize(8)
+    doc.text(`${CONTACT.EMAIL}  ·  ${CONTACT.MOBILE}  ·  ${CONTACT.PHONE}`, 18, H - 10)
 
-        rightColY += 8;
-        doc.setFont("courier", "normal");
-        doc.setFontSize(9); // Slightly smaller to ensure fit
+    // ─── PAGE 2: Mediciones + Mockup ─────────────────────────────────────────
+    doc.addPage([W, H])
 
-        // Split mockup text to fit the right column (~130mm wide)
-        const splitMockup = doc.splitTextToSize(data.mockup, 130);
-        doc.text(splitMockup, rightColX, rightColY);
+    // Left half: white
+    fillRect(doc, 0, 0, W / 2, H, WHITE)
+    // Right half: navy
+    fillRect(doc, W / 2, 0, W / 2, H, NAVY)
 
+    // Left header bar
+    fillRect(doc, 0, 0, W / 2, 14, NAVY)
+    setColor(doc, ACCENT)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('MEDICIONES CONFIRMADAS', 10, 9.5)
 
-        // --- Page 5 (Price) ---
-        doc.addPage([width, height]);
-        doc.addImage(img5, 'JPEG', 0, 0, width, height);
+    // Items list
+    let y = 24
+    data.items.forEach((item, i) => {
+        if (y > H - 12) return
+        setColor(doc, NAVY)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.text(`${i + 1}. ${item.name}`, 10, y)
 
-        // Page 5: Left Side (Items & Price) - White Background
+        setColor(doc, LIGHT.replace('#', '') === LIGHT ? LIGHT : LIGHT)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        setColor(doc, '#475569')
+        doc.text(`${Number(item.width).toFixed(2)}m × ${Number(item.height).toFixed(2)}m = ${Number(item.area).toFixed(2)} m²`, 14, y + 5)
+        y += 14
+    })
 
-        doc.setTextColor(0, 0, 0); // Default Black for items
+    // Right header bar
+    fillRect(doc, W / 2, 0, W / 2, 14, '#0f172a')
+    setColor(doc, ACCENT)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('PLANO DE LA INSTALACIÓN', W / 2 + 8, 9.5)
 
-        yPos = 60; // Adjusted for new height (was 80)
+    // Mockup
+    setColor(doc, ACCENT)
+    doc.setFont('courier', 'normal')
+    doc.setFontSize(6.5)
+    const mockupLines = doc.splitTextToSize(data.mockup || '(sin mockup)', W / 2 - 16) as string[]
+    doc.text(mockupLines.slice(0, 28), W / 2 + 8, 20)
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
+    // ─── PAGE 3: Presupuesto ─────────────────────────────────────────────────
+    doc.addPage([W, H])
+    fillRect(doc, 0, 0, W, H, NAVY)
+    fillRect(doc, 0, 0, 6, H, ACCENT)
 
-        data.items.forEach(item => {
-            // [item - medidas - calculo da area m2]
-            const text = `• ${item.name} - ${item.width.toFixed(2)}x${item.height.toFixed(2)}m = ${item.area.toFixed(2)}m²`;
-            doc.text(text, 15, yPos);
-            yPos += 8;
-        });
+    // Header
+    setColor(doc, ACCENT)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.text('DETALLE DEL PRESUPUESTO', 18, 18)
+    doc.setDrawColor(ar, ag, ab)
+    doc.setLineWidth(0.3)
+    doc.line(18, 21, W - 18, 21)
 
-        // Total Price at Bottom Left
-        const totalY = 135; // Moved up significantly (was 160)
+    // Items table
+    y = 30
+    data.items.forEach((item) => {
+        if (y > H - 35) return
+        setColor(doc, WHITE)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.text(item.name, 18, y)
 
-        // Label
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.setTextColor(77, 42, 54); // Brand Wine Color
-        doc.text("Inversión Total:", 15, totalY);
+        setColor(doc, LIGHT)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.text(`${Number(item.width).toFixed(2)}×${Number(item.height).toFixed(2)}m · ${Number(item.area).toFixed(2)}m²`, 18, y + 5)
 
-        // Value
-        doc.setFontSize(22);
-        doc.setTextColor(BRAND.PRIMARY_COLOR); // Brand Wine Color (Standard)
-        doc.text(`€ ${data.total.toFixed(2)} + IVA`, 65, totalY);
+        setColor(doc, ACCENT)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.text(`€ ${Number(item.price).toFixed(2)}`, W - 30, y, { align: 'right' })
+        y += 14
+    })
 
-        // Footer Contact Info
-        doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
-        const footerY = 158; // Moved up to valid range (max 167)
-        doc.text(CONTACT.EMAIL, 15, footerY);
-        doc.text(`Móvil: ${CONTACT.MOBILE}  |  Fijo: ${CONTACT.PHONE}`, 15, footerY + 5);
+    // Total box
+    fillRect(doc, 16, H - 42, W - 32, 26, '#0f172a')
+    setColor(doc, LIGHT)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.text('INVERSIÓN TOTAL + IVA', 26, H - 30)
+    setColor(doc, ACCENT)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(22)
+    doc.text(`€ ${data.total.toFixed(2)}`, W - 26, H - 25, { align: 'right' })
 
+    // Footer
+    setColor(doc, LIGHT)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.text(`${CONTACT.EMAIL}  ·  ${CONTACT.MOBILE}  ·  ${CONTACT.PHONE}`, 18, H - 6)
 
-        // Save
-        const safeName = data.clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        doc.save(`Preventiva_Presupuesto_${safeName}.pdf`);
+    return doc
+}
 
-    } catch (error) {
-        console.error("Error generating PDF:", error);
-        alert("Error al generar el PDF. Asegúrate de que las imágenes de fondo existan.");
-    }
-};
+export const generateProposalPDF = async (data: ProposalData): Promise<void> => {
+    const doc = buildPDF(data)
+    const safeName = (data.clientName || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+    doc.save(`Preventiva_Presupuesto_${safeName}.pdf`)
+}
 
 export const generateProposalBlob = async (data: ProposalData): Promise<Blob | null> => {
-    // Landscape orientation with custom 16:9 aspect ratio
-    const width = 297;
-    const height = 167.1;
-
-    const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [width, height]
-    });
-
     try {
-        // Load all images first
-        const [img1, img2, img3, img4, img5] = await Promise.all([
-            loadImage('/assets/pdf/page1.jpg'),
-            loadImage('/assets/pdf/page2.jpg'),
-            loadImage('/assets/pdf/page3.jpg'),
-            loadImage('/assets/pdf/page4.jpg'),
-            loadImage('/assets/pdf/page5.jpg'),
-        ]);
-
-        // --- Page 1 ---
-        doc.addImage(img1, 'JPEG', 0, 0, width, height);
-
-        // --- Page 2 ---
-        doc.addPage([width, height]);
-        doc.addImage(img2, 'JPEG', 0, 0, width, height);
-
-        // --- Page 3 ---
-        doc.addPage([width, height]);
-        doc.addImage(img3, 'JPEG', 0, 0, width, height);
-
-        // --- Page 4 (Measurements & Mockup) ---
-        doc.addPage([width, height]);
-        doc.addImage(img4, 'JPEG', 0, 0, width, height);
-
-        // Page 4: Left Side (Measurements)
-        doc.setTextColor(0, 0, 0);
-        let yPos = 95;
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(12);
-
-        data.items.forEach(item => {
-            const text = `• ${item.name}: ${item.width.toFixed(2)}x${item.height.toFixed(2)}m (${item.area.toFixed(2)}m²)`;
-            doc.text(text, 15, yPos);
-            yPos += 8;
-        });
-
-        // Page 4: Right Side (Mockups)
-        const rightColX = 160;
-        let rightColY = 35; // Consistent with generateProposalPDF
-
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.text("Design / Mockup:", rightColX, rightColY);
-
-        rightColY += 8;
-        doc.setFont("courier", "normal");
-        doc.setFontSize(9);
-
-        const splitMockup = doc.splitTextToSize(data.mockup, 130);
-        doc.text(splitMockup, rightColX, rightColY);
-
-        // --- Page 5 (Price) ---
-        doc.addPage([width, height]);
-        doc.addImage(img5, 'JPEG', 0, 0, width, height);
-
-        // Page 5: Left Side (Items & Price)
-        doc.setTextColor(0, 0, 0);
-        yPos = 60;
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-
-        data.items.forEach(item => {
-            const text = `• ${item.name} - ${item.width.toFixed(2)}x${item.height.toFixed(2)}m = ${item.area.toFixed(2)}m²`;
-            doc.text(text, 15, yPos);
-            yPos += 8;
-        });
-
-        // Total Price
-        const totalY = 135;
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.setTextColor(BRAND.PRIMARY_COLOR);
-        doc.text("Inversión Total:", 15, totalY);
-
-        // Value
-        doc.setFontSize(22);
-        doc.setTextColor(BRAND.PRIMARY_COLOR);
-        doc.text(`€ ${data.total.toFixed(2)} + IVA`, 65, totalY);
-
-        // Footer Contact Info
-        doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
-        const footerY = 158;
-        doc.text(CONTACT.EMAIL, 15, footerY);
-        doc.text(`Móvil: ${CONTACT.MOBILE}  |  Fijo: ${CONTACT.PHONE}`, 15, footerY + 5);
-
-        return doc.output('blob');
-
-    } catch (error) {
-        console.error("Error generating PDF Blob:", error);
-        return null;
+        const doc = buildPDF(data)
+        return doc.output('blob')
+    } catch (err) {
+        console.error('Error generating PDF blob:', err)
+        return null
     }
-};
+}
