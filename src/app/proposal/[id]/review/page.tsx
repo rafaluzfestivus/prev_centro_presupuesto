@@ -10,7 +10,8 @@ import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalA
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
 import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator'
-import { generateProposalPDF } from '@/services/pdfGenerator'
+import { generateProposalPDF, generateProposalBlob } from '@/services/pdfGenerator'
+import { sendDocumentMessage } from '@/lib/evolution'
 import { createClient } from '@/lib/supabase/client'
 
 type ProposalItem = {
@@ -254,21 +255,49 @@ export default function ReviewPage() {
     }
   }
 
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
+  const WA_CAPTION = 'Te paso el presupuesto. Mira si esta todo bien y si necesitas cualquier cambio me dices, vale? Atencion que con el calor tenemos cada día menos fechas disponibles.'
+
   const handleWhatsApp = async () => {
     if (!data) return
+    setSendingWhatsApp(true)
+    setActionError(null)
 
-    let message = `*Preventiva Centro - Presupuesto Técnico*\n\n`
-    message += `Hola ${data.clientName || 'Cliente'},\n\n`
-    message += `Te paso el presupuesto. Mira si las medidas están bien y si necesitas cualquier cambio me dices, vale?\n\n`
-    message += `*Detalles de la inversión:*\n`
-    message += `• Valor Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
+    try {
+      const phone = data.whatsapp?.trim()
+      if (!phone) throw new Error('No hay número de WhatsApp para este cliente.')
 
-    message += `¿Deseas que agendemos la instalación para esta semana?`
+      // Generate PDF blob
+      const pdfBlob = await generateProposalBlob({
+        clientName: data.clientName,
+        city: data.city,
+        items: data.items,
+        total: data.total,
+        mockup: data.mockup,
+      })
 
-    const encoded = encodeURIComponent(message)
-    const whatsappNumber = data.whatsapp?.replace(/\D/g, '')
-    const baseUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}` : `https://wa.me/`
-    window.open(`${baseUrl}?text=${encoded}`, '_blank')
+      if (!pdfBlob) throw new Error('No se pudo generar el PDF.')
+
+      const safeName = (data.clientName || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      const fileName = `Preventiva_Presupuesto_${safeName}.pdf`
+
+      // Try Evolution API first
+      const evolutionUrl = process.env.NEXT_PUBLIC_EVOLUTION_API_URL
+      if (evolutionUrl) {
+        await sendDocumentMessage(phone, pdfBlob, fileName, WA_CAPTION)
+        return
+      }
+
+      // Fallback: open wa.me with message text
+      const encoded = encodeURIComponent(WA_CAPTION)
+      const digits = phone.replace(/\D/g, '')
+      window.open(`https://wa.me/${digits}?text=${encoded}`, '_blank')
+    } catch (err: any) {
+      console.error(err)
+      setActionError(err.message || 'Error al enviar WhatsApp')
+    } finally {
+      setSendingWhatsApp(false)
+    }
   }
 
   if (loading) {
@@ -314,8 +343,8 @@ export default function ReviewPage() {
               {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar Cambios
             </Button>
-            <Button onClick={handleWhatsApp} className="bg-green-500 hover:bg-green-600 text-white font-extrabold px-6">
-              <MessageCircle className="w-4 h-4 mr-2" />
+            <Button onClick={handleWhatsApp} disabled={sendingWhatsApp} className="bg-green-500 hover:bg-green-600 text-white font-extrabold px-6">
+              {sendingWhatsApp ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MessageCircle className="w-4 h-4 mr-2" />}
               WhatsApp
             </Button>
             <Button onClick={() => router.push(`/proposal/${id}/report`)} variant="ghost" className="hidden md:flex font-bold text-gray-500 hover:text-navy">

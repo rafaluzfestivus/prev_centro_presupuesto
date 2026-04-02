@@ -74,3 +74,38 @@ export async function getQRCode(): Promise<{ qrcode: string | null }> {
         return { qrcode: null }
     }
 }
+
+export async function sendDocumentMessage(
+    phone: string,
+    pdfBlob: Blob,
+    fileName: string,
+    caption: string,
+): Promise<{ messageId: string }> {
+    const number = normalizePhone(phone)
+    const url = `${BASE_URL}/message/sendMedia/${INSTANCE}`
+
+    // Convert blob to base64
+    const arrayBuffer = await pdfBlob.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+            number,
+            mediatype: 'document',
+            mimetype: 'application/pdf',
+            media: base64,
+            fileName,
+            caption,
+        }),
+    })
+
+    if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Evolution API error ${res.status}: ${body}`)
+    }
+
+    const data = await res.json()
+    return { messageId: data?.key?.id ?? data?.id ?? '' }
+}
