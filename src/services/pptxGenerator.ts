@@ -8,8 +8,13 @@ export interface ProposalDataPPTX extends ProposalData {
 
 export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob | null> => {
     try {
-        // Fetch the template PPTX
-        const response = await fetch('/assets/presupuesto_preventiva.pptx');
+        // Fetch the city-specific template (fallback to generic)
+        const isEste = data.city?.toLowerCase().includes('este')
+        const templatePath = isEste
+            ? '/assets/presupuesto_preventiva_este.pptx'
+            : '/assets/presupuesto_preventiva_centro.pptx'
+        let response = await fetch(templatePath)
+        if (!response.ok) response = await fetch('/assets/presupuesto_preventiva.pptx')
         if (!response.ok) throw new Error('Failed to load PPTX template');
         const buffer = await response.arrayBuffer();
         
