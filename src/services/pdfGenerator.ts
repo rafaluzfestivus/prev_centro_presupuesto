@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import JSZip from 'jszip';
 import { CONTACT } from '@/lib/constants';
 
 export interface ProposalItem {
@@ -18,21 +19,20 @@ export interface ProposalData {
     mockup: string;
 }
 
-// App color palette
-const NAVY   = '#1e293b'
-const ACCENT = '#EAB308'
-const WHITE  = '#FFFFFF'
-const LIGHT  = '#94a3b8'
+// ── PPTX colors ───────────────────────────────────────────────────────────────
+const WINE      = '#4D2A36'   // main background (from PPTX bg)
+const WINE_MID  = '#6B3A4A'   // right-panel / secondary
+const WINE_DARK = '#3D1F2B'   // darkest panel
+const YELLOW    = '#EAB308'   // accent gold
+const WHITE     = '#FFFFFF'
+const WHITE_SOFT = '#F3F4F6'
+const LIGHT     = '#c9a0ae'   // muted wine-tinted text
 
 function hexToRgb(hex: string): [number, number, number] {
     const r = parseInt(hex.slice(1, 3), 16)
     const g = parseInt(hex.slice(3, 5), 16)
     const b = parseInt(hex.slice(5, 7), 16)
     return [r, g, b]
-}
-
-function buildDoc(): jsPDF {
-    return new jsPDF({ orientation: 'landscape', unit: 'mm', format: [297, 167] })
 }
 
 function fillRect(doc: jsPDF, x: number, y: number, w: number, h: number, hex: string) {
@@ -46,128 +46,186 @@ function setColor(doc: jsPDF, hex: string) {
     doc.setTextColor(r, g, b)
 }
 
-function buildPDF(data: ProposalData): jsPDF {
-    const doc = buildDoc()
+function setDraw(doc: jsPDF, hex: string) {
+    const [r, g, b] = hexToRgb(hex)
+    doc.setDrawColor(r, g, b)
+}
+
+// ── Extract logo from PPTX template ──────────────────────────────────────────
+async function loadLogoBase64(): Promise<string | null> {
+    try {
+        const res = await fetch('/assets/presupuesto_preventiva.pptx')
+        if (!res.ok) return null
+        const buf = await res.arrayBuffer()
+        const zip = await JSZip.loadAsync(buf)
+        const logoFile = zip.file('ppt/media/image1.png')
+        if (!logoFile) return null
+        const b64 = await logoFile.async('base64')
+        return `data:image/png;base64,${b64}`
+    } catch {
+        return null
+    }
+}
+
+// ── PDF builder ───────────────────────────────────────────────────────────────
+async function buildPDF(data: ProposalData): Promise<jsPDF> {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [297, 167] })
     const W = 297, H = 167
+    const MID = W / 2   // 148.5
 
-    // ─── PAGE 1: Cover ───────────────────────────────────────────────────────
-    fillRect(doc, 0, 0, W, H, NAVY)
-
-    // Accent left stripe
-    fillRect(doc, 0, 0, 6, H, ACCENT)
-
-    // Logo text (city-specific)
-    setColor(doc, ACCENT)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
+    const logoB64 = await loadLogoBase64()
     const brandName = data.city?.toLowerCase().includes('este') ? 'PREVENTIVA ESTE' : 'PREVENTIVA CENTRO'
-    doc.text(brandName, 18, 28)
 
-    // Divider
-    const [ar, ag, ab] = hexToRgb(ACCENT)
-    doc.setDrawColor(ar, ag, ab)
-    doc.setLineWidth(0.4)
-    doc.line(18, 31, 120, 31)
+    // ── PAGE 1: Cover ─────────────────────────────────────────────────────────
+    fillRect(doc, 0, 0, W, H, WINE)
 
-    // Tag
-    setColor(doc, LIGHT)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.text('Presupuesto Técnico de Instalación de Redes de Seguridad', 18, 38)
+    // Yellow top strip
+    fillRect(doc, 0, 0, W, 3, YELLOW)
 
-    // Client name
+    // Right panel (darker)
+    fillRect(doc, MID, 3, MID, H - 3, WINE_MID)
+
+    // ── Left side content ──
+    const LX = 14  // left margin
+
+    // Logo image
+    if (logoB64) {
+        const logoH = 32, logoW = 44
+        const logoX = MID / 2 - logoW / 2  // centered on left half
+        doc.addImage(logoB64, 'PNG', logoX, 12, logoW, logoH)
+    } else {
+        // Fallback text logo
+        setColor(doc, YELLOW)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.text(brandName, LX, 30)
+        setColor(doc, WHITE_SOFT)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7)
+        doc.text('REDES DE PROTECCIÓN', LX, 36)
+    }
+
+    // "Tu hogar, protegido."
     setColor(doc, WHITE)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(32)
-    const nameLines = doc.splitTextToSize(data.clientName || '—', 180) as string[]
-    doc.text(nameLines, 18, 68)
+    doc.setFontSize(22)
+    doc.text('Tu hogar, protegido.', LX, 62)
 
-    // City + date
-    setColor(doc, ACCENT)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(12)
-    doc.text(`${data.city || 'Madrid'}  ·  ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}`, 18, 90)
-
-    // Contact footer
-    setColor(doc, LIGHT)
+    // Subtext
+    setColor(doc, WHITE_SOFT)
+    doc.setFont('helvetica', 'italic')
     doc.setFontSize(8)
-    doc.text(`${CONTACT.EMAIL}  ·  ${CONTACT.MOBILE}  ·  ${CONTACT.PHONE}`, 18, H - 10)
+    doc.text('Hemos preparado esta propuesta', LX, 72)
+    doc.text('especialmente para ti.', LX, 78)
 
-    // ─── PAGE 2: Mediciones + Mockup ─────────────────────────────────────────
+    // Client name
+    setColor(doc, YELLOW)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(24)
+    const nameLines = doc.splitTextToSize(data.clientName || '—', MID - LX - 8) as string[]
+    doc.text(nameLines, LX, 100)
+
+    // "Propuesta Personalizada" button
+    const btnY = 128, btnH = 11, btnW = 70
+    const [yr, yg, yb] = hexToRgb(YELLOW)
+    doc.setFillColor(yr, yg, yb)
+    doc.roundedRect(LX, btnY, btnW, btnH, 3, 3, 'F')
+    setColor(doc, WINE_DARK)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.text('Propuesta Personalizada', LX + btnW / 2, btnY + 7.2, { align: 'center' })
+
+    // ── Right side content ──
+    const RX = MID + 10
+
+    setColor(doc, WHITE)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(16)
+    doc.text('Redes de Protección', RX, 60)
+    doc.text('para tu Hogar', RX, 74)
+
+    // Decorative grid on right side
+    setDraw(doc, WINE_DARK)
+    doc.setLineWidth(0.3)
+    for (let gx = MID + 5; gx < W - 5; gx += 16) {
+        doc.line(gx, 8, gx, H - 5)
+    }
+    for (let gy = 8; gy < H - 5; gy += 20) {
+        doc.line(MID + 5, gy, W - 5, gy)
+    }
+
+    // ── PAGE 2: Measurements + Mockup ─────────────────────────────────────────
     doc.addPage([W, H])
 
-    // Left half: white
-    fillRect(doc, 0, 0, W / 2, H, WHITE)
-    // Right half: navy
-    fillRect(doc, W / 2, 0, W / 2, H, NAVY)
+    // Left = wine
+    fillRect(doc, 0, 0, MID, H, WINE)
+    // Right = wine_dark
+    fillRect(doc, MID, 0, MID, H, WINE_DARK)
 
-    // Left header bar
-    fillRect(doc, 0, 0, W / 2, 14, NAVY)
-    setColor(doc, ACCENT)
+    // Yellow top strip
+    fillRect(doc, 0, 0, W, 3, YELLOW)
+
+    // Left header
+    fillRect(doc, 0, 3, MID, 14, WINE_DARK)
+    setColor(doc, YELLOW)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
-    doc.text('MEDICIONES CONFIRMADAS', 10, 9.5)
+    doc.text('MEDICIONES CONFIRMADAS', 10, 13)
 
     // Items list
-    let y = 24
+    let y = 26
     data.items.forEach((item, i) => {
         if (y > H - 12) return
-        setColor(doc, NAVY)
+        setColor(doc, WHITE)
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
         doc.text(`${i + 1}. ${item.name}`, 10, y)
-
-        setColor(doc, LIGHT.replace('#', '') === LIGHT ? LIGHT : LIGHT)
+        setColor(doc, LIGHT)
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
-        setColor(doc, '#475569')
         doc.text(`${Number(item.width).toFixed(2)}m × ${Number(item.height).toFixed(2)}m = ${Number(item.area).toFixed(2)} m²`, 14, y + 5)
         y += 14
     })
 
-    // Right header bar
-    fillRect(doc, W / 2, 0, W / 2, 14, '#0f172a')
-    setColor(doc, ACCENT)
+    // Right header
+    fillRect(doc, MID, 3, MID, 14, '#2a1218')
+    setColor(doc, YELLOW)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
-    doc.text('PLANO DE LA INSTALACIÓN', W / 2 + 8, 9.5)
+    doc.text('PLANO DE LA INSTALACIÓN', MID + 8, 13)
 
     // Mockup
-    setColor(doc, ACCENT)
+    setColor(doc, YELLOW)
     doc.setFont('courier', 'normal')
     doc.setFontSize(6.5)
-    const mockupLines = doc.splitTextToSize(data.mockup || '(sin mockup)', W / 2 - 16) as string[]
-    doc.text(mockupLines.slice(0, 28), W / 2 + 8, 20)
+    const mockupLines = doc.splitTextToSize(data.mockup || '(sin mockup)', MID - 16) as string[]
+    doc.text(mockupLines.slice(0, 28), MID + 8, 22)
 
-    // ─── PAGE 3: Presupuesto ─────────────────────────────────────────────────
+    // ── PAGE 3: Budget detail ─────────────────────────────────────────────────
     doc.addPage([W, H])
-    fillRect(doc, 0, 0, W, H, NAVY)
-    fillRect(doc, 0, 0, 6, H, ACCENT)
+    fillRect(doc, 0, 0, W, H, WINE)
+    fillRect(doc, 0, 0, W, 3, YELLOW)
 
-    // Header
-    setColor(doc, ACCENT)
+    setColor(doc, YELLOW)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
     doc.text('DETALLE DEL PRESUPUESTO', 18, 18)
-    doc.setDrawColor(ar, ag, ab)
+    setDraw(doc, YELLOW)
     doc.setLineWidth(0.3)
     doc.line(18, 21, W - 18, 21)
 
-    // Items table
     y = 30
     data.items.forEach((item) => {
-        if (y > H - 35) return
+        if (y > H - 38) return
         setColor(doc, WHITE)
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
         doc.text(item.name, 18, y)
-
         setColor(doc, LIGHT)
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
         doc.text(`${Number(item.width).toFixed(2)}×${Number(item.height).toFixed(2)}m · ${Number(item.area).toFixed(2)}m²`, 18, y + 5)
-
-        setColor(doc, ACCENT)
+        setColor(doc, YELLOW)
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
         doc.text(`€ ${Number(item.price).toFixed(2)}`, W - 30, y, { align: 'right' })
@@ -175,12 +233,12 @@ function buildPDF(data: ProposalData): jsPDF {
     })
 
     // Total box
-    fillRect(doc, 16, H - 42, W - 32, 26, '#0f172a')
+    fillRect(doc, 16, H - 42, W - 32, 26, WINE_DARK)
     setColor(doc, LIGHT)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.text('INVERSIÓN TOTAL + IVA', 26, H - 30)
-    setColor(doc, ACCENT)
+    setColor(doc, YELLOW)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(22)
     doc.text(`€ ${data.total.toFixed(2)}`, W - 26, H - 25, { align: 'right' })
@@ -195,14 +253,14 @@ function buildPDF(data: ProposalData): jsPDF {
 }
 
 export const generateProposalPDF = async (data: ProposalData): Promise<void> => {
-    const doc = buildPDF(data)
+    const doc = await buildPDF(data)
     const safeName = (data.clientName || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase()
     doc.save(`Preventiva_Presupuesto_${safeName}.pdf`)
 }
 
 export const generateProposalBlob = async (data: ProposalData): Promise<Blob | null> => {
     try {
-        const doc = buildPDF(data)
+        const doc = await buildPDF(data)
         return doc.output('blob')
     } catch (err) {
         console.error('Error generating PDF blob:', err)
