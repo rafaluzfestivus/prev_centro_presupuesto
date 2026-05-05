@@ -15,10 +15,16 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
         
         const zip = await JSZip.loadAsync(buffer);
 
-        // 1. Page 1: Client Name
+        // 1. Page 1: Client Name + city branding
         if (zip.file('ppt/slides/slide1.xml')) {
             let slide1 = await zip.file('ppt/slides/slide1.xml')!.async('string');
             slide1 = slide1.replace(/\[Cliente\]/g, data.clientName);
+            // City-specific brand name replacement
+            if (data.city?.toLowerCase().includes('este')) {
+                slide1 = slide1.replace(/Preventiva Centro/g, 'Preventiva Este')
+                slide1 = slide1.replace(/PREVENTIVA CENTRO/g, 'PREVENTIVA ESTE')
+                slide1 = slide1.replace(/preventiva centro/gi, 'Preventiva Este')
+            }
             zip.file('ppt/slides/slide1.xml', slide1);
         }
 

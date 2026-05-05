@@ -607,3 +607,28 @@ export async function deleteProposalAction(id: string) {
         return { success: false, error: 'Error al eliminar el presupuesto' }
     }
 }
+
+export async function saveBuilderItemsAction(
+    proposalId: string,
+    items: { name: string; width: number; height: number; area: number; price: number }[],
+    mockup: string,
+    total: number,
+) {
+    try {
+        const result = {
+            items,
+            ascii_mockup: mockup,
+            pricing_logic: items.map(i =>
+                `${i.name}: ${i.width.toFixed(2)}×${i.height.toFixed(2)}m = ${i.area.toFixed(2)}m² → €${i.price.toFixed(2)}`
+            ).join('\n'),
+            total,
+        }
+        await saveAIProcessing(proposalId, result, 'builder', items)
+        revalidatePath(`/proposal/${proposalId}`)
+        revalidatePath('/dashboard/presupuestos')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to save builder items:', error)
+        return { success: false, error: error.message || 'Error al guardar ítems' }
+    }
+}
