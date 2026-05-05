@@ -60,12 +60,9 @@ async function fetchAsBase64(path: string): Promise<string | null> {
     } catch { return null }
 }
 
-/** Load city-specific slide: tries slide{n}_{city}.png then slide{n}.png */
-async function loadStaticSlide(n: number, city: string): Promise<string | null> {
-    const key = city?.toLowerCase().includes('este') ? 'este' : 'centro'
+/** Load static slide — tries slide{n}.png / slide{n}.jpg */
+async function loadStaticSlide(n: number): Promise<string | null> {
     return (
-        await fetchAsBase64(`/assets/pdf/slide${n}_${key}.png`) ||
-        await fetchAsBase64(`/assets/pdf/slide${n}_${key}.jpg`) ||
         await fetchAsBase64(`/assets/pdf/slide${n}.png`) ||
         await fetchAsBase64(`/assets/pdf/slide${n}.jpg`)
     )
@@ -265,7 +262,7 @@ async function buildPDF(data: ProposalData): Promise<jsPDF> {
 
     // ── Pages 2 & 3: Static slides ──
     for (const n of [2, 3]) {
-        const img = await loadStaticSlide(n, data.city)
+        const img = await loadStaticSlide(n)
         if (img) addFullPageImage(doc, W, H, img)
     }
 
@@ -277,7 +274,7 @@ async function buildPDF(data: ProposalData): Promise<jsPDF> {
 
     // ── Pages 6, 7, 8: Static slides ──
     for (const n of [6, 7, 8]) {
-        const img = await loadStaticSlide(n, data.city)
+        const img = await loadStaticSlide(n)
         if (img) addFullPageImage(doc, W, H, img)
     }
 
