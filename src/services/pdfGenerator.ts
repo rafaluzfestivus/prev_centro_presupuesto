@@ -51,20 +51,40 @@ function setDraw(doc: jsPDF, hex: string) {
     doc.setDrawColor(r, g, b)
 }
 
-// ── Extract logo from PPTX template ──────────────────────────────────────────
-async function loadLogoBase64(): Promise<string | null> {
+// ── Extract logo from the correct PPTX template ──────────────────────────────
+async function loadLogoBase64(city: string): Promise<string | null> {
+    const isEste = city?.toLowerCase().includes('este')
+
+    // Try city-specific static PNG first (fastest, no JSZip needed)
+    const staticPath = isEste ? '/assets/logo_preventiva_este.png' : '/assets/logo_preventiva_centro.png'
     try {
-        const res = await fetch('/assets/presupuesto_preventiva.pptx')
-        if (!res.ok) return null
-        const buf = await res.arrayBuffer()
-        const zip = await JSZip.loadAsync(buf)
-        const logoFile = zip.file('ppt/media/image1.png')
-        if (!logoFile) return null
-        const b64 = await logoFile.async('base64')
-        return `data:image/png;base64,${b64}`
-    } catch {
-        return null
+        const r = await fetch(staticPath)
+        if (r.ok) {
+            const buf = await r.arrayBuffer()
+            const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+            return `data:image/png;base64,${b64}`
+        }
+    } catch { /* fall through */ }
+
+    // Fallback: extract from the PPTX template
+    const pptxPath = isEste
+        ? '/assets/presupuesto_preventiva_este.pptx'
+        : '/assets/presupuesto_preventiva_centro.pptx'
+    const fallbackPath = '/assets/presupuesto_preventiva.pptx'
+
+    for (const path of [pptxPath, fallbackPath]) {
+        try {
+            const res = await fetch(path)
+            if (!res.ok) continue
+            const buf = await res.arrayBuffer()
+            const zip = await JSZip.loadAsync(buf)
+            const logoFile = zip.file('ppt/media/image1.png')
+            if (!logoFile) continue
+            const b64 = await logoFile.async('base64')
+            return `data:image/png;base64,${b64}`
+        } catch { /* try next */ }
     }
+    return null
 }
 
 // ── PDF builder ───────────────────────────────────────────────────────────────
@@ -73,7 +93,7 @@ async function buildPDF(data: ProposalData): Promise<jsPDF> {
     const W = 297, H = 167
     const MID = W / 2   // 148.5
 
-    const logoB64 = await loadLogoBase64()
+    const logoB64 = await loadLogoBase64(data.city || '')
     const brandName = data.city?.toLowerCase().includes('este') ? 'PREVENTIVA ESTE' : 'PREVENTIVA CENTRO'
 
     // ── PAGE 1: Cover ─────────────────────────────────────────────────────────
