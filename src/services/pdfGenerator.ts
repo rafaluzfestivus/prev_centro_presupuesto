@@ -56,11 +56,12 @@ function buildPDF(data: ProposalData): jsPDF {
     // Accent left stripe
     fillRect(doc, 0, 0, 6, H, ACCENT)
 
-    // Logo text
+    // Logo text (city-specific)
     setColor(doc, ACCENT)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.text('PREVENTIVA CENTRO', 18, 28)
+    const brandName = data.city?.toLowerCase().includes('este') ? 'PREVENTIVA ESTE' : 'PREVENTIVA CENTRO'
+    doc.text(brandName, 18, 28)
 
     // Divider
     const [ar, ag, ab] = hexToRgb(ACCENT)

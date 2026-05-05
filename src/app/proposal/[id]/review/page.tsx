@@ -265,7 +265,7 @@ export default function ReviewPage() {
 
     try {
       const phone = data.whatsapp?.trim()
-      if (!phone) throw new Error('No hay número de WhatsApp para este cliente.')
+      if (!phone) throw new Error('Introduce el número de WhatsApp del cliente (campo editable arriba).')
 
       // Generate PDF blob
       const pdfBlob = await generateProposalBlob({
@@ -411,7 +411,12 @@ export default function ReviewPage() {
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <span className="text-[10px] font-black uppercase text-gray-400">WhatsApp</span>
-                <p className="text-lg font-bold text-navy">{data.whatsapp || '---'}</p>
+                <Input
+                  value={data.whatsapp || ''}
+                  onChange={e => setData(prev => prev ? { ...prev, whatsapp: e.target.value } : null)}
+                  placeholder="34600000000"
+                  className="border-none shadow-none p-0 h-auto text-lg font-bold text-navy focus-visible:ring-0"
+                />
               </div>
               <div className="bg-navy p-6 rounded-2xl shadow-xl text-white flex flex-col justify-center">
                 <span className="text-[10px] font-black uppercase text-white/50">Total del Presupuesto</span>

@@ -54,7 +54,7 @@ export interface AIProcessingResult {
 export interface CreateProposalInput {
     clientName: string;
     city: string;
-    measurements: string;
+    measurements?: string;
     observations?: string;
     imageUrl?: string;
     whatsapp?: string;

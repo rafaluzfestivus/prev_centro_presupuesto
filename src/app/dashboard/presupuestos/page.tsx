@@ -1,64 +1,30 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createProposalAction, getProposalsAction, deleteProposalAction } from '@/actions/proposal'
 import { Proposal } from '@/lib/types'
-import { Loader2, Upload, X, Trash2, FileText, Plus, RefreshCw, Calendar, ClipboardList, AlertCircle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { Loader2, Trash2, FileText, Plus, RefreshCw, Calendar, ClipboardList, AlertCircle, Search, X } from 'lucide-react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-
 import { Suspense } from 'react'
+
+const CITIES = ['Preventiva Centro', 'Preventiva Este'] as const
 
 function ProposalsContent() {
     const router = useRouter()
-    const searchParams = useSearchParams()
     const [proposals, setProposals] = useState<Proposal[]>([])
     const [loadingHistory, setLoadingHistory] = useState(true)
     const [clientName, setClientName] = useState('')
-    const [city, setCity] = useState('')
-    const [measurements, setMeasurements] = useState('')
-    const [observations, setObservations] = useState('')
-    const [whatsapp, setWhatsapp] = useState('')
+    const [city, setCity] = useState<string>(CITIES[0])
     const [loading, setLoading] = useState(false)
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
-    const [uploading, setUploading] = useState(false)
     const [formError, setFormError] = useState('')
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-    const fileInputRef = useRef<HTMLInputElement>(null)
+    const [search, setSearch] = useState('')
 
-    useEffect(() => {
-        const source = searchParams.get('source')
-        if (source === 'lead') {
-            const name = searchParams.get('name')
-            const wa = searchParams.get('whatsapp')
-            const msg = searchParams.get('message')
-
-            if (name) setClientName(name)
-            if (wa) setWhatsapp(wa)
-            if (msg) setMeasurements(`Pedido vindo do site:\n${msg}`)
-        }
-    }, [searchParams])
-
-    useEffect(() => {
-        loadProposals()
-        const handleWindowPaste = (e: ClipboardEvent) => {
-            if (e.clipboardData && e.clipboardData.items) {
-                const items = e.clipboardData.items
-                for (let i = 0; i < items.length; i++) {
-                    if (items[i].type.indexOf('image') !== -1) {
-                        const file = items[i].getAsFile()
-                        if (file) { setSelectedFile(file); break; }
-                    }
-                }
-            }
-        }
-        window.addEventListener('paste', handleWindowPaste)
-        return () => window.removeEventListener('paste', handleWindowPaste)
-    }, [])
+    useEffect(() => { loadProposals() }, [])
 
     const loadProposals = async () => {
         setLoadingHistory(true)
@@ -70,43 +36,23 @@ function ProposalsContent() {
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault()
         setFormError('')
+        if (!clientName.trim()) { setFormError('Por favor, insira o nome do cliente.'); return }
         setLoading(true)
         try {
-            let imageUrl = ''
-            if (selectedFile) {
-                setUploading(true)
-                const supabase = createClient()
-                const fileExt = selectedFile.name.split('.').pop()
-                const fileName = `input_${Date.now()}.${fileExt}`
-                const { error: uploadError } = await supabase.storage.from('proposals').upload(fileName, selectedFile)
-                if (uploadError) throw uploadError
-                const { data: { publicUrl } } = supabase.storage.from('proposals').getPublicUrl(fileName)
-                imageUrl = publicUrl
-                setUploading(false)
-            }
-            if (!measurements && !imageUrl) {
-                setFormError('Por favor, insira as medidas ou envie uma imagem.')
-                setLoading(false)
-                return
-            }
-            const result = await createProposalAction({ clientName, city, measurements, observations, imageUrl, whatsapp })
-            if (result.success && result.id) router.push(`/proposal/${result.id}/preview`)
+            const result = await createProposalAction({ clientName: clientName.trim(), city })
+            if (result.success && result.id) router.push(`/proposal/${result.id}/builder`)
             else setFormError('Erro ao criar orçamento: ' + (result.error || 'Erro desconhecido'))
         } catch (error) {
             console.error(error)
             setFormError('Erro ao criar orçamento')
         } finally {
             setLoading(false)
-            setUploading(false)
         }
     }
 
-    const clearFile = () => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }
-
     const handleScheduleVisit = (e: React.MouseEvent, p: Proposal) => {
         e.stopPropagation()
-        const clientName = p.cliente_nome || 'Cliente da Proposta'
-        router.push(`/dashboard/citas?client=${encodeURIComponent(clientName)}`)
+        router.push(`/dashboard/citas?client=${encodeURIComponent(p.cliente_nome || 'Cliente')}`)
     }
 
     const handleDeleteClick = (e: React.MouseEvent, id: string) => {
@@ -118,23 +64,27 @@ function ProposalsContent() {
         e.stopPropagation()
         if (!pendingDeleteId) return
         const result = await deleteProposalAction(pendingDeleteId)
-        if (result.success) {
-            setPendingDeleteId(null)
-            loadProposals()
-        } else {
-            setPendingDeleteId(null)
-            setFormError('Erro ao excluir orçamento')
-        }
+        if (result.success) { setPendingDeleteId(null); loadProposals() }
+        else { setPendingDeleteId(null); setFormError('Erro ao excluir orçamento') }
     }
+
+    const filteredProposals = proposals.filter(p => {
+        if (!search.trim()) return true
+        const q = search.toLowerCase()
+        const name = (p.cliente_nome || '').toLowerCase()
+        const date = new Date(p.data_criacao).toLocaleDateString()
+        return name.includes(q) || date.includes(q)
+    })
 
     return (
         <DashboardLayout>
             <header className="mb-10">
                 <h1 className="text-3xl font-bold mb-2">Gerenciador de <span className="accent-text">Orçamentos</span></h1>
-                <p className="text-text-muted">Crie orçamentos profissionais em segundos com ajuda de IA.</p>
+                <p className="text-text-muted">Crie orçamentos profissionais de forma rápida e simples.</p>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* ── New Proposal Form ── */}
                 <div className="glass-card p-10 bg-white border-none shadow-sm h-fit">
                     <h2 className="text-xl font-bold text-navy mb-8 uppercase tracking-widest flex items-center gap-3">
                         <Plus className="text-accent" />
@@ -150,57 +100,44 @@ function ProposalsContent() {
                     )}
 
                     <form className="space-y-6" onSubmit={handleGenerate}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Cliente</Label>
-                                <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex: Ana Garcia" className="p-4 bg-bg-dark border-none rounded-xl" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Cidade</Label>
-                                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex: Madrid" className="p-4 bg-bg-dark border-none rounded-xl" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">WhatsApp</Label>
-                                <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex: 34600000000" className="p-4 bg-bg-dark border-none rounded-xl" />
-                            </div>
-                        </div>
-
                         <div className="space-y-2">
-                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Medidas e Detalhes</Label>
-                            <textarea
-                                required={!selectedFile}
-                                className="w-full min-h-[150px] p-6 bg-bg-dark border-none rounded-xl text-sm focus:ring-2 focus:ring-accent/30 outline-none resize-none"
-                                placeholder="Descreva as medidas ou cole o texto do WhatsApp..."
-                                value={measurements}
-                                onChange={(e) => setMeasurements(e.target.value)}
+                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Nome do Cliente</Label>
+                            <Input
+                                value={clientName}
+                                onChange={(e) => setClientName(e.target.value)}
+                                placeholder="Ex: Ana García"
+                                className="p-4 bg-bg-dark border-none rounded-xl text-base"
+                                required
                             />
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Imagem / Esboço</Label>
-                            {!selectedFile ? (
-                                <div className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-bg-dark transition-colors" onClick={() => fileInputRef.current?.click()}>
-                                    <Upload className="h-8 w-8 text-accent mb-3" />
-                                    <span className="text-sm font-bold text-navy">Enviar Imagem</span>
-                                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])} />
-                                </div>
-                            ) : (
-                                <div className="relative rounded-xl overflow-hidden border border-border group">
-                                    <img src={URL.createObjectURL(selectedFile)} alt="Preview" className="w-full h-48 object-cover" />
-                                    <button onClick={clearFile} className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-lg text-red-500"><X size={16} /></button>
-                                </div>
-                            )}
+                            <Label className="font-bold text-navy uppercase text-[10px] tracking-widest">Delegação</Label>
+                            <select
+                                value={city}
+                                onChange={(e) => setCity(e.target.value)}
+                                className="w-full p-4 bg-bg-dark border-none rounded-xl text-base font-medium text-navy focus:ring-2 focus:ring-accent/30 outline-none appearance-none cursor-pointer"
+                            >
+                                {CITIES.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
                         </div>
 
-                        <Button type="submit" className="w-full py-4 bg-accent text-navy font-black rounded-xl hover:shadow-xl transition-all h-auto text-lg" disabled={loading}>
+                        <Button
+                            type="submit"
+                            className="w-full py-4 bg-accent text-navy font-black rounded-xl hover:shadow-xl transition-all h-auto text-lg"
+                            disabled={loading}
+                        >
                             {loading && <Loader2 className="mr-3 h-5 w-5 animate-spin" />}
-                            {loading ? 'Processando...' : 'GERAR ORÇAMENTO COM IA'}
+                            {loading ? 'Criando...' : 'CRIAR ORÇAMENTO →'}
                         </Button>
                     </form>
                 </div>
 
-                <div className="glass-card p-10 bg-white border-none shadow-sm flex flex-col h-[700px]">
-                    <div className="flex justify-between items-center mb-8">
+                {/* ── History ── */}
+                <div className="glass-card p-10 bg-white border-none shadow-sm flex flex-col h-[640px]">
+                    <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-bold text-navy uppercase tracking-widest flex items-center gap-3">
                             <FileText className="text-accent" />
                             Histórico
@@ -210,16 +147,46 @@ function ProposalsContent() {
                         </button>
                     </div>
 
+                    {/* Search */}
+                    <div className="relative mb-4">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                        <Input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Buscar por nome ou data..."
+                            className="pl-9 bg-bg-dark border-none rounded-xl text-sm"
+                        />
+                        {search && (
+                            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-navy">
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+
                     <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                        {proposals.map((p) => (
-                            <div key={p.id} className="p-5 rounded-2xl bg-bg-dark/50 border border-border/50 hover:bg-white hover:shadow-md transition-all cursor-pointer group" onClick={() => router.push(`/proposal/${p.id}/review`)}>
+                        {loadingHistory ? (
+                            <div className="flex items-center justify-center h-32">
+                                <Loader2 className="animate-spin h-6 w-6 text-accent" />
+                            </div>
+                        ) : filteredProposals.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-32 text-text-muted">
+                                <FileText size={32} className="mb-2 opacity-30" />
+                                <p className="text-sm font-medium">{search ? 'Nenhum resultado' : 'Nenhum orçamento ainda'}</p>
+                            </div>
+                        ) : filteredProposals.map((p) => (
+                            <div
+                                key={p.id}
+                                className="p-5 rounded-2xl bg-bg-dark/50 border border-border/50 hover:bg-white hover:shadow-md transition-all cursor-pointer group"
+                                onClick={() => router.push(`/proposal/${p.id}/review`)}
+                            >
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
                                         <h3 className="font-bold text-navy">{p.cliente_nome}</h3>
                                         <p className="text-[10px] text-text-muted font-black uppercase tracking-widest">{p.cidade}</p>
                                     </div>
-                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-accent/10 text-accent'
-                                        }`}>{p.status}</span>
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                                        p.status === 'Confirmada' ? 'bg-green-100 text-green-700' : 'bg-accent/10 text-accent'
+                                    }`}>{p.status}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-text-muted font-bold">{new Date(p.data_criacao).toLocaleDateString()}</span>
@@ -243,21 +210,13 @@ function ProposalsContent() {
                                         )}
                                         {pendingDeleteId === p.id ? (
                                             <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setPendingDeleteId(null); }}
-                                                    className="px-2 py-1 text-xs bg-white border border-border text-navy rounded-lg"
-                                                >
-                                                    Não
-                                                </button>
-                                                <button
-                                                    onClick={handleDeleteConfirm}
-                                                    className="px-2 py-1 text-xs bg-red-600 text-white rounded-lg font-bold"
-                                                >
-                                                    Sim
-                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); setPendingDeleteId(null) }} className="px-2 py-1 text-xs bg-white border border-border text-navy rounded-lg">Não</button>
+                                                <button onClick={handleDeleteConfirm} className="px-2 py-1 text-xs bg-red-600 text-white rounded-lg font-bold">Sim</button>
                                             </div>
                                         ) : (
-                                            <button onClick={(e) => handleDeleteClick(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Excluir"><Trash2 size={16} /></button>
+                                            <button onClick={(e) => handleDeleteClick(e, p.id)} className="p-2 text-red-500 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-lg transition-all" title="Excluir">
+                                                <Trash2 size={16} />
+                                            </button>
                                         )}
                                     </div>
                                 </div>
