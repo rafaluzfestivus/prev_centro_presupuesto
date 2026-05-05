@@ -10,7 +10,7 @@ export async function createProposal(data: CreateProposalInput, userId?: string)
         .insert({
             cliente_nome: data.clientName,
             cidade: data.city,
-            medidas_input: data.measurements,
+            medidas_input: data.measurements ?? '',
             observacoes: data.observations,
             input_image_url: data.imageUrl,
             whatsapp: data.whatsapp,
