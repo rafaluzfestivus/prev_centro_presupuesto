@@ -20,35 +20,29 @@ export interface ProposalData {
 }
 
 /** Generate PPTX then convert to PDF via /api/pptx-to-pdf (Google Drive). */
-export const generateProposalBlob = async (data: ProposalData): Promise<Blob | null> => {
-    try {
-        // 1. Generate the PPTX (same file used for download)
-        const pptxBlob = await generateProposalPPTX(data as ProposalDataPPTX)
-        if (!pptxBlob) throw new Error('PPTX generation failed')
+export const generateProposalBlob = async (data: ProposalData): Promise<Blob> => {
+    // 1. Generate the PPTX
+    const pptxBlob = await generateProposalPPTX(data as ProposalDataPPTX)
+    if (!pptxBlob) throw new Error('Falha ao gerar o arquivo PPTX')
 
-        // 2. Send to conversion API
-        const res = await fetch('/api/pptx-to-pdf', {
-            method: 'POST',
-            body: pptxBlob,
-            headers: { 'Content-Type': 'application/octet-stream' },
-        })
+    // 2. Send to conversion API
+    const res = await fetch('/api/pptx-to-pdf', {
+        method: 'POST',
+        body: pptxBlob,
+        headers: { 'Content-Type': 'application/octet-stream' },
+    })
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: res.statusText }))
-            throw new Error(err.error || 'Conversion failed')
-        }
-
-        return await res.blob()
-    } catch (err) {
-        console.error('[generateProposalBlob]', err)
-        return null
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(err.error || 'Conversion failed')
     }
+
+    return await res.blob()
 }
 
 /** Generate PDF and trigger browser download. */
 export const generateProposalPDF = async (data: ProposalData): Promise<void> => {
     const blob = await generateProposalBlob(data)
-    if (!blob) throw new Error('Não foi possível gerar o PDF. Verifique se GOOGLE_SERVICE_ACCOUNT_JSON está configurado no Vercel.')
 
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
