@@ -55,18 +55,16 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
 
         const zip = await JSZip.loadAsync(buffer)
 
-        // ── Slide 1: Cover — replace [Cliente] ───────────────────────────────
+        // ── Slide 1: Cover — replace [cliente] ───────────────────────────────
         if (zip.file('ppt/slides/slide1.xml')) {
             let slide1 = await zip.file('ppt/slides/slide1.xml')!.async('string')
-            slide1 = replacePlaceholder(slide1, '[Cliente]', data.clientName)
+            slide1 = replacePlaceholder(slide1, '[cliente]', data.clientName)
             zip.file('ppt/slides/slide1.xml', slide1)
         }
 
         // ── Slide 6: Items list + ASCII mockup + background image ────────────
         if (zip.file('ppt/slides/slide6.xml')) {
             let slide6 = await zip.file('ppt/slides/slide6.xml')!.async('string')
-
-            slide6 = slide6.replace('Esto es exactamente lo que necesitas.', '')
 
             const textItemsXml = data.items.map(item => `
 <a:p>
@@ -130,15 +128,15 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
             zip.file('ppt/slides/slide6.xml', slide6)
         }
 
-        // ── Slide 7: Pricing — replace [PRECIO] and [X] ──────────────────────
+        // ── Slide 7: Pricing — replace [valor] and [area] ────────────────────
         if (zip.file('ppt/slides/slide7.xml')) {
             let slide7 = await zip.file('ppt/slides/slide7.xml')!.async('string')
             const totalPrice = Number(data.total || 0).toFixed(2)
             const totalArea = data.items
                 .reduce((acc, item) => acc + Number(item.area || 0), 0)
                 .toFixed(2)
-            slide7 = replacePlaceholder(slide7, '[PRECIO]', totalPrice)
-            slide7 = replacePlaceholder(slide7, '[X]', totalArea)
+            slide7 = replacePlaceholder(slide7, '[valor]', totalPrice)
+            slide7 = replacePlaceholder(slide7, '[area]', totalArea)
             zip.file('ppt/slides/slide7.xml', slide7)
         }
 
