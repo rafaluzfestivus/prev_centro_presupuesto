@@ -242,6 +242,7 @@ export default function ReviewPage() {
   const handleDownloadPDF = async () => {
     if (!data) return
     setGeneratingPDF(true)
+    setActionError(null)
     try {
       await generateProposalPDF({
         clientName: data.clientName,
@@ -250,6 +251,8 @@ export default function ReviewPage() {
         total: data.total,
         mockup: data.mockup,
       })
+    } catch (err: any) {
+      setActionError(err.message || 'Error al generar el PDF')
     } finally {
       setGeneratingPDF(false)
     }
