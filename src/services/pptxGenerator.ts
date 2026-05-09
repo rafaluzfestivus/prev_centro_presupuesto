@@ -6,22 +6,6 @@ export interface ProposalDataPPTX extends ProposalData {
     whatsapp?: string;
 }
 
-/** Extract plain text from slide XML (strips all tags) */
-function slideText(xml: string): string {
-    return xml.replace(/<[^>]+>/g, ' ')
-}
-
-/** List all slide file paths sorted by slide number */
-function listSlides(zip: JSZip): string[] {
-    return Object.keys(zip.files)
-        .filter(f => /^ppt\/slides\/slide\d+\.xml$/.test(f))
-        .sort((a, b) => {
-            const na = parseInt(a.match(/\d+/)![0])
-            const nb = parseInt(b.match(/\d+/)![0])
-            return na - nb
-        })
-}
-
 export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob | null> => {
     try {
         // Load city-specific v2 template
@@ -29,29 +13,26 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
         const templatePath = isEste
             ? '/assets/presupuesto_prev_este_v2.pptx'
             : '/assets/presupuesto_prev_centro_v2.pptx'
-        let response = await fetch(templatePath)
+        const response = await fetch(templatePath)
         if (!response.ok) throw new Error(`Failed to load PPTX template: ${templatePath}`)
         const buffer = await response.arrayBuffer()
 
         const zip = await JSZip.loadAsync(buffer)
-        const slides = listSlides(zip)
 
-        for (const slidePath of slides) {
-            let xml = await zip.file(slidePath)!.async('string')
-            const text = slideText(xml)
-            let changed = false
+        // ── Slide 1: Cover — replace [Cliente] ───────────────────────────────
+        if (zip.file('ppt/slides/slide1.xml')) {
+            let slide1 = await zip.file('ppt/slides/slide1.xml')!.async('string')
+            slide1 = slide1.replace(/\[Cliente\]/g, data.clientName)
+            zip.file('ppt/slides/slide1.xml', slide1)
+        }
 
-            // ── Cover slide: contains [Cliente] ──────────────────────────────
-            if (text.includes('[Cliente]')) {
-                xml = xml.replace(/\[Cliente\]/g, data.clientName)
-                changed = true
-            }
+        // ── Slide 6: Items list + ASCII mockup + background image ────────────
+        if (zip.file('ppt/slides/slide6.xml')) {
+            let slide6 = await zip.file('ppt/slides/slide6.xml')!.async('string')
 
-            // ── Items + mockup slide: contains the instruction text placeholder ─
-            if (text.includes('Esto es exactamente lo que necesitas.')) {
-                xml = xml.replace('Esto es exactamente lo que necesitas.', '')
+            slide6 = slide6.replace('Esto es exactamente lo que necesitas.', '')
 
-                const textItemsXml = data.items.map(item => `
+            const textItemsXml = data.items.map(item => `
 <a:p>
     <a:pPr algn="l"><a:lnSpc><a:spcPct val="120000"/></a:lnSpc></a:pPr>
     <a:r>
@@ -60,7 +41,7 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
     </a:r>
 </a:p>`).join('')
 
-                const leftBoxXml = `
+            const leftBoxXml = `
 <p:sp>
   <p:nvSpPr><p:cNvPr id="900" name="InsertedTextItems"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
   <p:spPr>
@@ -73,13 +54,13 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
   </p:txBody>
 </p:sp>`
 
-                let mockupXml = ''
-                if (data.mockup) {
-                    const mockupLinesXml = data.mockup
-                        .split('\\n')
-                        .map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
-                        .join('</a:t></a:r></a:p><a:p><a:pPr algn="ctr"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr><a:r><a:rPr sz="1400" b="1"><a:solidFill><a:srgbClr val="A3E635"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr><a:t>')
-                    mockupXml = `
+            let mockupXml = ''
+            if (data.mockup) {
+                const mockupLinesXml = data.mockup
+                    .split('\\n')
+                    .map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+                    .join('</a:t></a:r></a:p><a:p><a:pPr algn="ctr"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr><a:r><a:rPr sz="1400" b="1"><a:solidFill><a:srgbClr val="A3E635"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr><a:t>')
+                mockupXml = `
 <p:sp>
   <p:nvSpPr><p:cNvPr id="901" name="InsertedMockup"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
   <p:spPr>
@@ -97,38 +78,35 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
     </a:p>
   </p:txBody>
 </p:sp>`
-                }
+            }
 
-                xml = xml.replace('</p:spTree>', leftBoxXml + mockupXml + '</p:spTree>')
+            slide6 = slide6.replace('</p:spTree>', leftBoxXml + mockupXml + '</p:spTree>')
 
-                // Replace background image on this slide if provided
-                if (data.imageUrl) {
-                    try {
-                        const imgRes = await fetch(data.imageUrl)
-                        if (imgRes.ok) {
-                            const imgBlob = await imgRes.blob()
-                            zip.file('ppt/media/image2.jpeg', imgBlob)
-                        }
-                    } catch (e) {
-                        console.error('Error fetching background image', e)
+            if (data.imageUrl) {
+                try {
+                    const imgRes = await fetch(data.imageUrl)
+                    if (imgRes.ok) {
+                        const imgBlob = await imgRes.blob()
+                        zip.file('ppt/media/image2.jpeg', imgBlob)
                     }
+                } catch (e) {
+                    console.error('Error fetching background image', e)
                 }
-
-                changed = true
             }
 
-            // ── Pricing slide: contains [PRECIO] or [X] ──────────────────────
-            if (text.includes('[PRECIO]') || text.includes('[X]')) {
-                const totalPrice = Number(data.total || 0).toFixed(2)
-                const totalArea = data.items
-                    .reduce((acc, item) => acc + Number(item.area || 0), 0)
-                    .toFixed(2)
-                xml = xml.replace(/\[PRECIO\]/g, totalPrice)
-                xml = xml.replace(/\[X\]/g, totalArea)
-                changed = true
-            }
+            zip.file('ppt/slides/slide6.xml', slide6)
+        }
 
-            if (changed) zip.file(slidePath, xml)
+        // ── Slide 7: Pricing — replace [PRECIO] and [X] ──────────────────────
+        if (zip.file('ppt/slides/slide7.xml')) {
+            let slide7 = await zip.file('ppt/slides/slide7.xml')!.async('string')
+            const totalPrice = Number(data.total || 0).toFixed(2)
+            const totalArea = data.items
+                .reduce((acc, item) => acc + Number(item.area || 0), 0)
+                .toFixed(2)
+            slide7 = slide7.replace(/\[PRECIO\]/g, totalPrice)
+            slide7 = slide7.replace(/\[X\]/g, totalArea)
+            zip.file('ppt/slides/slide7.xml', slide7)
         }
 
         return await zip.generateAsync({ type: 'blob' })
