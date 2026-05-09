@@ -19,7 +19,7 @@ export interface ProposalData {
     whatsapp?: string;
 }
 
-/** Generate PPTX then convert to PDF via /api/pptx-to-pdf (CloudConvert). */
+/** Generate PPTX then convert to PDF via /api/pptx-to-pdf (Google Drive). */
 export const generateProposalBlob = async (data: ProposalData): Promise<Blob | null> => {
     try {
         // 1. Generate the PPTX (same file used for download)
@@ -48,7 +48,7 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob | n
 /** Generate PDF and trigger browser download. */
 export const generateProposalPDF = async (data: ProposalData): Promise<void> => {
     const blob = await generateProposalBlob(data)
-    if (!blob) throw new Error('Não foi possível gerar o PDF. Verifique se CLOUDCONVERT_API_KEY está configurado.')
+    if (!blob) throw new Error('Não foi possível gerar o PDF. Verifique se GOOGLE_SERVICE_ACCOUNT_JSON está configurado no Vercel.')
 
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
