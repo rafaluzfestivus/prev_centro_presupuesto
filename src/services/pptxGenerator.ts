@@ -162,3 +162,39 @@ export const downloadProposalPPTX = async (data: ProposalDataPPTX) => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 };
+
+/** Generate a PPSX blob (slideshow mode) from the same PPTX content. */
+export const generateProposalPPSX = async (data: ProposalDataPPTX): Promise<Blob | null> => {
+    const pptxBlob = await generateProposalPPTX(data);
+    if (!pptxBlob) return null;
+
+    const zip = await JSZip.loadAsync(pptxBlob);
+
+    // Switch content type from presentation to slideshow
+    if (zip.file('[Content_Types].xml')) {
+        let ct = await zip.file('[Content_Types].xml')!.async('string');
+        ct = ct.replace(
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml',
+            'application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml',
+        );
+        zip.file('[Content_Types].xml', ct);
+    }
+
+    return await zip.generateAsync({ type: 'blob' });
+};
+
+export const downloadProposalPPSX = async (data: ProposalDataPPTX) => {
+    const blob = await generateProposalPPSX(data);
+    if (!blob) return;
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeName = data.clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    link.download = `Preventiva_Presupuesto_${safeName}.ppsx`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};
