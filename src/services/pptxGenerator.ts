@@ -6,6 +6,42 @@ export interface ProposalDataPPTX extends ProposalData {
     whatsapp?: string;
 }
 
+/**
+ * Replace a placeholder that PowerPoint may have split across multiple <a:r> runs.
+ * Within each <a:p>, merges all run texts, checks for the placeholder, and if found
+ * rebuilds the paragraph with the replacement in the first run (dropping extra runs).
+ */
+function replacePlaceholder(xml: string, placeholder: string, value: string): string {
+    const escaped = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(escaped, 'g')
+
+    // Fast path: placeholder is not split
+    if (re.test(xml)) return xml.replace(re, value)
+
+    // Slow path: placeholder may be split across runs within a paragraph
+    return xml.replace(/(<a:p\b[^>]*>)([\s\S]*?)(<\/a:p>)/g, (match, pOpen, inner, pClose) => {
+        const runMatches = [...inner.matchAll(/<a:r>([\s\S]*?)<\/a:r>/g)]
+        if (runMatches.length === 0) return match
+
+        const combined = runMatches
+            .map(m => { const t = m[1].match(/<a:t[^>]*>([\s\S]*?)<\/a:t>/); return t ? t[1] : '' })
+            .join('')
+
+        if (!combined.includes(placeholder)) return match
+
+        const replaced = combined.replace(re, value)
+        let firstDone = false
+        const newInner = inner.replace(/<a:r>[\s\S]*?<\/a:r>/g, (run) => {
+            if (!firstDone) {
+                firstDone = true
+                return run.replace(/<a:t[^>]*>[\s\S]*?<\/a:t>/, `<a:t>${replaced}</a:t>`)
+            }
+            return ''
+        })
+        return pOpen + newInner + pClose
+    })
+}
+
 export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob | null> => {
     try {
         // Load city-specific v2 template
@@ -22,7 +58,7 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
         // ── Slide 1: Cover — replace [Cliente] ───────────────────────────────
         if (zip.file('ppt/slides/slide1.xml')) {
             let slide1 = await zip.file('ppt/slides/slide1.xml')!.async('string')
-            slide1 = slide1.replace(/\[Cliente\]/g, data.clientName)
+            slide1 = replacePlaceholder(slide1, '[Cliente]', data.clientName)
             zip.file('ppt/slides/slide1.xml', slide1)
         }
 
@@ -85,10 +121,7 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
             if (data.imageUrl) {
                 try {
                     const imgRes = await fetch(data.imageUrl)
-                    if (imgRes.ok) {
-                        const imgBlob = await imgRes.blob()
-                        zip.file('ppt/media/image2.jpeg', imgBlob)
-                    }
+                    if (imgRes.ok) zip.file('ppt/media/image2.jpeg', await imgRes.blob())
                 } catch (e) {
                     console.error('Error fetching background image', e)
                 }
@@ -104,8 +137,8 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
             const totalArea = data.items
                 .reduce((acc, item) => acc + Number(item.area || 0), 0)
                 .toFixed(2)
-            slide7 = slide7.replace(/\[PRECIO\]/g, totalPrice)
-            slide7 = slide7.replace(/\[X\]/g, totalArea)
+            slide7 = replacePlaceholder(slide7, '[PRECIO]', totalPrice)
+            slide7 = replacePlaceholder(slide7, '[X]', totalArea)
             zip.file('ppt/slides/slide7.xml', slide7)
         }
 
@@ -120,13 +153,12 @@ export const downloadProposalPPTX = async (data: ProposalDataPPTX) => {
     const blob = await generateProposalPPTX(data);
     if (!blob) return;
 
-    // Create download link
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     const safeName = data.clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     link.download = `Preventiva_Presupuesto_${safeName}.pptx`;
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
