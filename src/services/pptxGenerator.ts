@@ -31,7 +31,7 @@ function replacePlaceholder(xml: string, placeholder: string, value: string): st
 
         const replaced = combined.replace(re, value)
         let firstDone = false
-        const newInner = inner.replace(/<a:r>[\s\S]*?<\/a:r>/g, (run) => {
+        const newInner = inner.replace(/<a:r>[\s\S]*?<\/a:r>/g, (run: string) => {
             if (!firstDone) {
                 firstDone = true
                 return run.replace(/<a:t[^>]*>[\s\S]*?<\/a:t>/, `<a:t>${replaced}</a:t>`)
