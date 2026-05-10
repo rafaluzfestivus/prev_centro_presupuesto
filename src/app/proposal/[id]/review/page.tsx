@@ -9,7 +9,8 @@ import { ArrowLeft, RefreshCw, Send, Loader2, Trash2, Plus, Download, MessageCir
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction, InstallationData } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
-import { downloadProposalPPTX, downloadProposalPPSX, generateProposalPPSX, ProposalDataPPTX } from '@/services/pptxGenerator'
+import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator'
+import { generateProposalBlob, generateProposalPDF } from '@/services/pdfGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
 import { createClient } from '@/lib/supabase/client'
 
@@ -237,13 +238,13 @@ export default function ReviewPage() {
     downloadProposalPPTX(data)
   }
 
-  const [generatingPPSX, setGeneratingPPSX] = useState(false)
-  const handleDownloadPPSX = async () => {
+  const [generatingPDF, setGeneratingPDF] = useState(false)
+  const handleDownloadPDF = async () => {
     if (!data) return
-    setGeneratingPPSX(true)
+    setGeneratingPDF(true)
     setActionError(null)
     try {
-      await downloadProposalPPSX({
+      await generateProposalPDF({
         clientName: data.clientName,
         city: data.city,
         items: data.items,
@@ -251,9 +252,9 @@ export default function ReviewPage() {
         mockup: data.mockup,
       })
     } catch (err: any) {
-      setActionError(err.message || 'Error al generar el PPSX')
+      setActionError(err.message || 'Error al generar el PDF')
     } finally {
-      setGeneratingPPSX(false)
+      setGeneratingPDF(false)
     }
   }
 
@@ -269,8 +270,8 @@ export default function ReviewPage() {
       const phone = data.whatsapp?.trim()
       if (!phone) throw new Error('Introduce el número de WhatsApp del cliente (campo editable arriba).')
 
-      // Generate PPSX blob
-      const ppsxBlob = await generateProposalPPSX({
+      // Generate PDF blob
+      const pdfBlob = await generateProposalBlob({
         clientName: data.clientName,
         city: data.city,
         items: data.items,
@@ -278,15 +279,13 @@ export default function ReviewPage() {
         mockup: data.mockup,
       })
 
-      if (!ppsxBlob) throw new Error('No se pudo generar el archivo.')
-
       const safeName = (data.clientName || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase()
-      const fileName = `Preventiva_Presupuesto_${safeName}.ppsx`
+      const fileName = `Preventiva_Presupuesto_${safeName}.pdf`
 
       // Try Evolution API first
       const evolutionUrl = process.env.NEXT_PUBLIC_EVOLUTION_API_URL
       if (evolutionUrl) {
-        await sendDocumentMessage(phone, ppsxBlob, fileName, WA_CAPTION)
+        await sendDocumentMessage(phone, pdfBlob, fileName, WA_CAPTION)
         return
       }
 
@@ -333,9 +332,9 @@ export default function ReviewPage() {
             <Button variant="outline" onClick={() => setIsEditing(!isEditing)} className="hidden md:flex">
               {isEditing ? 'Cancelar Edición' : 'Editar Manualmente'}
             </Button>
-            <Button onClick={handleDownloadPPSX} disabled={generatingPPSX} className="bg-red-50 hover:bg-red-100 text-red-700 font-bold px-4 border border-red-200">
-              {generatingPPSX ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-              PPSX
+            <Button onClick={handleDownloadPDF} disabled={generatingPDF} className="bg-red-50 hover:bg-red-100 text-red-700 font-bold px-4 border border-red-200">
+              {generatingPDF ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+              PDF
             </Button>
             <Button onClick={handleDownloadPPTX} className="bg-gray-100 hover:bg-gray-200 text-navy font-bold px-4">
               <Download className="w-4 h-4 mr-2" />

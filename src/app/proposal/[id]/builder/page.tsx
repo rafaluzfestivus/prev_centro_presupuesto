@@ -17,7 +17,7 @@ const ITEM_TYPES = [
     'Terraza Frente',
     'Terraza Lateral',
     'Balcón',
-    'Haste Sustentación',
+    'Poste de Soporte',
     'Techo',
     'Personalizado',
 ] as const
@@ -120,9 +120,11 @@ export default function BuilderPage() {
         if (type !== 'Personalizado') setFormName(type)
     }
 
+    const parseDecimal = (v: string) => parseFloat(v.replace(',', '.'))
+
     const handleAddItem = () => {
-        const w = parseFloat(formWidth)
-        const h = parseFloat(formHeight)
+        const w = parseDecimal(formWidth)
+        const h = parseDecimal(formHeight)
         if (!formName.trim() || isNaN(w) || isNaN(h) || w <= 0 || h <= 0) {
             setError('Preencha nome, largura e altura com valores válidos.')
             return
@@ -156,8 +158,8 @@ export default function BuilderPage() {
     const handleEdit = (item: BuilderItem) => {
         setFormType(item.type)
         setFormName(item.name)
-        setFormWidth(String(item.width))
-        setFormHeight(String(item.height))
+        setFormWidth(String(item.width).replace('.', ','))
+        setFormHeight(String(item.height).replace('.', ','))
         setEditingId(item.id)
         setShowForm(true)
     }
@@ -191,8 +193,8 @@ export default function BuilderPage() {
     const mockup = generateMockup(items)
 
     const formAreaPreview = (() => {
-        const w = parseFloat(formWidth)
-        const h = parseFloat(formHeight)
+        const w = parseDecimal(formWidth)
+        const h = parseDecimal(formHeight)
         if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) return null
         const area = w * h
         const price = Math.max(PRICING.MIN_PRICE_PER_ITEM, area * PRICING.PRICE_PER_M2)
@@ -351,24 +353,22 @@ export default function BuilderPage() {
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase text-gray-400">Largo (m)</Label>
                                     <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
+                                        type="text"
+                                        inputMode="decimal"
                                         value={formWidth}
                                         onChange={e => setFormWidth(e.target.value)}
-                                        placeholder="0.00"
+                                        placeholder="0,00"
                                         className="bg-gray-50 border-none rounded-xl font-bold"
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase text-gray-400">Alto (m)</Label>
                                     <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
+                                        type="text"
+                                        inputMode="decimal"
                                         value={formHeight}
                                         onChange={e => setFormHeight(e.target.value)}
-                                        placeholder="0.00"
+                                        placeholder="0,00"
                                         className="bg-gray-50 border-none rounded-xl font-bold"
                                     />
                                 </div>
