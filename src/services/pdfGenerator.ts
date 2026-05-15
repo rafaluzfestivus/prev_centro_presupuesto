@@ -19,7 +19,7 @@ export interface ProposalData {
     whatsapp?: string;
 }
 
-/** Generate PPTX then convert to PDF via /api/pptx-to-pdf (Google Drive). */
+/** Generate PPTX then convert to PDF via /api/pptx-to-pdf (ConvertAPI). */
 export const generateProposalBlob = async (data: ProposalData): Promise<Blob> => {
     // 1. Generate the PPTX
     const pptxBlob = await generateProposalPPTX(data as ProposalDataPPTX)
