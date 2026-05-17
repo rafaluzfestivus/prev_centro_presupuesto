@@ -311,12 +311,8 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
 
         const whatsapp = proposal.whatsapp?.replace(/\D/g, '')
 
-        // 1. Update Proposal Status + Installation Data
-        const updates: Record<string, any> = { status: 'Confirmada' }
-        if (installation?.address) updates.installation_address = installation.address
-        if (installation?.notes) updates.installation_notes = installation.notes
-        if (installation?.beforePhotos?.length) updates.before_photos = installation.beforePhotos
-        await updateProposal(id, updates)
+        // 1. Update Proposal Status only (installation columns may not exist in schema)
+        await updateProposal(id, { status: 'Confirmada' })
 
         // 2. Ensure Client exists and Create Appointment
         if (whatsapp) {
