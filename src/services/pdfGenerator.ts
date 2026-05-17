@@ -20,28 +20,7 @@ export interface ProposalData {
     whatsapp?: string;
 }
 
-const NAVY   = [26, 54, 93]   as [number, number, number]
-const WINE   = [77, 42, 54]   as [number, number, number]
-const ACCENT = [251, 191, 36] as [number, number, number]
-const WHITE  = [255, 255, 255] as [number, number, number]
-
-async function loadLogoBase64(city: string): Promise<string | null> {
-    const isEste = city?.toLowerCase().includes('este')
-    const path = isEste ? '/assets/logo_preventiva_este.png' : '/assets/logo_preventiva_centro.png'
-    try {
-        const res = await fetch(path)
-        if (!res.ok) return null
-        const blob = await res.blob()
-        return await new Promise<string>(resolve => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.readAsDataURL(blob)
-        })
-    } catch {
-        return null
-    }
-}
-
+/** Generate PPTX then convert to PDF via /api/pptx-to-pdf (ConvertAPI). */
 export const generateProposalBlob = async (data: ProposalData): Promise<Blob> => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const pageW = 210
