@@ -314,54 +314,43 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
         // 1. Update Proposal Status only (installation columns may not exist in schema)
         await updateProposal(id, { status: 'Confirmada' })
 
-        // 2. Ensure Client exists and Create Appointment
+        // 2. Ensure Client exists and Create Appointment (non-fatal if fails)
         if (whatsapp) {
-            const { data: client } = await supabase
-                .from('clients')
-                .upsert({
-                    name: proposal.cliente_nome,
-                    whatsapp: whatsapp,
-                    location: installation?.address || proposal.cidade,
-                    source: 'proposta',
-                    status: 'customer'
-                }, { onConflict: 'whatsapp' })
-                .select()
-                .single()
+            try {
+                const { data: client } = await supabase
+                    .from('clients')
+                    .upsert(
+                        { name: proposal.cliente_nome, whatsapp },
+                        { onConflict: 'whatsapp' }
+                    )
+                    .select()
+                    .single()
 
-            if (client) {
-                const notes = [
-                    `Venta cerrada desde presupuesto ${id}.`,
-                    `Total: €${proposal.total_geral}`,
-                    installation?.address ? `Dirección: ${installation.address}` : '',
-                    installation?.notes ? `Notas: ${installation.notes}` : ''
-                ].filter(Boolean).join(' | ')
+                if (client) {
+                    const notes = [
+                        `Venta cerrada desde presupuesto ${id}.`,
+                        `Total: €${proposal.total_geral}`,
+                        installation?.address ? `Dirección: ${installation.address}` : '',
+                        installation?.notes ? `Notas: ${installation.notes}` : ''
+                    ].filter(Boolean).join(' | ')
 
-                // Calculate total m² from proposal items
-                const { data: proposalItems } = await supabase
-                    .from('ItemProposta')
-                    .select('area_m2')
-                    .eq('proposta_id', id)
-                const totalM2 = (proposalItems || []).reduce((sum: number, i: any) => sum + (Number(i.area_m2) || 0), 0)
+                    const appointmentDate = installation?.scheduledAt
+                        ? new Date(installation.scheduledAt).toISOString()
+                        : new Date().toISOString()
 
-                const appointmentDate = installation?.scheduledAt
-                    ? new Date(installation.scheduledAt).toISOString()
-                    : new Date().toISOString()
-
-                const { error: aptError } = await supabase
-                    .from('appointments')
-                    .insert({
-                        client_id: client.id,
-                        date_start: appointmentDate,
-                        date_end: appointmentDate,
-                        scheduled_at: appointmentDate,
-                        status: 'confirmed',
-                        notes,
-                        installation_address: installation?.address || null,
-                        total_value: proposal.total_geral || null,
-                        total_m2: totalM2 || null,
-                    })
-
-                if (aptError) throw aptError
+                    await supabase
+                        .from('appointments')
+                        .insert({
+                            client_id: client.id,
+                            date_start: appointmentDate,
+                            date_end: appointmentDate,
+                            scheduled_at: appointmentDate,
+                            status: 'confirmed',
+                            notes,
+                        })
+                }
+            } catch (aptErr) {
+                console.error('Appointment creation failed (sale still closed):', aptErr)
             }
         }
 
