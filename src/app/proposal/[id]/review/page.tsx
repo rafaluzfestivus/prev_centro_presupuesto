@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, RefreshCw, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home, AlertCircle, MapPin, Camera, X, FileText } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home, AlertCircle, MapPin, Camera, X, FileText, Calendar } from 'lucide-react'
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction, InstallationData } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
@@ -50,6 +50,7 @@ export default function ReviewPage() {
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [installAddress, setInstallAddress] = useState('')
   const [installNotes, setInstallNotes] = useState('')
+  const [installDate, setInstallDate] = useState('')
   const [beforePhotoFiles, setBeforePhotoFiles] = useState<File[]>([])
   const [beforePhotoUrls, setBeforePhotoUrls] = useState<string[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
@@ -214,6 +215,7 @@ export default function ReviewPage() {
         address: installAddress || undefined,
         notes: installNotes || undefined,
         beforePhotos: uploadedPhotoUrls.length ? uploadedPhotoUrls : undefined,
+        scheduledAt: installDate || undefined,
       }
 
       const result = await closeSaleAction(id, installation)
@@ -525,9 +527,23 @@ export default function ReviewPage() {
                   <p className="text-[10px] text-gray-400 font-bold">Datos de instalación para el equipo</p>
                 </div>
               </div>
-              <button onClick={() => setShowCloseModal(false)} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setShowCloseModal(false); setInstallDate('') }} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Date & time */}
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-navy/60 flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> Fecha y hora de instalación
+              </Label>
+              <input
+                type="datetime-local"
+                required
+                value={installDate}
+                onChange={e => setInstallDate(e.target.value)}
+                className="w-full h-12 px-4 bg-gray-50 border-none rounded-xl font-medium text-navy focus:ring-2 focus:ring-accent/50 outline-none text-sm"
+              />
             </div>
 
             {/* Address */}
@@ -607,7 +623,7 @@ export default function ReviewPage() {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => setShowCloseModal(false)}
+                onClick={() => { setShowCloseModal(false); setInstallDate('') }}
                 disabled={isConfirming}
                 className="h-14 px-6 text-gray-500 font-bold rounded-xl hover:bg-gray-100"
               >
