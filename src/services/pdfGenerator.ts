@@ -20,10 +20,18 @@ export interface ProposalData {
     whatsapp?: string;
 }
 
-const NAVY   = [26, 54, 93]   as [number, number, number]
-const WINE   = [77, 42, 54]   as [number, number, number]
-const ACCENT = [251, 191, 36] as [number, number, number]
-const WHITE  = [255, 255, 255] as [number, number, number]
+// Brand colours — use index access to avoid spread-tuple TS error
+const NAVY   = { r: 26,  g: 54,  b: 93  }
+const WINE   = { r: 77,  g: 42,  b: 54  }
+const ACCENT = { r: 251, g: 191, b: 36  }
+const WHITE  = { r: 255, g: 255, b: 255 }
+
+function fill(doc: jsPDF, c: { r: number; g: number; b: number }) {
+    doc.setFillColor(c.r, c.g, c.b)
+}
+function text(doc: jsPDF, c: { r: number; g: number; b: number }) {
+    doc.setTextColor(c.r, c.g, c.b)
+}
 
 async function loadLogoBase64(city: string): Promise<string | null> {
     const isEste = city?.toLowerCase().includes('este')
@@ -49,20 +57,20 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob> =>
     const margin = 18
 
     // ── Header bar
-    doc.setFillColor(...NAVY)
+    fill(doc, NAVY)
     doc.rect(0, 0, pageW, 38, 'F')
 
     const logo = await loadLogoBase64(data.city)
     if (logo) {
         doc.addImage(logo, 'PNG', margin, 7, 48, 22)
     } else {
-        doc.setTextColor(...WHITE)
+        text(doc, WHITE)
         doc.setFontSize(14)
         doc.setFont('helvetica', 'bold')
         doc.text('PREVENTIVA', margin, 22)
     }
 
-    doc.setTextColor(...WHITE)
+    text(doc, WHITE)
     doc.setFontSize(7.5)
     doc.setFont('helvetica', 'normal')
     doc.text('contacto@preventivacentro.es', pageW - margin, 14, { align: 'right' })
@@ -70,10 +78,10 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob> =>
     doc.text('www.preventivacentro.es', pageW - margin, 26, { align: 'right' })
 
     // ── Title band
-    doc.setFillColor(...WINE)
+    fill(doc, WINE)
     doc.rect(0, 38, pageW, 18, 'F')
 
-    doc.setTextColor(...WHITE)
+    text(doc, WHITE)
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
     doc.text('PRESUPUESTO DE INSTALACIÓN', margin, 50)
@@ -91,7 +99,7 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob> =>
     doc.setFillColor(245, 247, 250)
     doc.roundedRect(margin, y - 4, pageW - margin * 2, 22, 3, 3, 'F')
 
-    doc.setTextColor(...NAVY)
+    text(doc, NAVY)
     doc.setFontSize(7)
     doc.setFont('helvetica', 'bold')
     doc.text('CLIENTE', margin + 5, y + 2)
@@ -124,17 +132,17 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob> =>
         body: tableBody,
         margin: { left: margin, right: margin },
         headStyles: {
-            fillColor: NAVY,
+            fillColor: [NAVY.r, NAVY.g, NAVY.b],
             textColor: 255,
             fontStyle: 'bold',
             fontSize: 8.5,
         },
         bodyStyles: {
             fontSize: 8.5,
-            textColor: [40, 40, 40] as [number, number, number],
+            textColor: [40, 40, 40],
         },
         alternateRowStyles: {
-            fillColor: [248, 250, 252] as [number, number, number],
+            fillColor: [248, 250, 252],
         },
         columnStyles: {
             0: { halign: 'center', cellWidth: 10 },
@@ -149,15 +157,15 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob> =>
     y = (doc as any).lastAutoTable.finalY + 6
 
     // ── Total box
-    doc.setFillColor(...NAVY)
+    fill(doc, NAVY)
     doc.roundedRect(pageW - margin - 68, y, 68, 16, 3, 3, 'F')
 
-    doc.setTextColor(...WHITE)
+    text(doc, WHITE)
     doc.setFontSize(7.5)
     doc.setFont('helvetica', 'bold')
     doc.text('TOTAL PRESUPUESTO', pageW - margin - 34, y + 5.5, { align: 'center' })
 
-    doc.setTextColor(...ACCENT)
+    text(doc, ACCENT)
     doc.setFontSize(13)
     doc.text(`€ ${Number(data.total).toFixed(2)}`, pageW - margin - 34, y + 13, { align: 'center' })
 
@@ -185,10 +193,10 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob> =>
     }
 
     // ── Footer
-    doc.setFillColor(...NAVY)
+    fill(doc, NAVY)
     doc.rect(0, pageH - 16, pageW, 16, 'F')
 
-    doc.setTextColor(...WHITE)
+    text(doc, WHITE)
     doc.setFontSize(6.5)
     doc.setFont('helvetica', 'normal')
     doc.text(
