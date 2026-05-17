@@ -91,7 +91,7 @@ export const generateProposalPPTX = async (data: ProposalDataPPTX): Promise<Blob
             let mockupXml = ''
             if (data.mockup) {
                 const mockupLinesXml = data.mockup
-                    .split('\\n')
+                    .split('\n')
                     .map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
                     .join('</a:t></a:r></a:p><a:p><a:pPr algn="ctr"><a:lnSpc><a:spcPct val="100000"/></a:lnSpc></a:pPr><a:r><a:rPr sz="1400" b="1"><a:solidFill><a:srgbClr val="A3E635"/></a:solidFill><a:latin typeface="Consolas"/></a:rPr><a:t>')
                 mockupXml = `

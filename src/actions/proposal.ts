@@ -299,6 +299,7 @@ export interface InstallationData {
     address?: string
     notes?: string
     beforePhotos?: string[]
+    scheduledAt?: string // ISO datetime for the appointment
 }
 
 export async function closeSaleAction(id: string, installation?: InstallationData) {
@@ -346,12 +347,18 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                     .eq('proposta_id', id)
                 const totalM2 = (proposalItems || []).reduce((sum: number, i: any) => sum + (Number(i.area_m2) || 0), 0)
 
+                const appointmentDate = installation?.scheduledAt
+                    ? new Date(installation.scheduledAt).toISOString()
+                    : new Date().toISOString()
+
                 const { error: aptError } = await supabase
                     .from('appointments')
                     .insert({
                         client_id: client.id,
-                        scheduled_at: new Date().toISOString(),
-                        status: 'pending',
+                        date_start: appointmentDate,
+                        date_end: appointmentDate,
+                        scheduled_at: appointmentDate,
+                        status: 'confirmed',
                         notes,
                         installation_address: installation?.address || null,
                         total_value: proposal.total_geral || null,
