@@ -314,41 +314,51 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
         await updateProposal(id, { status: 'Confirmada' })
         console.log('[closeSale] Proposta marcada Confirmada:', id)
 
-        // 2. Find or create client, then create appointment
+        // 2. Find or create client
         const whatsapp = (installation?.whatsapp || proposal.whatsapp || '').replace(/\D/g, '')
         console.log('[closeSale] whatsapp:', whatsapp || '(nenhum)')
 
-        if (!whatsapp) {
-            console.error('[closeSale] Sem whatsapp — agendamento não criado')
-            revalidatePath(`/proposal/${id}`)
-            revalidatePath('/dashboard/citas')
-            revalidatePath('/dashboard/presupuestos')
-            return { success: true }
+        let clientId: string | null = null
+
+        if (whatsapp) {
+            // Step A: find existing client by whatsapp
+            const { data: existing } = await supabase
+                .from('clients')
+                .select('id')
+                .eq('whatsapp', whatsapp)
+                .maybeSingle()
+
+            if (existing) {
+                clientId = existing.id
+                console.log('[closeSale] Cliente existente:', clientId)
+            } else {
+                // Step B: insert new client with whatsapp
+                const { data: newClient, error: clientErr } = await supabase
+                    .from('clients')
+                    .insert({ name: proposal.cliente_nome || 'Cliente', whatsapp, source: 'proposta' })
+                    .select('id')
+                    .single()
+                if (clientErr) {
+                    console.error('[closeSale] Erro ao criar cliente com whatsapp:', JSON.stringify(clientErr))
+                } else {
+                    clientId = newClient?.id ?? null
+                    console.log('[closeSale] Novo cliente criado:', clientId)
+                }
+            }
         }
 
-        // Step A: find existing client by whatsapp
-        let clientId: string | null = null
-        const { data: existing } = await supabase
-            .from('clients')
-            .select('id')
-            .eq('whatsapp', whatsapp)
-            .maybeSingle()
-
-        if (existing) {
-            clientId = existing.id
-            console.log('[closeSale] Cliente existente:', clientId)
-        } else {
-            // Step B: insert new client
+        // Step C: if still no client (no whatsapp or insert failed), create name-only client
+        if (!clientId) {
             const { data: newClient, error: clientErr } = await supabase
                 .from('clients')
-                .insert({ name: proposal.cliente_nome, whatsapp })
+                .insert({ name: proposal.cliente_nome || 'Cliente', source: 'proposta' })
                 .select('id')
                 .single()
             if (clientErr) {
-                console.error('[closeSale] Erro ao criar cliente:', JSON.stringify(clientErr))
+                console.error('[closeSale] Erro ao criar cliente sem whatsapp:', JSON.stringify(clientErr))
             } else {
                 clientId = newClient?.id ?? null
-                console.log('[closeSale] Novo cliente criado:', clientId)
+                console.log('[closeSale] Cliente sem whatsapp criado:', clientId)
             }
         }
 
@@ -360,7 +370,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
             return { success: true }
         }
 
-        // Step C: create appointment using exact same columns as CalendarView
+        // Step D: create appointment using exact same columns as CalendarView
         const appointmentDate = installation?.scheduledAt
             ? new Date(installation.scheduledAt).toISOString()
             : new Date().toISOString()
@@ -378,6 +388,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                 total_value: Number(proposal.total_geral) || null,
                 total_m2: null,
                 special_attention: false,
+                notes: `Venta cerrada desde presupuesto ${id}.`,
             })
 
         if (aptErr) {
