@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Fallback: Google Drive API (already configured in Vercel)
+        // Fallback: Google Drive API
         try {
             const pdfBytes = await convertWithGoogleDrive(pptxBuffer)
             console.log('[pptx-to-pdf] PDF via Google Drive, tamanho:', pdfBytes.length, 'bytes')
@@ -115,7 +115,11 @@ export async function POST(request: NextRequest) {
             })
         } catch (e: any) {
             console.error('[pptx-to-pdf] Google Drive falhou:', e.message)
-            throw e
+            // Both services failed — return actionable error
+            return NextResponse.json({
+                error: 'PDF_NOT_CONFIGURED',
+                message: 'Para gerar PDF adicione a variável CONVERTAPI_SECRET no Vercel (Settings → Environment Variables). Registo gratuito em convertapi.com.',
+            }, { status: 503 })
         }
     } catch (err: any) {
         console.error('[pptx-to-pdf] Erro:', err)

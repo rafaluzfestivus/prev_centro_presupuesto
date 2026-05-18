@@ -310,55 +310,80 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
 
         if (!proposal) throw new Error("Propuesta no encontrada")
 
-        // Use whatsapp from UI if passed (may not be saved in DB yet)
-        const whatsapp = (installation?.whatsapp || proposal.whatsapp || '').replace(/\D/g, '')
-
-        // 1. Update Proposal Status
+        // 1. Mark proposal as confirmed
         await updateProposal(id, { status: 'Confirmada' })
+        console.log('[closeSale] Proposta marcada Confirmada:', id)
 
-        // 2. Create Appointment (non-fatal — sale is already closed above)
-        try {
-            const appointmentDate = installation?.scheduledAt
-                ? new Date(installation.scheduledAt).toISOString()
-                : new Date().toISOString()
+        // 2. Find or create client, then create appointment
+        const whatsapp = (installation?.whatsapp || proposal.whatsapp || '').replace(/\D/g, '')
+        console.log('[closeSale] whatsapp:', whatsapp || '(nenhum)')
 
-            const notesText = [
-                `Venta cerrada desde presupuesto ${id}.`,
-                `Total: €${proposal.total_geral}`,
-                installation?.address ? `Dirección: ${installation.address}` : '',
-                installation?.notes || '',
-            ].filter(Boolean).join(' | ')
+        if (!whatsapp) {
+            console.error('[closeSale] Sem whatsapp — agendamento não criado')
+            revalidatePath(`/proposal/${id}`)
+            revalidatePath('/dashboard/citas')
+            revalidatePath('/dashboard/presupuestos')
+            return { success: true }
+        }
 
-            let clientId: string | null = null
-            if (whatsapp) {
-                const { data: client } = await supabase
-                    .from('clients')
-                    .upsert(
-                        { name: proposal.cliente_nome, whatsapp },
-                        { onConflict: 'whatsapp' }
-                    )
-                    .select('id')
-                    .single()
-                clientId = client?.id ?? null
+        // Step A: find existing client by whatsapp
+        let clientId: string | null = null
+        const { data: existing } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('whatsapp', whatsapp)
+            .maybeSingle()
+
+        if (existing) {
+            clientId = existing.id
+            console.log('[closeSale] Cliente existente:', clientId)
+        } else {
+            // Step B: insert new client
+            const { data: newClient, error: clientErr } = await supabase
+                .from('clients')
+                .insert({ name: proposal.cliente_nome, whatsapp })
+                .select('id')
+                .single()
+            if (clientErr) {
+                console.error('[closeSale] Erro ao criar cliente:', JSON.stringify(clientErr))
+            } else {
+                clientId = newClient?.id ?? null
+                console.log('[closeSale] Novo cliente criado:', clientId)
             }
+        }
 
-            if (clientId) {
-                await supabase
-                    .from('appointments')
-                    .insert({
-                        client_id: clientId,
-                        date_start: appointmentDate,
-                        date_end: appointmentDate,
-                        scheduled_at: appointmentDate,
-                        status: 'confirmed',
-                        notes: notesText,
-                        installation_address: installation?.address || proposal.cidade || null,
-                        total_value: proposal.total_geral || null,
-                        special_attention: false,
-                    })
-            }
-        } catch (aptErr) {
-            console.error('Appointment creation failed (sale still closed):', aptErr)
+        if (!clientId) {
+            console.error('[closeSale] clientId nulo — agendamento não criado')
+            revalidatePath(`/proposal/${id}`)
+            revalidatePath('/dashboard/citas')
+            revalidatePath('/dashboard/presupuestos')
+            return { success: true }
+        }
+
+        // Step C: create appointment using exact same columns as CalendarView
+        const appointmentDate = installation?.scheduledAt
+            ? new Date(installation.scheduledAt).toISOString()
+            : new Date().toISOString()
+
+        const { error: aptErr } = await supabase
+            .from('appointments')
+            .insert({
+                client_id: clientId,
+                date_start: appointmentDate,
+                date_end: appointmentDate,
+                scheduled_at: appointmentDate,
+                status: 'confirmed',
+                attachment_url: null,
+                installation_address: installation?.address || proposal.cidade || null,
+                total_value: Number(proposal.total_geral) || null,
+                total_m2: null,
+                special_attention: false,
+            })
+
+        if (aptErr) {
+            console.error('[closeSale] Erro ao criar agendamento:', JSON.stringify(aptErr))
+        } else {
+            console.log('[closeSale] Agendamento criado para', appointmentDate)
         }
 
         revalidatePath(`/proposal/${id}`)
@@ -367,7 +392,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
 
         return { success: true }
     } catch (error: any) {
-        console.error('Failed to close sale:', error)
+        console.error('[closeSale] Erro fatal:', error)
         return { success: false, error: error.message || 'Error al cerrar venta' }
     }
 }

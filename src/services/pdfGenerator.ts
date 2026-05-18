@@ -32,7 +32,7 @@ export const generateProposalBlob = async (data: ProposalData): Promise<Blob> =>
 
     if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }))
-        throw new Error(err.error || 'Falha na conversão PPTX → PDF')
+        throw new Error(err.message || err.error || 'Falha na conversão PPTX → PDF')
     }
 
     return await res.blob()
