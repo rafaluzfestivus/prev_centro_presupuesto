@@ -216,6 +216,7 @@ export default function ReviewPage() {
         notes: installNotes || undefined,
         beforePhotos: uploadedPhotoUrls.length ? uploadedPhotoUrls : undefined,
         scheduledAt: installDate || undefined,
+        whatsapp: data?.whatsapp || undefined,
       }
 
       const result = await closeSaleAction(id, installation)

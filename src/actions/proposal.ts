@@ -299,6 +299,7 @@ export interface InstallationData {
     address?: string
     notes?: string
     beforePhotos?: string[]
+    whatsapp?: string  // phone from UI (may not be saved in DB yet)
     scheduledAt?: string // ISO datetime for the appointment
 }
 
@@ -309,52 +310,55 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
 
         if (!proposal) throw new Error("Propuesta no encontrada")
 
-        const whatsapp = proposal.whatsapp?.replace(/\D/g, '')
+        // Use whatsapp from UI if passed (may not be saved in DB yet)
+        const whatsapp = (installation?.whatsapp || proposal.whatsapp || '').replace(/\D/g, '')
 
-        // 1. Update Proposal Status only (installation columns may not exist in schema)
+        // 1. Update Proposal Status
         await updateProposal(id, { status: 'Confirmada' })
 
-        // 2. Ensure Client exists and Create Appointment (non-fatal if fails)
-        if (whatsapp) {
-            try {
+        // 2. Create Appointment (non-fatal — sale is already closed above)
+        try {
+            const appointmentDate = installation?.scheduledAt
+                ? new Date(installation.scheduledAt).toISOString()
+                : new Date().toISOString()
+
+            const notesText = [
+                `Venta cerrada desde presupuesto ${id}.`,
+                `Total: €${proposal.total_geral}`,
+                installation?.address ? `Dirección: ${installation.address}` : '',
+                installation?.notes || '',
+            ].filter(Boolean).join(' | ')
+
+            let clientId: string | null = null
+            if (whatsapp) {
                 const { data: client } = await supabase
                     .from('clients')
                     .upsert(
                         { name: proposal.cliente_nome, whatsapp },
                         { onConflict: 'whatsapp' }
                     )
-                    .select()
+                    .select('id')
                     .single()
-
-                if (client) {
-                    const appointmentDate = installation?.scheduledAt
-                        ? new Date(installation.scheduledAt).toISOString()
-                        : new Date().toISOString()
-
-                    const notesText = [
-                        `Venta cerrada desde presupuesto ${id}.`,
-                        `Total: €${proposal.total_geral}`,
-                        installation?.address ? `Dirección: ${installation.address}` : '',
-                        installation?.notes ? installation.notes : '',
-                    ].filter(Boolean).join(' | ')
-
-                    await supabase
-                        .from('appointments')
-                        .insert({
-                            client_id: client.id,
-                            date_start: appointmentDate,
-                            date_end: appointmentDate,
-                            scheduled_at: appointmentDate,
-                            status: 'confirmed',
-                            notes: notesText,
-                            installation_address: installation?.address || proposal.cidade || null,
-                            total_value: proposal.total_geral || null,
-                            special_attention: false,
-                        })
-                }
-            } catch (aptErr) {
-                console.error('Appointment creation failed (sale still closed):', aptErr)
+                clientId = client?.id ?? null
             }
+
+            if (clientId) {
+                await supabase
+                    .from('appointments')
+                    .insert({
+                        client_id: clientId,
+                        date_start: appointmentDate,
+                        date_end: appointmentDate,
+                        scheduled_at: appointmentDate,
+                        status: 'confirmed',
+                        notes: notesText,
+                        installation_address: installation?.address || proposal.cidade || null,
+                        total_value: proposal.total_geral || null,
+                        special_attention: false,
+                    })
+            }
+        } catch (aptErr) {
+            console.error('Appointment creation failed (sale still closed):', aptErr)
         }
 
         revalidatePath(`/proposal/${id}`)
