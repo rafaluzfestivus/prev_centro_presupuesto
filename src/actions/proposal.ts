@@ -327,16 +327,16 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                     .single()
 
                 if (client) {
-                    const notes = [
-                        `Venta cerrada desde presupuesto ${id}.`,
-                        `Total: €${proposal.total_geral}`,
-                        installation?.address ? `Dirección: ${installation.address}` : '',
-                        installation?.notes ? `Notas: ${installation.notes}` : ''
-                    ].filter(Boolean).join(' | ')
-
                     const appointmentDate = installation?.scheduledAt
                         ? new Date(installation.scheduledAt).toISOString()
                         : new Date().toISOString()
+
+                    const notesText = [
+                        `Venta cerrada desde presupuesto ${id}.`,
+                        `Total: €${proposal.total_geral}`,
+                        installation?.address ? `Dirección: ${installation.address}` : '',
+                        installation?.notes ? installation.notes : '',
+                    ].filter(Boolean).join(' | ')
 
                     await supabase
                         .from('appointments')
@@ -346,7 +346,10 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                             date_end: appointmentDate,
                             scheduled_at: appointmentDate,
                             status: 'confirmed',
-                            notes,
+                            notes: notesText,
+                            installation_address: installation?.address || proposal.cidade || null,
+                            total_value: proposal.total_geral || null,
+                            special_attention: false,
                         })
                 }
             } catch (aptErr) {
