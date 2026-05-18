@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
             try {
                 const pdfBytes = await convertWithConvertAPI(pptxBuffer, convertApiSecret)
                 console.log('[pptx-to-pdf] PDF via ConvertAPI, tamanho:', pdfBytes.length, 'bytes')
-                return new Response(pdfBytes, {
+                return new Response(Buffer.from(pdfBytes), {
                     headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="presupuesto.pdf"' },
                 })
             } catch (e: any) {
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         try {
             const pdfBytes = await convertWithGoogleDrive(pptxBuffer)
             console.log('[pptx-to-pdf] PDF via Google Drive, tamanho:', pdfBytes.length, 'bytes')
-            return new Response(pdfBytes, {
+            return new Response(Buffer.from(pdfBytes), {
                 headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="presupuesto.pdf"' },
             })
         } catch (e: any) {
