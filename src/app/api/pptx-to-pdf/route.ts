@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const maxDuration = 60
 export const runtime = 'nodejs'
 
-async function convertWithConvertAPI(pptxBuffer: ArrayBuffer, secret: string): Promise<Uint8Array> {
+async function convertWithConvertAPI(pptxBuffer: ArrayBuffer, token: string): Promise<Uint8Array> {
     const form = new FormData()
     form.append(
         'File',
@@ -13,8 +13,12 @@ async function convertWithConvertAPI(pptxBuffer: ArrayBuffer, secret: string): P
         'presentation.pptx',
     )
     const res = await fetch(
-        `https://v2.convertapi.com/convert/pptx/to/pdf?Secret=${secret}`,
-        { method: 'POST', body: form },
+        'https://v2.convertapi.com/convert/pptx/to/pdf',
+        {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: form,
+        },
     )
     if (!res.ok) {
         const err = await res.json().catch(() => ({ Message: res.statusText }))
