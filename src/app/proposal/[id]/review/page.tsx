@@ -213,29 +213,50 @@ export default function ReviewPage() {
       // 2. Find or create client (same pattern as CalendarView)
       const cleanWhatsapp = (data?.whatsapp || '').replace(/\D/g, '')
       let clientId: string | null = null
+      const clientName = data?.clientName || 'Cliente'
 
       if (cleanWhatsapp) {
+        // Search with both formats: with and without country prefix +
         const { data: existing } = await supabase
           .from('clients')
           .select('id')
-          .eq('whatsapp', cleanWhatsapp)
+          .or(`whatsapp.eq.${cleanWhatsapp},whatsapp.eq.+${cleanWhatsapp}`)
           .limit(1)
+
         if (existing && existing.length > 0) {
           clientId = existing[0].id
         } else {
-          const { data: newClient } = await supabase
+          // Insert new — if unique constraint fires, re-search
+          const { data: newClient, error: insertErr } = await supabase
             .from('clients')
-            .insert({ name: data?.clientName || 'Cliente', whatsapp: cleanWhatsapp, source: 'proposta' })
+            .insert({ name: clientName, whatsapp: cleanWhatsapp, source: 'proposta' })
             .select('id')
             .single()
-          clientId = newClient?.id ?? null
+
+          if (insertErr) {
+            // Conflict: someone else created this client — find by last 9 digits
+            const suffix = cleanWhatsapp.slice(-9)
+            const { data: retry } = await supabase
+              .from('clients')
+              .select('id')
+              .ilike('whatsapp', `%${suffix}`)
+              .limit(1)
+            clientId = retry?.[0]?.id ?? null
+          } else {
+            clientId = newClient?.id ?? null
+          }
         }
       }
 
+      // Fallback: create client with placeholder whatsapp so NOT NULL constraint is met
       if (!clientId) {
+        const placeholder = `proposta_${id.slice(0, 8)}`
         const { data: newClient } = await supabase
           .from('clients')
-          .insert({ name: data?.clientName || 'Cliente', source: 'proposta' })
+          .upsert(
+            { name: clientName, whatsapp: placeholder, source: 'proposta' },
+            { onConflict: 'whatsapp' }
+          )
           .select('id')
           .single()
         clientId = newClient?.id ?? null
