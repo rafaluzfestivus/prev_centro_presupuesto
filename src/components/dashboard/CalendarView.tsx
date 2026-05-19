@@ -63,11 +63,19 @@ const CalendarView = () => {
     useEffect(() => {
         const clientParam = searchParams.get('client');
         const whatsappParam = searchParams.get('whatsapp');
+        const addressParam = searchParams.get('address');
+        const valueParam = searchParams.get('value');
+        const m2Param = searchParams.get('m2');
+        const dateParam = searchParams.get('date');
         if (clientParam || whatsappParam) {
             setFormData(prev => ({
                 ...prev,
                 client_name: clientParam || '',
-                whatsapp: whatsappParam || ''
+                whatsapp: whatsappParam || '',
+                ...(addressParam ? { installation_address: addressParam } : {}),
+                ...(valueParam ? { total_value: valueParam } : {}),
+                ...(m2Param ? { total_m2: m2Param } : {}),
+                ...(dateParam ? { date_start: dateParam } : {}),
             }));
             setIsModalOpen(true);
         }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, RefreshCw, Send, Loader2, Trash2, Plus, Download, MessageCircle, Home, AlertCircle, MapPin, Camera, X, FileText, Calendar } from 'lucide-react'
-import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, closeSaleAction, InstallationData } from '@/actions/proposal'
+import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, updateProposalAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
 import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator'
@@ -192,13 +192,12 @@ export default function ReviewPage() {
   const handleCloseSale = async () => {
     setIsConfirming(true)
     setActionError(null)
+    const supabase = createClient()
     try {
+      // 1. Upload before photos
       let uploadedPhotoUrls: string[] = []
-
-      // Upload before photos to Supabase storage
       if (beforePhotoFiles.length > 0) {
         setUploadingPhotos(true)
-        const supabase = createClient()
         for (const file of beforePhotoFiles) {
           const ext = file.name.split('.').pop()
           const fileName = `${id}/before/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
@@ -211,23 +210,70 @@ export default function ReviewPage() {
         setUploadingPhotos(false)
       }
 
-      const installation: InstallationData = {
-        address: installAddress || undefined,
-        notes: installNotes || undefined,
-        beforePhotos: uploadedPhotoUrls.length ? uploadedPhotoUrls : undefined,
-        scheduledAt: installDate || undefined,
-        whatsapp: data?.whatsapp || undefined,
+      // 2. Find or create client (same pattern as CalendarView)
+      const cleanWhatsapp = (data?.whatsapp || '').replace(/\D/g, '')
+      let clientId: string | null = null
+
+      if (cleanWhatsapp) {
+        const { data: existing } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('whatsapp', cleanWhatsapp)
+          .limit(1)
+        if (existing && existing.length > 0) {
+          clientId = existing[0].id
+        } else {
+          const { data: newClient } = await supabase
+            .from('clients')
+            .insert({ name: data?.clientName || 'Cliente', whatsapp: cleanWhatsapp, source: 'proposta' })
+            .select('id')
+            .single()
+          clientId = newClient?.id ?? null
+        }
       }
 
-      const result = await closeSaleAction(id, installation)
-      if (result.success) {
-        router.push('/dashboard/citas')
-      } else {
-        setActionError(result.error || 'Error al cerrar venta')
-        setShowCloseModal(false)
+      if (!clientId) {
+        const { data: newClient } = await supabase
+          .from('clients')
+          .insert({ name: data?.clientName || 'Cliente', source: 'proposta' })
+          .select('id')
+          .single()
+        clientId = newClient?.id ?? null
       }
+
+      if (!clientId) throw new Error('Não foi possível identificar o cliente')
+
+      // 3. Create appointment (same pattern as CalendarView)
+      const isoDate = installDate
+        ? new Date(installDate).toISOString()
+        : new Date().toISOString()
+
+      const { error: aptErr } = await supabase
+        .from('appointments')
+        .insert({
+          client_id: clientId,
+          date_start: isoDate,
+          date_end: isoDate,
+          scheduled_at: isoDate,
+          status: 'confirmed',
+          attachment_url: null,
+          installation_address: installAddress || data?.city || null,
+          total_value: data?.total ?? null,
+          total_m2: data?.items.reduce((s, i) => s + i.area, 0) ?? null,
+          special_attention: false,
+          notes: `Venta cerrada desde presupuesto ${id}.`,
+          before_photos: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
+          installation_notes: installNotes || null,
+        })
+
+      if (aptErr) throw new Error(aptErr.message)
+
+      // 4. Mark proposal as Confirmada
+      await updateProposalAction(id, { status: 'Confirmada' })
+
+      router.push('/dashboard/citas')
     } catch (error: any) {
-      console.error(error)
+      console.error('[handleCloseSale]', error)
       setActionError(error.message || 'Error al cerrar venta')
       setShowCloseModal(false)
     } finally {
