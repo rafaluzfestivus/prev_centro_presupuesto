@@ -8,7 +8,7 @@ import {
     addAppointmentBeforePhotosAction,
     deleteAppointmentPhotoAction,
 } from '@/actions/proposal'
-import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, Plus, CheckCircle2, Calendar, Euro, Layers, FileText, AlertTriangle, Trash2, X } from 'lucide-react'
+import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, Plus, CheckCircle2, Calendar, Euro, Layers, FileText, AlertTriangle, Trash2, X, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
@@ -34,6 +34,7 @@ export default function AppointmentReportPage() {
     const [beforePhotoUrls, setBeforePhotoUrls] = useState<string[]>([])
     const [uploadError, setUploadError] = useState<string | null>(null)
     const [uploadSuccess, setUploadSuccess] = useState<'before' | 'after' | null>(null)
+    const [hideValues, setHideValues] = useState(false)
     const afterInputRef = useRef<HTMLInputElement>(null)
     const beforeInputRef = useRef<HTMLInputElement>(null)
 
@@ -156,10 +157,21 @@ export default function AppointmentReportPage() {
                         <ArrowLeft className="h-4 w-4" /> Volver
                     </Button>
                     <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Ficha de Instalación</span>
-                    <Button onClick={() => window.print()} className="bg-navy text-white font-bold h-9 px-4 gap-2 rounded-lg hover:bg-navy/90">
-                        <Printer className="h-4 w-4" />
-                        Imprimir / PDF
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setHideValues(v => !v)}
+                            className={`h-9 px-3 gap-2 rounded-lg font-bold text-sm ${hideValues ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'text-gray-500 hover:bg-gray-100'}`}
+                            title={hideValues ? 'Mostrar valores' : 'Ocultar valores'}
+                        >
+                            {hideValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            <span className="hidden sm:inline">{hideValues ? 'Valores ocultos' : 'Ocultar valores'}</span>
+                        </Button>
+                        <Button onClick={() => window.print()} className="bg-navy text-white font-bold h-9 px-4 gap-2 rounded-lg hover:bg-navy/90">
+                            <Printer className="h-4 w-4" />
+                            Imprimir / PDF
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -240,7 +252,7 @@ export default function AppointmentReportPage() {
                 {/* Financial Summary */}
                 <div className="bg-navy rounded-2xl p-6 text-white">
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4">Resumen</h2>
-                    <div className="grid grid-cols-3 gap-6">
+                    <div className={`grid gap-6 ${hideValues ? 'grid-cols-2' : 'grid-cols-3'}`}>
                         <div>
                             <p className="text-[10px] font-black uppercase text-white/40 mb-1">Total m²</p>
                             <p className="text-3xl font-black text-accent">{Number(displayM2).toFixed(2)}</p>
@@ -251,13 +263,15 @@ export default function AppointmentReportPage() {
                             <p className="text-3xl font-black text-accent">{items.length || '—'}</p>
                             <p className="text-[10px] text-white/40 font-bold">redes individuales</p>
                         </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase text-white/40 mb-1">Inversión Total</p>
-                            <p className="text-3xl font-black text-accent">
-                                {totalValue > 0 ? `€ ${totalValue.toFixed(2)}` : '—'}
-                            </p>
-                            <p className="text-[10px] text-white/40 font-bold">+ IVA</p>
-                        </div>
+                        {!hideValues && (
+                            <div>
+                                <p className="text-[10px] font-black uppercase text-white/40 mb-1">Inversión Total</p>
+                                <p className="text-3xl font-black text-accent">
+                                    {totalValue > 0 ? `€ ${totalValue.toFixed(2)}` : '—'}
+                                </p>
+                                <p className="text-[10px] text-white/40 font-bold">+ IVA</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -276,7 +290,7 @@ export default function AppointmentReportPage() {
                                         <th className="text-right px-4 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">Largo</th>
                                         <th className="text-right px-4 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">Alto</th>
                                         <th className="text-right px-4 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">m²</th>
-                                        <th className="text-right px-6 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">Precio</th>
+                                        {!hideValues && <th className="text-right px-6 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">Precio</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -287,15 +301,15 @@ export default function AppointmentReportPage() {
                                             <td className="px-4 py-4 text-right font-medium text-gray-600">{Number(item.largura).toFixed(2)}m</td>
                                             <td className="px-4 py-4 text-right font-medium text-gray-600">{Number(item.altura).toFixed(2)}m</td>
                                             <td className="px-4 py-4 text-right font-bold text-navy">{Number(item.area_m2).toFixed(2)}</td>
-                                            <td className="px-6 py-4 text-right font-black text-navy">€ {Number(item.valor_total).toFixed(2)}</td>
+                                            {!hideValues && <td className="px-6 py-4 text-right font-black text-navy">€ {Number(item.valor_total).toFixed(2)}</td>}
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
                                     <tr className="border-t-2 border-gray-200 bg-navy/5">
-                                        <td colSpan={4} className="px-6 py-4 font-black text-navy uppercase text-xs tracking-widest">TOTAL</td>
+                                        <td colSpan={hideValues ? 4 : 4} className="px-6 py-4 font-black text-navy uppercase text-xs tracking-widest">TOTAL</td>
                                         <td className="px-4 py-4 text-right font-black text-navy">{totalArea.toFixed(2)}</td>
-                                        <td className="px-6 py-4 text-right font-black text-navy text-base">€ {totalValue.toFixed(2)}</td>
+                                        {!hideValues && <td className="px-6 py-4 text-right font-black text-navy text-base">€ {totalValue.toFixed(2)}</td>}
                                     </tr>
                                 </tfoot>
                             </table>

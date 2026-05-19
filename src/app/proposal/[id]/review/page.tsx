@@ -250,7 +250,7 @@ export default function ReviewPage() {
 
       // Fallback: create client with placeholder whatsapp so NOT NULL constraint is met
       if (!clientId) {
-        const placeholder = `proposta_${id.slice(0, 8)}`
+        const placeholder = cleanWhatsapp || `proposta_${id.slice(0, 8)}`
         const { data: newClient } = await supabase
           .from('clients')
           .upsert(
@@ -263,6 +263,11 @@ export default function ReviewPage() {
       }
 
       if (!clientId) throw new Error('Não foi possível identificar o cliente')
+
+      // Normalise stored whatsapp to the clean digits format the user entered
+      if (clientId && cleanWhatsapp) {
+        supabase.from('clients').update({ whatsapp: cleanWhatsapp }).eq('id', clientId).then()
+      }
 
       // 3. Create appointment (same pattern as CalendarView)
       const isoDate = installDate
