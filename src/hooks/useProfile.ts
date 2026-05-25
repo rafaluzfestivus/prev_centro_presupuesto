@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { COMPANIES, type UserProfile } from '@/lib/profile'
+import { COMPANIES } from '@/lib/companies'
+import type { UserProfile } from '@/lib/profile'
 
 export { COMPANIES }
 export type { UserProfile }
