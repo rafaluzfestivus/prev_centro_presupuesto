@@ -7,15 +7,13 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
     LayoutDashboard,
-    MessageSquare,
-    BookOpen,
-    Settings,
     LogOut,
     Calendar,
     Users,
     FileText,
     TrendingUp,
     X,
+    ExternalLink,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -41,9 +39,6 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
         { id: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp },
         { id: '/dashboard/clientes', label: 'Leads del Sitio', icon: Users },
         { id: '/dashboard/citas', label: 'Agenda', icon: Calendar },
-        { id: '/dashboard/conversaciones', label: 'Conversaciones', icon: MessageSquare },
-        { id: '/dashboard/conocimiento', label: 'Conocimiento', icon: BookOpen },
-        { id: '/dashboard/configuracion', label: 'Cerebro IA', icon: Settings },
     ];
 
     return (
@@ -92,7 +87,16 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                 })}
             </nav>
 
-            <div className="pt-6 border-t border-white/10 mt-6">
+            <div className="pt-6 border-t border-white/10 mt-6 flex flex-col gap-1">
+                <a
+                    href="https://chat.preventivacentro.es"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-white/5 group"
+                >
+                    <ExternalLink size={20} className="text-white/50 group-hover:text-white" />
+                    <span className="text-sm font-semibold text-white/50 group-hover:text-white">Chatwoot</span>
+                </a>
                 <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-red-500/10 group w-full text-left">
                     <LogOut size={20} className="text-white/50 group-hover:text-red-400" />
                     <span className="text-sm font-semibold text-white/50 group-hover:text-red-400">Salir</span>
