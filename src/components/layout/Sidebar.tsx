@@ -14,6 +14,7 @@ import {
     TrendingUp,
     X,
     ExternalLink,
+    Settings,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -39,6 +40,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
         { id: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp },
         { id: '/dashboard/clientes', label: 'Leads del Sitio', icon: Users },
         { id: '/dashboard/citas', label: 'Agenda', icon: Calendar },
+        { id: '/dashboard/configuracion', label: 'Mi Empresa', icon: Settings },
     ];
 
     return (

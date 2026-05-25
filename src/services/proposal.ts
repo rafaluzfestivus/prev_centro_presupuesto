@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { CreateProposalInput, Proposal, ProposalItem, AIProcessingResult } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
 
-export async function createProposal(data: CreateProposalInput, userId?: string) {
+export async function createProposal(data: CreateProposalInput, userId?: string, companyId = 1) {
     const supabase = await createClient()
 
     const { data: proposal, error } = await supabase
@@ -15,6 +15,7 @@ export async function createProposal(data: CreateProposalInput, userId?: string)
             input_image_url: data.imageUrl,
             whatsapp: data.whatsapp,
             criado_por: userId,
+            company_id: companyId,
             status: 'Rascunho'
         })
         .select()
@@ -24,7 +25,7 @@ export async function createProposal(data: CreateProposalInput, userId?: string)
     return proposal as Proposal
 }
 
-export async function getProposals(userId?: string) {
+export async function getProposals(companyId?: number) {
     const supabase = await createClient()
 
     let query = supabase
@@ -32,8 +33,8 @@ export async function getProposals(userId?: string) {
         .select('*')
         .order('data_criacao', { ascending: false })
 
-    if (userId) {
-        query = query.eq('criado_por', userId)
+    if (companyId) {
+        query = query.eq('company_id', companyId)
     }
 
     const { data, error } = await query

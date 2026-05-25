@@ -10,11 +10,13 @@ import { Proposal } from '@/lib/types'
 import { Loader2, Trash2, FileText, Plus, RefreshCw, Calendar, ClipboardList, AlertCircle, Search, X } from 'lucide-react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Suspense } from 'react'
+import { useProfile, COMPANIES } from '@/hooks/useProfile'
 
 const CITIES = ['Preventiva Centro', 'Preventiva Este'] as const
 
 function ProposalsContent() {
     const router = useRouter()
+    const { profile } = useProfile()
     const [proposals, setProposals] = useState<Proposal[]>([])
     const [loadingHistory, setLoadingHistory] = useState(true)
     const [clientName, setClientName] = useState('')
@@ -23,6 +25,14 @@ function ProposalsContent() {
     const [formError, setFormError] = useState('')
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
     const [search, setSearch] = useState('')
+
+    // Set default city based on user's company
+    useEffect(() => {
+        if (profile) {
+            const co = COMPANIES[profile.company_id]
+            if (co) setCity(co.name)
+        }
+    }, [profile])
 
     useEffect(() => { loadProposals() }, [])
 

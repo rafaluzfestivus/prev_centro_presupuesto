@@ -9,17 +9,15 @@ import { OpenAI } from 'openai'
 import { SYSTEM_PROMPT } from '@/services/ai/prompt'
 import { EXTRACTION_SYSTEM_PROMPT } from '@/services/ai/extraction_prompt'
 import { parseAIResponseContent, normalizeAIItems } from '@/lib/pricing'
+import { getUserProfile } from '@/lib/profile'
 
 export async function createProposalAction(data: CreateProposalInput) {
     try {
-        // TODO: Get real user ID from auth
-        // const { userId } = auth() 
-        const userId = '00000000-0000-0000-0000-000000000000' // Mock or undefined for now if auth not strict
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const profile = await getUserProfile()
 
-        // Actually, we should check if we have a user. If anon, maybe explicit null?
-        // creating with null for now as we might not have auth setup in this context fully verified
-
-        const proposal = await createProposal(data, userId)
+        const proposal = await createProposal(data, user?.id, profile.company_id)
         revalidatePath('/painel')
         return { success: true, id: proposal.id }
     } catch (error: any) {
@@ -30,7 +28,8 @@ export async function createProposalAction(data: CreateProposalInput) {
 
 export async function getProposalsAction() {
     try {
-        const proposals = await getProposals()
+        const profile = await getUserProfile()
+        const proposals = await getProposals(profile.company_id)
         return { success: true, data: proposals }
     } catch (error) {
         console.error('Failed to fetch presupuestos:', error)
@@ -306,6 +305,7 @@ export interface InstallationData {
 export async function closeSaleAction(id: string, installation?: InstallationData) {
     try {
         const supabase = await createClient()
+        const profile = await getUserProfile()
         const proposal = await getProposalById(id)
 
         if (!proposal) throw new Error("Propuesta no encontrada")
@@ -335,7 +335,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                 // Step B: insert new client with whatsapp
                 const { data: newClient, error: clientErr } = await supabase
                     .from('clients')
-                    .insert({ name: proposal.cliente_nome || 'Cliente', whatsapp, source: 'proposta' })
+                    .insert({ name: proposal.cliente_nome || 'Cliente', whatsapp, source: 'proposta', company_id: profile.company_id })
                     .select('id')
                     .single()
                 if (clientErr) {
@@ -351,7 +351,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
         if (!clientId) {
             const { data: newClient, error: clientErr } = await supabase
                 .from('clients')
-                .insert({ name: proposal.cliente_nome || 'Cliente', source: 'proposta' })
+                .insert({ name: proposal.cliente_nome || 'Cliente', source: 'proposta', company_id: profile.company_id })
                 .select('id')
                 .single()
             if (clientErr) {
@@ -389,6 +389,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                 total_m2: null,
                 special_attention: false,
                 notes: `Venta cerrada desde presupuesto ${id}.`,
+                company_id: profile.company_id,
             })
 
         if (aptErr) {
@@ -424,11 +425,13 @@ export async function addAfterPhotosAction(id: string, photoUrls: string[]) {
 export async function getSalesAction() {
     try {
         const supabase = await createClient()
+        const profile = await getUserProfile()
 
-        // Sales = all appointments (agendamento = venda)
+        // Sales = all appointments filtered by company
         const { data: appointments, error: aptError } = await supabase
             .from('appointments')
             .select('*, clients(id, name, whatsapp, location)')
+            .eq('company_id', profile.company_id)
             .order('scheduled_at', { ascending: false })
 
         if (aptError) throw aptError

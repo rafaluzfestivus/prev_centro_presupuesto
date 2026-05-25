@@ -19,11 +19,13 @@ import { ChevronLeft, ChevronRight, Plus, X, CheckCircle, ShieldCheck, AlertCirc
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useSearchParams } from 'next/navigation';
+import { useProfile } from '@/hooks/useProfile';
 
 const CalendarView = () => {
     const supabase = createClient();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { profile } = useProfile();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [appointments, setAppointments] = useState<any[]>([]);
@@ -91,10 +93,9 @@ const CalendarView = () => {
     }, [searchParams, appointments]);
 
     const fetchBlockedPeriods = async () => {
-        const { data } = await supabase
-            .from('agenda_blocked_periods')
-            .select('*')
-            .order('time_from', { ascending: true });
+        let q = supabase.from('agenda_blocked_periods').select('*').order('time_from', { ascending: true });
+        if (profile) q = q.eq('company_id', profile.company_id);
+        const { data } = await q;
         setBlockedPeriods(data || []);
     };
 
@@ -114,10 +115,9 @@ const CalendarView = () => {
 
     const fetchAppointments = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('appointments')
-            .select('*, clients(name, whatsapp, location)')
-            .order('date_start', { ascending: true });
+        let q = supabase.from('appointments').select('*, clients(name, whatsapp, location)').order('date_start', { ascending: true });
+        if (profile) q = q.eq('company_id', profile.company_id);
+        const { data, error } = await q;
 
         if (error) console.error('Error fetching appointments:', error);
         setAppointments(data || []);
@@ -127,7 +127,7 @@ const CalendarView = () => {
     useEffect(() => {
         fetchAppointments();
         fetchBlockedPeriods();
-    }, []);
+    }, [profile]);
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
     const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
@@ -223,7 +223,8 @@ const CalendarView = () => {
             const { data: newClient, error: insertError } = await supabase.from('clients').insert({
                 whatsapp: cleanWhatsApp,
                 name: formData.client_name || 'Cliente Manual',
-                source: 'manual'
+                source: 'manual',
+                company_id: profile?.company_id ?? 1,
             }).select('id').single();
 
             if (insertError) {
@@ -254,6 +255,7 @@ const CalendarView = () => {
             total_value: formData.total_value ? parseFloat(formData.total_value) : null,
             total_m2: formData.total_m2 ? parseFloat(formData.total_m2) : null,
             special_attention: formData.special_attention,
+            company_id: profile?.company_id ?? 1,
         };
 
         if (selectedAppointment) {

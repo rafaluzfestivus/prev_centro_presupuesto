@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, Search, RefreshCw, CheckCircle, Clock, AlertCircle, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useProfile } from '@/hooks/useProfile';
 
 const LeadsManager = () => {
     const [leads, setLeads] = useState<any[]>([]);
@@ -11,13 +12,16 @@ const LeadsManager = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const supabase = createClient();
     const router = useRouter();
+    const { profile } = useProfile();
 
     const fetchLeads = async () => {
+        if (!profile) return;
         setLoading(true);
         const { data } = await supabase
             .from('clients')
             .select('*')
             .eq('source', 'site')
+            .eq('company_id', profile.company_id)
             .order('created_at', { ascending: false });
 
         setLeads(data || []);
@@ -26,7 +30,7 @@ const LeadsManager = () => {
 
     useEffect(() => {
         fetchLeads();
-    }, []);
+    }, [profile]);
 
     const updateStatus = async (id: string, status: string) => {
         const { error } = await supabase

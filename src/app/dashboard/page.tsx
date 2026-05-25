@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Users, FileText, Calendar, ShieldCheck, ArrowUpRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useProfile } from '@/hooks/useProfile';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
 const StatCard = ({ icon: Icon, label, value, trend }: any) => (
@@ -25,12 +26,15 @@ const StatCard = ({ icon: Icon, label, value, trend }: any) => (
 
 const DashboardHome = () => {
     const supabase = createClient();
+    const { profile, company } = useProfile();
     const [stats, setStats] = useState<any[]>([]);
     const [recentLeads, setRecentLeads] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [userName, setUserName] = useState('');
 
     useEffect(() => {
+        if (!profile) return;
+
         const load = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             const displayName =
@@ -40,10 +44,12 @@ const DashboardHome = () => {
                 'Usuario';
             setUserName(displayName);
 
-            const { count: clientCount } = await supabase.from('clients').select('*', { count: 'exact', head: true });
-            const { count: proposalCount } = await supabase.from('Proposta').select('*', { count: 'exact', head: true });
-            const { count: apptCount } = await supabase.from('appointments').select('*', { count: 'exact', head: true });
-            const { count: handoverCount } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'handover');
+            const cid = profile.company_id;
+
+            const { count: clientCount } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('company_id', cid);
+            const { count: proposalCount } = await supabase.from('Proposta').select('*', { count: 'exact', head: true }).eq('company_id', cid);
+            const { count: apptCount } = await supabase.from('appointments').select('*', { count: 'exact', head: true }).eq('company_id', cid);
+            const { count: handoverCount } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('company_id', cid).eq('status', 'handover');
 
             setStats([
                 { label: 'Total Leads', value: String(clientCount || 0), icon: Users, trend: 'Nuevo' },
@@ -56,6 +62,7 @@ const DashboardHome = () => {
                 .from('clients')
                 .select('*')
                 .eq('source', 'site')
+                .eq('company_id', cid)
                 .order('created_at', { ascending: false })
                 .limit(4);
 
@@ -63,7 +70,7 @@ const DashboardHome = () => {
             setLoading(false);
         };
         load();
-    }, []);
+    }, [profile]);
 
     return (
         <DashboardLayout>
@@ -71,7 +78,9 @@ const DashboardHome = () => {
                 <h1 className="text-2xl sm:text-4xl font-extrabold mb-2 text-navy">
                     Bienvenido, <span className="accent-text">{userName || '...'}</span>
                 </h1>
-                <p className="text-text-muted text-sm sm:text-lg">Tu centro integrado de presupuestos y atención.</p>
+                <p className="text-text-muted text-sm sm:text-lg">
+                    {company ? `${company.name} · ${company.city}` : 'Tu centro integrado de presupuestos y atención.'}
+                </p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
