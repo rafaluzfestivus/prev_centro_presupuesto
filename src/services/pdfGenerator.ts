@@ -1,4 +1,4 @@
-import { generateProposalPPTX, ProposalDataPPTX } from './pptxGenerator'
+import { generateDirectPDF } from './pdfDirectGenerator'
 
 export interface ProposalItem {
     name: string;
@@ -19,23 +19,9 @@ export interface ProposalData {
     whatsapp?: string;
 }
 
-/** Generate PPTX then convert to PDF via /api/pptx-to-pdf (Google Drive). */
+/** Generate PDF blob directly (no PPTX intermediate). */
 export const generateProposalBlob = async (data: ProposalData): Promise<Blob> => {
-    const pptxBlob = await generateProposalPPTX(data as ProposalDataPPTX)
-    if (!pptxBlob) throw new Error('Falha ao gerar o arquivo PPTX')
-
-    const res = await fetch('/api/pptx-to-pdf', {
-        method: 'POST',
-        body: pptxBlob,
-        headers: { 'Content-Type': 'application/octet-stream' },
-    })
-
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }))
-        throw new Error(err.message || err.error || 'Falha na conversão PPTX → PDF')
-    }
-
-    return await res.blob()
+    return generateDirectPDF(data)
 }
 
 /** Generate PDF and trigger browser download. */

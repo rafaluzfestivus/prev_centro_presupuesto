@@ -4,20 +4,18 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Download, MessageCircle, Home, Loader2, Share2, ArrowLeft } from 'lucide-react'
-import { generateProposalPPTX, downloadProposalPPTX, ProposalDataPPTX as ExtendedProposalData } from '@/services/pptxGenerator'
 import { ProposalItem, generateProposalBlob } from '@/services/pdfGenerator'
 import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal'
 import { createClient } from '@/lib/supabase/client'
-
-
+import type { ProposalData } from '@/services/pdfGenerator'
 
 export default function SuccessPage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
-  const [data, setData] = useState<ExtendedProposalData | null>(null)
+  const [data, setData] = useState<ProposalData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [pptxUrl, setPptxUrl] = useState<string | null>(null)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [pdfStatus, setPdfStatus] = useState<'idle' | 'generating' | 'done' | 'error'>('idle')
 
@@ -29,12 +27,10 @@ export default function SuccessPage() {
       if (result.success && result.data) {
         const { proposal, items, processing } = result.data
 
-        // Use existing PPTX URL if available
         if (proposal.pdf_gerado) {
-          setPptxUrl(proposal.pdf_gerado)
+          setPdfUrl(proposal.pdf_gerado)
         }
 
-        // Map DB items to PDF structure
         const mappedItems: ProposalItem[] = items.map(item => ({
           name: item.nome_ambiente,
           width: item.largura,
@@ -60,23 +56,22 @@ export default function SuccessPage() {
     loadData()
   }, [id])
 
-  // Generate and Upload PPTX if not already present
+  // Generate PDF, upload to Supabase, persist URL
   useEffect(() => {
     const generateAndUpload = async () => {
-      if (!data || pptxUrl || uploading) return
+      if (!data || pdfUrl || uploading) return
       setUploading(true)
 
       try {
-        const blob = await generateProposalPPTX(data)
-        if (!blob) throw new Error("Fallo al generar PPTX")
+        const blob = await generateProposalBlob(data)
 
         const supabase = createClient()
-        const fileName = `${id}_${Date.now()}.pptx`
+        const fileName = `${id}_${Date.now()}.pdf`
 
         const { error: uploadError } = await supabase.storage
           .from('proposals')
           .upload(fileName, blob, {
-            contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            contentType: 'application/pdf',
             upsert: true
           })
 
@@ -86,38 +81,32 @@ export default function SuccessPage() {
           .from('proposals')
           .getPublicUrl(fileName)
 
-        setPptxUrl(publicUrl)
+        setPdfUrl(publicUrl)
 
-        // Save URL to DB (Background)
         try {
-          // Re-using the pdf_gerado field to avoid DB migrations, but containing the PPTX link
           await updateProposalAction(id, { pdf_gerado: publicUrl })
         } catch (err) {
-          console.error("Error saving PPTX link to DB:", err)
+          console.error('Error saving PDF URL to DB:', err)
         }
-
-        console.log("PPTX Uploaded and Persisted:", publicUrl)
-
       } catch (error) {
-        console.error("Error al subir el PPTX:", error)
+        console.error('Error generating/uploading PDF:', error)
       } finally {
         setUploading(false)
       }
     }
 
-    if (data && !pptxUrl) {
+    if (data && !pdfUrl) {
       generateAndUpload()
     }
-  }, [data, pptxUrl, id, uploading])
+  }, [data, pdfUrl, id, uploading])
 
-  // Auto-generate and download PDF after approval
+  // Auto-download PDF after data is ready
   useEffect(() => {
-    const autoDownloadPDF = async () => {
+    const autoDownload = async () => {
       if (!data || pdfStatus !== 'idle') return
       setPdfStatus('generating')
       try {
         const blob = await generateProposalBlob(data)
-        if (!blob) throw new Error('No se pudo generar el PDF')
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
@@ -135,14 +124,27 @@ export default function SuccessPage() {
     }
 
     if (data && pdfStatus === 'idle') {
-      autoDownloadPDF()
+      autoDownload()
     }
   }, [data, pdfStatus])
 
-
-  const handleDownload = async () => {
-    if (data) {
-      await downloadProposalPPTX(data)
+  const handleDownloadPDF = async () => {
+    if (!data) return
+    setPdfStatus('generating')
+    try {
+      const blob = await generateProposalBlob(data)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const safeName = data.clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      link.download = `Preventiva_Presupuesto_${safeName}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      setPdfStatus('done')
+    } catch {
+      setPdfStatus('error')
     }
   }
 
@@ -155,8 +157,8 @@ export default function SuccessPage() {
     message += `*Detalles de la inversión:*\n`
     message += `• Valor Total: *€ ${data.total.toFixed(2)} + IVA*\n\n`
 
-    if (pptxUrl) {
-      message += `📥 Descarga tu presentación propuesta aquí:\n${pptxUrl}\n\n`
+    if (pdfUrl) {
+      message += `📄 Descarga tu presupuesto en PDF aquí:\n${pdfUrl}\n\n`
     }
 
     const encoded = encodeURIComponent(message)
@@ -176,7 +178,6 @@ export default function SuccessPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 p-10 rounded-[2rem] shadow-2xl max-w-lg w-full text-center space-y-8 border-none relative overflow-hidden">
-        {/* Decoration */}
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-accent to-navy" />
 
         <div className="flex justify-center">
@@ -213,9 +214,18 @@ export default function SuccessPage() {
           </Button>
 
           <div className="grid grid-cols-2 gap-3">
-            <Button onClick={handleDownload} variant="outline" className="h-14 font-bold border-2 rounded-xl gap-2 hover:bg-gray-50 border-gray-100 text-navy">
-              <Download className="h-5 w-5" />
-              Versión Presentación
+            <Button
+              onClick={handleDownloadPDF}
+              variant="outline"
+              className="h-14 font-bold border-2 rounded-xl gap-2 hover:bg-gray-50 border-gray-100 text-navy"
+              disabled={pdfStatus === 'generating'}
+            >
+              {pdfStatus === 'generating' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Download className="h-5 w-5" />
+              )}
+              Descargar PDF
             </Button>
 
             <Button variant="ghost" onClick={() => router.push('/dashboard')} className="h-14 font-bold rounded-xl text-gray-600 hover:text-navy hover:bg-gray-100">
@@ -237,7 +247,7 @@ export default function SuccessPage() {
         <div className="pt-4 border-t border-gray-100 flex flex-col items-center gap-2">
           {pdfStatus === 'generating' && (
             <p className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em] flex items-center gap-2">
-              <Loader2 className="h-3 w-3 animate-spin" /> Guardando PDF...
+              <Loader2 className="h-3 w-3 animate-spin" /> Generando PDF...
             </p>
           )}
           {pdfStatus === 'done' && (
@@ -247,7 +257,7 @@ export default function SuccessPage() {
           )}
           {pdfStatus === 'error' && (
             <p className="text-[10px] font-black uppercase text-orange-500 tracking-[0.2em]">
-              PDF no disponible — descárgalo manualmente
+              Error al generar PDF — inténtalo de nuevo
             </p>
           )}
           <p className="text-[10px] font-black uppercase text-gray-600 tracking-[0.2em]">Próximo Paso: Esperar confirmación para agendar</p>
