@@ -96,6 +96,23 @@ export default function VentasPage() {
     const totalM2      = filtered.reduce((s, v) => s + (v.totalM2 || 0), 0)
     const avgTicket    = filtered.length > 0 ? totalRevenue / filtered.length : 0
 
+    // Monthly chart — last 6 months from ALL sales (not filtered by preset)
+    const monthlyData = useMemo(() => {
+        const months: { label: string; revenue: number; count: number }[] = []
+        const now = new Date()
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            const label = d.toLocaleDateString('es-ES', { month: 'short' })
+            const rows = sales.filter(s => {
+                const sd = new Date(s.scheduledAt)
+                return `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, '0')}` === key
+            })
+            months.push({ label, revenue: rows.reduce((a, r) => a + (Number(r.total_geral) || 0), 0), count: rows.length })
+        }
+        return months
+    }, [sales])
+
     const stats = [
         { label: 'Facturación Total',   value: `€ ${totalRevenue.toFixed(2)}`, icon: Euro,       color: 'text-green-600',  bg: 'bg-green-50' },
         { label: 'Visitas Agendadas',   value: filtered.length,                icon: TrendingUp,  color: 'text-accent',     bg: 'bg-accent/10' },
@@ -183,6 +200,41 @@ export default function VentasPage() {
                     )
                 })}
             </div>
+
+            {/* Monthly chart */}
+            {!loading && sales.length > 0 && (() => {
+                const maxRev = Math.max(...monthlyData.map(m => m.revenue), 1)
+                return (
+                    <div className="bg-white border border-border rounded-2xl p-6 mb-8">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-5">Facturación mensual — últimos 6 meses</p>
+                        <div className="flex items-end gap-3 h-36">
+                            {monthlyData.map((m, i) => {
+                                const pct = maxRev > 0 ? (m.revenue / maxRev) * 100 : 0
+                                return (
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                                        <span className="text-[9px] font-black text-text-muted opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                            {m.revenue > 0 ? `€${m.revenue.toFixed(0)}` : '—'}
+                                        </span>
+                                        <div className="w-full relative" style={{ height: '96px' }}>
+                                            <div
+                                                className="absolute bottom-0 w-full rounded-t-lg bg-accent transition-all duration-500"
+                                                style={{ height: `${Math.max(pct, m.revenue > 0 ? 4 : 0)}%` }}
+                                            />
+                                            {m.revenue === 0 && (
+                                                <div className="absolute bottom-0 w-full h-1 bg-gray-100 rounded-t" />
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] font-bold text-text-muted capitalize">{m.label}</span>
+                                        {m.count > 0 && (
+                                            <span className="text-[9px] text-text-muted/60">{m.count} vis.</span>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )
+            })()}
 
             {error && (
                 <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
