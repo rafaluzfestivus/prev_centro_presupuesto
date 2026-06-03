@@ -4,11 +4,13 @@ import React, { useEffect, useState } from 'react';
 import { Save, RotateCcw, Trash2, Zap, Shield, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { SYSTEM_PROMPT } from '@/services/ai/prompt';
+import { useProfile } from '@/hooks/useProfile';
 
 const DEFAULT_PROMPT = SYSTEM_PROMPT;
 
 const PromptEditor = () => {
     const supabase = createClient();
+    const { profile } = useProfile();
     const [prompt, setPrompt] = useState('');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -52,14 +54,27 @@ const PromptEditor = () => {
     };
 
     const handleCleanupConfirm = async () => {
+        if (!profile) return;
         setShowCleanupConfirm(false);
         setCleaning(true);
         setCleanupStatus('idle');
         try {
+            const cid = profile.company_id;
+
+            // First get client IDs belonging to this company (for conversations cascade)
+            const { data: companyClients } = await supabase
+                .from('clients')
+                .select('id')
+                .eq('company_id', cid);
+
+            const clientIds = (companyClients || []).map((c: any) => c.id);
+
             await Promise.all([
-                supabase.from('appointments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-                supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-                supabase.from('clients').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+                supabase.from('appointments').delete().eq('company_id', cid),
+                clientIds.length > 0
+                    ? supabase.from('conversations').delete().in('client_id', clientIds)
+                    : Promise.resolve(),
+                supabase.from('clients').delete().eq('company_id', cid),
             ]);
             setCleanupStatus('success');
             setCleanupMessage('¡Limpieza concluida!');

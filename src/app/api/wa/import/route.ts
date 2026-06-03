@@ -10,6 +10,14 @@ const INSTANCE = process.env.EVOLUTION_INSTANCE ?? 'preventiva'
 
 const evoHeaders = { 'Content-Type': 'application/json', apikey: API_KEY }
 
+function resolveCompanyId(instance: string): number {
+    const centro = process.env.EVOLUTION_INSTANCE_CENTRO
+    const este   = process.env.EVOLUTION_INSTANCE_ESTE
+    if (centro && instance === centro) return 1
+    if (este   && instance === este)   return 2
+    return 1
+}
+
 export async function GET(req: NextRequest) {
     // Verifica env vars
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -109,7 +117,7 @@ export async function GET(req: NextRequest) {
             } else {
                 const { data: newClient } = await supabase
                     .from('clients')
-                    .insert({ name: chat.name || phone, whatsapp: phone, source: 'whatsapp', status: 'new' })
+                    .insert({ name: chat.name || phone, whatsapp: phone, source: 'whatsapp', status: 'new', company_id: resolveCompanyId(INSTANCE) })
                     .select('id')
                     .single()
                 clientId = newClient?.id ?? null

@@ -33,10 +33,12 @@ const LeadsManager = () => {
     }, [profile]);
 
     const updateStatus = async (id: string, status: string) => {
+        if (!profile) return;
         const { error } = await supabase
             .from('clients')
             .update({ status })
-            .eq('id', id);
+            .eq('id', id)
+            .eq('company_id', profile.company_id);
 
         if (error) alert('Error al actualizar el estado: ' + error.message);
         else fetchLeads();

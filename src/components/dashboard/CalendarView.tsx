@@ -213,12 +213,13 @@ const CalendarView = () => {
         const { data: existingClients } = await supabase
             .from('clients')
             .select('id')
-            .eq('whatsapp', cleanWhatsApp);
+            .eq('whatsapp', cleanWhatsApp)
+            .eq('company_id', profile?.company_id ?? 1);
 
         if (existingClients && existingClients.length > 0) {
             clientId = existingClients[0].id;
             // Update name if changed
-            await supabase.from('clients').update({ name: formData.client_name }).eq('id', clientId);
+            await supabase.from('clients').update({ name: formData.client_name }).eq('id', clientId).eq('company_id', profile?.company_id ?? 1);
         } else {
             const { data: newClient, error: insertError } = await supabase.from('clients').insert({
                 whatsapp: cleanWhatsApp,
@@ -754,6 +755,7 @@ const CalendarView = () => {
                                             time_to: blockForm.time_to,
                                             days_of_week: blockForm.days_of_week.length > 0 ? blockForm.days_of_week : null,
                                             is_active: true,
+                                            company_id: profile?.company_id ?? 1,
                                         });
                                         setBlockForm({ label: '', time_from: '13:00', time_to: '15:00', days_of_week: [] });
                                         await fetchBlockedPeriods();

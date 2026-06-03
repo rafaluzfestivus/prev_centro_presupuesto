@@ -33,6 +33,7 @@ type ProposalData = {
   total: number
   whatsapp: string
   imageUrl?: string
+  company_id: number
 }
 
 export default function ReviewPage() {
@@ -79,7 +80,8 @@ export default function ReviewPage() {
         logic: processing?.logica_calculo || '',
         total: Number(proposal.total_geral || processing?.total_calculado || 0),
         whatsapp: proposal.whatsapp || '',
-        imageUrl: proposal.input_image_url
+        imageUrl: proposal.input_image_url,
+        company_id: proposal.company_id ?? 1,
       })
     }
     setLoading(false)
@@ -215,31 +217,35 @@ export default function ReviewPage() {
       let clientId: string | null = null
       const clientName = data?.clientName || 'Cliente'
 
+      const companyId = data?.company_id ?? 1
+
       if (cleanWhatsapp) {
-        // Search with both formats: with and without country prefix +
+        // Search with both formats: with and without country prefix +, scoped to company
         const { data: existing } = await supabase
           .from('clients')
           .select('id')
           .or(`whatsapp.eq.${cleanWhatsapp},whatsapp.eq.+${cleanWhatsapp}`)
+          .eq('company_id', companyId)
           .limit(1)
 
         if (existing && existing.length > 0) {
           clientId = existing[0].id
         } else {
-          // Insert new — if unique constraint fires, re-search
+          // Insert new — if unique constraint fires, re-search within company
           const { data: newClient, error: insertErr } = await supabase
             .from('clients')
-            .insert({ name: clientName, whatsapp: cleanWhatsapp, source: 'proposta' })
+            .insert({ name: clientName, whatsapp: cleanWhatsapp, source: 'proposta', company_id: companyId })
             .select('id')
             .single()
 
           if (insertErr) {
-            // Conflict: someone else created this client — find by last 9 digits
+            // Conflict: find by last 9 digits within company
             const suffix = cleanWhatsapp.slice(-9)
             const { data: retry } = await supabase
               .from('clients')
               .select('id')
               .ilike('whatsapp', `%${suffix}`)
+              .eq('company_id', companyId)
               .limit(1)
             clientId = retry?.[0]?.id ?? null
           } else {
@@ -254,7 +260,7 @@ export default function ReviewPage() {
         const { data: newClient } = await supabase
           .from('clients')
           .upsert(
-            { name: clientName, whatsapp: placeholder, source: 'proposta' },
+            { name: clientName, whatsapp: placeholder, source: 'proposta', company_id: companyId },
             { onConflict: 'whatsapp' }
           )
           .select('id')
@@ -290,6 +296,7 @@ export default function ReviewPage() {
           notes: `Venta cerrada desde presupuesto ${id}.`,
           before_photos: uploadedPhotoUrls.length ? uploadedPhotoUrls : null,
           installation_notes: installNotes || null,
+          company_id: companyId,
         })
 
       if (aptErr) throw new Error(aptErr.message)

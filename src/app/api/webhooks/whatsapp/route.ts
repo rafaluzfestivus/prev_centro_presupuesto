@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-/**
- * Evolution API sends webhooks for every event.
- * We only care about "messages.upsert" with fromMe=false (incoming messages).
- *
- * Configure in Evolution API:
- *   Webhook URL: https://seuapp.com/api/webhooks/whatsapp
- *   Events: messages.upsert
- */
+// Map Evolution API instance names → company_id
+// Configure EVOLUTION_INSTANCE_CENTRO and EVOLUTION_INSTANCE_ESTE in Vercel env vars
+function resolveCompanyId(instance: string): number {
+    const centro = process.env.EVOLUTION_INSTANCE_CENTRO
+    const este   = process.env.EVOLUTION_INSTANCE_ESTE
+    if (centro && instance === centro) return 1
+    if (este   && instance === este)   return 2
+    return 1 // default: Centro
+}
+
 export async function POST(req: NextRequest) {
-    // Criado dentro da função para evitar erro no build (env vars só existem em runtime)
     const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -19,24 +20,22 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
 
-        // Evolution API v2 usa MESSAGES_UPSERT — aceita ambos os formatos por segurança
         const eventName: string = (body.event ?? '').toUpperCase().replace('.', '_')
         if (eventName !== 'MESSAGES_UPSERT') {
             return NextResponse.json({ ok: true })
         }
 
-        // body.data pode ser um único objeto ou um array de mensagens
+        const companyId = resolveCompanyId(body.instance ?? '')
+
         const rawData = body.data
         if (!rawData) return NextResponse.json({ ok: true })
         const msgs = Array.isArray(rawData) ? rawData : [rawData]
 
         for (const msg of msgs) {
-            // Extract phone (remove @s.whatsapp.net ou @g.us)
             const remoteJid: string = msg.key?.remoteJid ?? ''
             const phone = remoteJid.split('@')[0]
             const isFromMe: boolean = msg.key?.fromMe === true
 
-            // Skip group messages
             if (remoteJid.endsWith('@g.us')) continue
             if (!phone) continue
 
@@ -52,10 +51,8 @@ export async function POST(req: NextRequest) {
             const mediaUrl: string | null  = msg.message?.imageMessage?.url ?? msg.message?.documentMessage?.url ?? null
             const mediaType: string | null = msg.message?.imageMessage ? 'image' : msg.message?.documentMessage ? 'document' : null
 
-            // Ignore empty messages
             if (!text && !mediaUrl) continue
 
-            // Avoid duplicates
             if (waMessageId) {
                 const { data: dup } = await supabase
                     .from('conversations')
@@ -65,7 +62,6 @@ export async function POST(req: NextRequest) {
                 if (dup?.id) continue
             }
 
-            // Find or create client by phone number
             let clientId: string | null = null
 
             const { data: existing } = await supabase
@@ -78,7 +74,6 @@ export async function POST(req: NextRequest) {
             if (existing?.id) {
                 clientId = existing.id
             } else {
-                // Create new client from WhatsApp contact
                 const { data: newClient } = await supabase
                     .from('clients')
                     .insert({
@@ -86,6 +81,7 @@ export async function POST(req: NextRequest) {
                         whatsapp: phone,
                         source: 'whatsapp',
                         status: 'new',
+                        company_id: companyId,
                     })
                     .select('id')
                     .single()

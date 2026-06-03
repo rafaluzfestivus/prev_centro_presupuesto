@@ -250,6 +250,7 @@ ${existingMockup}
 export async function confirmProposalAction(id: string, total: number, items: any[]) {
     try {
         const supabase = await createClient()
+        const profile = await getUserProfile()
 
         // 1. Get proposal to get whatsapp and other data
         const proposal = await getProposalById(id)
@@ -266,9 +267,8 @@ export async function confirmProposalAction(id: string, total: number, items: an
 
         console.log(`[AI] Confirmed items for proposal ${id}`)
 
-        // 4. Create/Update Client if whatsapp is present
+        // 4. Create/Update Client if whatsapp is present (scoped to company)
         if (whatsapp) {
-            // Upsert client - always keep client data updated
             const { data: client, error: clientError } = await supabase
                 .from('clients')
                 .upsert({
@@ -276,7 +276,8 @@ export async function confirmProposalAction(id: string, total: number, items: an
                     whatsapp: whatsapp,
                     location: proposal.cidade,
                     source: 'proposta',
-                    status: 'lead'
+                    status: 'lead',
+                    company_id: profile.company_id,
                 }, { onConflict: 'whatsapp' })
                 .select()
                 .single()
@@ -321,11 +322,12 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
         let clientId: string | null = null
 
         if (whatsapp) {
-            // Step A: find existing client by whatsapp
+            // Step A: find existing client by whatsapp scoped to this company
             const { data: existing } = await supabase
                 .from('clients')
                 .select('id')
                 .eq('whatsapp', whatsapp)
+                .eq('company_id', profile.company_id)
                 .maybeSingle()
 
             if (existing) {
@@ -458,6 +460,7 @@ export async function getSalesAction() {
                 .from('Proposta')
                 .select('*')
                 .in('id', proposalIds)
+                .eq('company_id', profile.company_id)
 
             for (const p of proposals || []) proposalMap[p.id] = p
 

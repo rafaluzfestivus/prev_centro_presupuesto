@@ -1,6 +1,5 @@
-'use server'
-
 import { createClient } from '@/lib/supabase/server'
+import { getUserProfile } from '@/lib/profile'
 import { NextResponse } from 'next/server'
 
 // ONE-TIME cleanup: delete appointments created by closeSaleAction
@@ -9,11 +8,19 @@ import { NextResponse } from 'next/server'
 export async function POST() {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+            return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
+        }
+
+        const profile = await getUserProfile()
 
         const { data: deleted, error } = await supabase
             .from('appointments')
             .delete()
             .like('notes', '%Venta cerrada desde presupuesto%')
+            .eq('company_id', profile.company_id)
             .select('id')
 
         if (error) throw error
