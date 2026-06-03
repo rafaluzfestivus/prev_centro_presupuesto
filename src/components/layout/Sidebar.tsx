@@ -12,6 +12,7 @@ import {
     Users,
     FileText,
     TrendingUp,
+    Filter,
     X,
     ExternalLink,
     Settings,
@@ -39,6 +40,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
         { id: '/dashboard/presupuestos', label: 'Presupuestos IA', icon: FileText },
         { id: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp },
         { id: '/dashboard/clientes', label: 'Leads del Sitio', icon: Users },
+        { id: '/dashboard/funil', label: 'Funil', icon: Filter },
         { id: '/dashboard/citas', label: 'Agenda', icon: Calendar },
         { id: '/dashboard/configuracion', label: 'Mi Empresa', icon: Settings },
     ];
