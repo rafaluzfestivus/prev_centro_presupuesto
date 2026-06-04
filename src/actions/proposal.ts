@@ -388,6 +388,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                 status: 'confirmed',
                 attachment_url: null,
                 installation_address: installation?.address || proposal.cidade || null,
+                installation_notes: installation?.notes || null,
                 total_value: Number(proposal.total_geral) || null,
                 total_m2: null,
                 special_attention: false,

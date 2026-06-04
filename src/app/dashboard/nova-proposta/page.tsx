@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import { parseProposalTextAction, createFullProposalAction, closeSaleAction } from '@/actions/proposal'
+import {
+    parseProposalTextAction, createFullProposalAction,
+    confirmProposalAction, closeSaleAction,
+} from '@/actions/proposal'
 import { generateProposalBlob } from '@/services/pdfGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
 import { PRICING } from '@/lib/constants'
@@ -11,12 +14,13 @@ import { useProfile } from '@/hooks/useProfile'
 import { COMPANIES } from '@/lib/companies'
 import {
     ArrowLeft, Sparkles, PenLine, Plus, Trash2, Loader2,
-    Download, MessageCircle, Home, Send, X, Camera,
-    AlertCircle, CheckCircle, Calendar, RotateCcw
+    Download, MessageCircle, Send, X, Camera,
+    AlertCircle, CheckCircle, Calendar, RotateCcw, Save, MapPin,
 } from 'lucide-react'
 
-type Step = 'input' | 'preview' | 'done'
+type Step = 'input' | 'proposta' | 'agendar'
 type Mode = 'ai' | 'manual'
+type SaveState = 'idle' | 'saving' | 'saved' | 'modified'
 
 type Item = {
     id: string
@@ -25,12 +29,45 @@ type Item = {
     height: number
     area: number
     price: number
+    priceManual: boolean
 }
 
-function calcItem(name: string, width: number, height: number): Item {
-    const area = width * height
-    const price = Math.max(area * PRICING.PRICE_PER_M2, area > 0 ? PRICING.MIN_PRICE_PER_ITEM : 0)
-    return { id: `item_${Date.now()}_${Math.random()}`, name, width, height, area, price }
+function buildItem(name = '', w = 0, h = 0): Item {
+    const area = w * h
+    return {
+        id: `i_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        name, width: w, height: h, area,
+        price: Math.max(area * PRICING.PRICE_PER_M2, area > 0 ? PRICING.MIN_PRICE_PER_ITEM : 0),
+        priceManual: false,
+    }
+}
+
+function Steps({ step }: { step: Step }) {
+    const list: { id: Step; label: string }[] = [
+        { id: 'input', label: 'Dados' },
+        { id: 'proposta', label: 'Proposta' },
+        { id: 'agendar', label: 'Agendar' },
+    ]
+    const idx = list.findIndex(s => s.id === step)
+    return (
+        <div className="flex items-center gap-2 mb-8">
+            {list.map((s, i) => (
+                <div key={s.id} className="flex items-center gap-2">
+                    <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-colors ${
+                        i < idx  ? 'bg-green-100 text-green-700' :
+                        i === idx ? 'bg-navy text-white' :
+                                    'bg-gray-100 text-gray-400'
+                    }`}>
+                        {i < idx ? <CheckCircle size={11} /> : <span>{i + 1}</span>}
+                        {s.label}
+                    </span>
+                    {i < list.length - 1 && (
+                        <div className={`h-px w-6 shrink-0 ${i < idx ? 'bg-green-300' : 'bg-gray-200'}`} />
+                    )}
+                </div>
+            ))}
+        </div>
+    )
 }
 
 function NovaPropostaInner() {
@@ -41,46 +78,44 @@ function NovaPropostaInner() {
     const [step, setStep] = useState<Step>('input')
     const [mode, setMode] = useState<Mode>('ai')
 
-    // Client info
-    const [clientName, setClientName] = useState(params.get('name') ?? '')
-    const [clientPhone, setClientPhone] = useState(params.get('phone') ?? params.get('whatsapp') ?? '')
+    // Client
+    const [clientName, setClientName]       = useState(params.get('name')     ?? '')
+    const [clientPhone, setClientPhone]     = useState(params.get('phone') ?? params.get('whatsapp') ?? '')
     const [clientLocation, setClientLocation] = useState(params.get('location') ?? '')
 
-    // AI mode
-    const [requestText, setRequestText] = useState(params.get('message') ?? '')
-    const [imageFile, setImageFile] = useState<File | null>(null)
+    // AI input
+    const [requestText, setRequestText]   = useState(params.get('message') ?? '')
+    const [imageFile, setImageFile]       = useState<File | null>(null)
     const [imagePreview, setImagePreview] = useState('')
-    const [imageUrl, setImageUrl] = useState('')
-    const [missingInfo, setMissingInfo] = useState('')
+    const [imageUrl, setImageUrl]         = useState('')
+    const [missingInfo, setMissingInfo]   = useState('')
     const [clarification, setClarification] = useState('')
 
-    // Items (preview step)
-    const [items, setItems] = useState<Item[]>([])
+    // Items
+    const [items, setItems]   = useState<Item[]>([])
     const [mockup, setMockup] = useState('')
+    const [refineText, setRefineText] = useState('')
 
-    // Manual mode add
-    const [newName, setNewName] = useState('')
-    const [newW, setNewW] = useState('')
-    const [newH, setNewH] = useState('')
+    // UI state
+    const [parsing, setParsing]   = useState(false)
+    const [error, setError]       = useState('')
 
-    // Loading / error
-    const [parsing, setParsing] = useState(false)
-    const [saving, setSaving] = useState(false)
-    const [error, setError] = useState('')
-
-    // Done step
+    // Save state (step 2)
     const [proposalId, setProposalId] = useState('')
-    const [generatingPDF, setGeneratingPDF] = useState(false)
-    const [sendingWA, setSendingWA] = useState(false)
-    const [showCloseModal, setShowCloseModal] = useState(false)
-    const [installDate, setInstallDate] = useState('')
-    const [installAddress, setInstallAddress] = useState('')
-    const [closing, setClosing] = useState(false)
+    const [saveState, setSaveState]   = useState<SaveState>('idle')
 
-    const city = profile ? (COMPANIES[profile.company_id]?.name ?? 'Preventiva Centro') : 'Preventiva Centro'
+    // Step 3 fields
+    const [installDate, setInstallDate]     = useState('')
+    const [installAddress, setInstallAddress] = useState('')
+    const [installNotes, setInstallNotes]   = useState('')
+    const [closing, setClosing]             = useState(false)
+    const [generatingPDF, setGeneratingPDF] = useState(false)
+    const [sendingWA, setSendingWA]         = useState(false)
+
+    const city  = profile ? (COMPANIES[profile.company_id]?.name ?? 'Preventiva Centro') : 'Preventiva Centro'
     const total = items.reduce((s, i) => s + i.price, 0)
 
-    // Image select
+    // ── Image ────────────────────────────────────────────────────────────────
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0]
         if (!f) return
@@ -88,233 +123,263 @@ function NovaPropostaInner() {
         setImagePreview(URL.createObjectURL(f))
     }
 
-    // Upload image and return URL
     const uploadImage = async (file: File): Promise<string> => {
         const ext = file.name.split('.').pop()
-        const path = `temp/${Date.now()}.${ext}`
         const form = new FormData()
         form.append('file', file)
-        form.append('path', path)
-        const res = await fetch('/api/upload', { method: 'POST', body: form })
+        form.append('path', `temp/${Date.now()}.${ext}`)
+        const res  = await fetch('/api/upload', { method: 'POST', body: form })
         const json = await res.json()
         if (!json.url) throw new Error('Falha no upload de imagem')
         return json.url
     }
 
-    // ── AI PARSE ────────────────────────────────────────────────────────────
+    // ── AI analyse → step 2 ──────────────────────────────────────────────────
     const handleAnalyse = async () => {
-        if (!requestText.trim() && !imageFile) {
-            setError('Insere o pedido do cliente ou uma imagem.')
-            return
-        }
-        setError('')
-        setParsing(true)
+        if (!requestText.trim() && !imageFile) { setError('Insere o pedido ou uma imagem.'); return }
+        setError(''); setParsing(true)
         try {
             let imgUrl = imageUrl
-            if (imageFile && !imgUrl) {
-                imgUrl = await uploadImage(imageFile)
-                setImageUrl(imgUrl)
-            }
-
-            const fullText = clarification
-                ? `${requestText}\n\nACLARACIÓN: ${clarification}`
-                : requestText
-
-            const res = await parseProposalTextAction(fullText || '', imgUrl || undefined)
+            if (imageFile && !imgUrl) { imgUrl = await uploadImage(imageFile); setImageUrl(imgUrl) }
+            const text = clarification ? `${requestText}\n\nACLARACIÓN: ${clarification}` : requestText
+            const res  = await parseProposalTextAction(text || '', imgUrl || undefined)
             if (!res.success || !res.data) throw new Error(res.error ?? 'Erro na IA')
-
-            const aiItems: Item[] = (res.data.items || []).map((it: any) =>
-                calcItem(it.name, Number(it.width) || 0, Number(it.height) || 0)
-            )
-            setItems(aiItems)
+            setItems((res.data.items || []).map((it: any) =>
+                buildItem(it.name, Number(it.width) || 0, Number(it.height) || 0)
+            ))
             setMockup(res.data.ascii_mockup ?? '')
             setMissingInfo(res.data.missing_info ?? '')
             setClarification('')
-            setStep('preview')
-        } catch (e: any) {
-            setError(e.message || 'Erro ao analisar')
-        }
+            setProposalId(''); setSaveState('idle')
+            setStep('proposta')
+        } catch (e: any) { setError(e.message || 'Erro ao analisar') }
         setParsing(false)
     }
 
-    // ── MANUAL ITEMS ────────────────────────────────────────────────────────
-    const addManualItem = () => {
-        if (!newName.trim()) return
-        setItems(prev => [...prev, calcItem(newName, parseFloat(newW) || 0, parseFloat(newH) || 0)])
-        setNewName(''); setNewW(''); setNewH('')
+    // ── AI refine (step 2) ───────────────────────────────────────────────────
+    const handleRefine = async () => {
+        if (!refineText.trim()) return
+        setParsing(true); setError('')
+        try {
+            const text = `${requestText}\n\nAJUSTE: ${refineText}`
+            const res  = await parseProposalTextAction(text, imageUrl || undefined)
+            if (!res.success || !res.data) throw new Error(res.error ?? 'Erro')
+            setItems((res.data.items || []).map((it: any) =>
+                buildItem(it.name, Number(it.width) || 0, Number(it.height) || 0)
+            ))
+            setMockup(res.data.ascii_mockup ?? '')
+            setRefineText('')
+            setSaveState(prev => prev === 'saved' ? 'modified' : prev)
+        } catch (e: any) { setError(e.message || 'Erro ao reajustar') }
+        setParsing(false)
     }
 
-    const toPreviewManual = () => {
-        if (items.length === 0) { setError('Adiciona pelo menos um item.'); return }
-        setError('')
-        setStep('preview')
-    }
+    // ── Item helpers ─────────────────────────────────────────────────────────
+    const markDirty = () => setSaveState(prev => prev === 'saved' ? 'modified' : prev)
 
-    // ── ITEM EDIT ───────────────────────────────────────────────────────────
     const updateItem = (id: string, field: 'name' | 'width' | 'height' | 'price', val: string) => {
         setItems(prev => prev.map(it => {
             if (it.id !== id) return it
-            const updated = { ...it, [field]: field === 'name' ? val : Number(val) }
-            if (field === 'width' || field === 'height') {
-                updated.area = updated.width * updated.height
-                updated.price = Math.max(updated.area * PRICING.PRICE_PER_M2, updated.area > 0 ? PRICING.MIN_PRICE_PER_ITEM : 0)
+            if (field === 'name')  return { ...it, name: val }
+            if (field === 'price') return { ...it, price: Number(val) || 0, priceManual: true }
+            const n = Number(val) || 0
+            const updated = { ...it, [field]: n }
+            updated.area = updated.width * updated.height
+            if (!updated.priceManual) {
+                updated.price = Math.max(
+                    updated.area * PRICING.PRICE_PER_M2,
+                    updated.area > 0 ? PRICING.MIN_PRICE_PER_ITEM : 0
+                )
             }
             return updated
         }))
+        markDirty()
     }
 
-    const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id))
+    const removeItem = (id: string) => { setItems(p => p.filter(i => i.id !== id)); markDirty() }
+    const addItem    = ()           => { setItems(p => [...p, buildItem()]); markDirty() }
 
-    // ── SAVE ────────────────────────────────────────────────────────────────
-    const handleCreate = async () => {
+    // ── Core save (returns result, stays on current step) ───────────────────
+    const saveProposal = async (): Promise<{ success: boolean; id?: string; error?: string }> => {
+        if (items.length === 0) return { success: false, error: 'A proposta não tem itens.' }
+        if (!clientName.trim()) return { success: false, error: 'Nome do cliente obrigatório.' }
+        setSaveState('saving')
+        try {
+            if (!proposalId) {
+                const res = await createFullProposalAction({
+                    clientName, whatsapp: clientPhone, city,
+                    requestText, imageUrl, items, mockup, total,
+                })
+                if (!res.success || !res.id) throw new Error(res.error ?? 'Erro ao criar')
+                setProposalId(res.id)
+                setSaveState('saved')
+                return { success: true, id: res.id }
+            } else {
+                const res = await confirmProposalAction(proposalId, total, items)
+                if (!res.success) throw new Error(res.error ?? 'Erro ao atualizar')
+                setSaveState('saved')
+                return { success: true, id: proposalId }
+            }
+        } catch (e: any) {
+            setSaveState(proposalId ? 'modified' : 'idle')
+            return { success: false, error: e.message || 'Erro ao guardar' }
+        }
+    }
+
+    // Guardar — sem navegar
+    const handleSave = async () => {
+        const r = await saveProposal()
+        if (!r.success) setError(r.error ?? 'Erro ao guardar')
+    }
+
+    // Continuar → guarda se preciso, depois navega para step 3
+    const handleContinue = async () => {
         if (items.length === 0) { setError('A proposta não tem itens.'); return }
         if (!clientName.trim()) { setError('Nome do cliente obrigatório.'); return }
-        setSaving(true); setError('')
-        const res = await createFullProposalAction({
-            clientName, whatsapp: clientPhone, city,
-            requestText, imageUrl,
-            items, mockup, total,
-        })
-        if (!res.success || !res.id) {
-            setError(res.error ?? 'Erro ao guardar proposta')
-            setSaving(false); return
+        if (saveState !== 'saved') {
+            const r = await saveProposal()
+            if (!r.success) { setError(r.error ?? 'Erro ao guardar'); return }
         }
-        setProposalId(res.id)
-        setStep('done')
-        setSaving(false)
+        if (!installAddress) setInstallAddress(clientLocation)
+        setStep('agendar')
     }
 
-    // ── PDF ─────────────────────────────────────────────────────────────────
-    const proposalDataForPDF = () => ({
+    // ── PDF / WA ─────────────────────────────────────────────────────────────
+    const pdfData = () => ({
         clientName, city, whatsapp: clientPhone,
         items: items.map(i => ({ name: i.name, width: i.width, height: i.height, area: i.area, price: i.price })),
         total, mockup,
     })
 
     const handleDownloadPDF = async () => {
-        setGeneratingPDF(true); setError('')
+        setGeneratingPDF(true)
         try {
-            const blob = await generateProposalBlob(proposalDataForPDF())
-            const url = URL.createObjectURL(blob)
+            const blob = await generateProposalBlob(pdfData())
             const a = document.createElement('a')
-            a.href = url
+            a.href = URL.createObjectURL(blob)
             a.download = `Preventiva_${clientName.replace(/\s+/g, '_')}.pdf`
             a.click()
-            URL.revokeObjectURL(url)
         } catch (e: any) { setError(e.message || 'Erro ao gerar PDF') }
         setGeneratingPDF(false)
     }
 
     const handleWhatsApp = async () => {
-        if (!clientPhone.trim()) { setError('Número de WhatsApp não definido.'); return }
-        setSendingWA(true); setError('')
+        if (!clientPhone.trim()) { setError('WhatsApp não definido.'); return }
+        setSendingWA(true)
         try {
-            const blob = await generateProposalBlob(proposalDataForPDF())
-            const safeName = clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+            const blob    = await generateProposalBlob(pdfData())
             const caption = 'Te paso el presupuesto. Mira si está todo bien y si necesitas cualquier cambio me dices. ¡Atención que con el calor tenemos cada día menos fechas disponibles!'
             if (process.env.NEXT_PUBLIC_EVOLUTION_API_URL) {
-                await sendDocumentMessage(clientPhone, blob, `Preventiva_${safeName}.pdf`, caption)
+                await sendDocumentMessage(
+                    clientPhone, blob,
+                    `Preventiva_${clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`,
+                    caption
+                )
             } else {
-                const digits = clientPhone.replace(/\D/g, '')
-                window.open(`https://wa.me/${digits}?text=${encodeURIComponent(caption)}`, '_blank')
+                window.open(`https://wa.me/${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(caption)}`, '_blank')
             }
-        } catch (e: any) { setError(e.message || 'Erro ao enviar WhatsApp') }
+        } catch (e: any) { setError(e.message || 'Erro ao enviar') }
         setSendingWA(false)
     }
 
+    // ── Fechar venda / confirmar instalação (step 3) ─────────────────────────
     const handleCloseSale = async () => {
-        if (!installDate) { setError('Selecciona la fecha de instalación.'); return }
+        if (!installDate)  { setError('Selecciona la fecha de instalación.'); return }
+        if (!proposalId)   { setError('Guarda a proposta primeiro.'); return }
         setClosing(true); setError('')
-        const res = await closeSaleAction(proposalId, { address: installAddress, scheduledAt: installDate })
-        if (!res.success) { setError(res.error ?? 'Erro ao fechar venda'); setClosing(false); return }
-        setShowCloseModal(false)
+        const res = await closeSaleAction(proposalId, {
+            address: installAddress,
+            notes: installNotes,
+            scheduledAt: installDate,
+        })
+        if (!res.success) { setError(res.error ?? 'Erro ao confirmar'); setClosing(false); return }
         router.push('/dashboard/citas')
     }
+
+    // ── Shared error banner ──────────────────────────────────────────────────
+    const ErrorBanner = error ? (
+        <div className="mb-5 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <AlertCircle size={16} className="shrink-0" />
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError('')}><X size={14} /></button>
+        </div>
+    ) : null
 
     // ────────────────────────────────────────────────────────────────────────
     return (
         <DashboardLayout>
             <div className="max-w-4xl mx-auto">
+                <Steps step={step} />
 
-                {/* ── STEP 1: INPUT ─────────────────────────────────────── */}
+                {/* ══ STEP 1 — DADOS ══════════════════════════════════════════ */}
                 {step === 'input' && (
                     <>
-                        <header className="mb-8 flex items-center gap-4">
+                        <header className="mb-6 flex items-center gap-4">
                             <button onClick={() => router.back()}
                                 className="p-2 rounded-xl border border-border hover:bg-gray-50 text-navy transition-colors">
                                 <ArrowLeft size={20} />
                             </button>
-                            <div>
-                                <h1 className="text-3xl font-bold text-navy">Nova <span className="accent-text">Proposta</span></h1>
-                                <p className="text-text-muted text-sm mt-1">Passo 1 de 2 — Dados do cliente e pedido</p>
-                            </div>
+                            <h1 className="text-2xl font-bold text-navy">Nova <span className="accent-text">Proposta</span></h1>
                         </header>
-
-                        {error && (
-                            <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                                <AlertCircle size={16} className="shrink-0" /><span>{error}</span>
-                                <button onClick={() => setError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
-                            </div>
-                        )}
+                        {ErrorBanner}
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Client info */}
+                            {/* Client */}
                             <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
-                                <h2 className="font-black text-navy uppercase tracking-widest text-xs flex items-center gap-2">
-                                    <PenLine size={14} className="text-accent" /> Dados do Cliente
+                                <h2 className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-2">
+                                    <PenLine size={12} className="text-accent" /> Dados do Cliente
                                 </h2>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">Nome *</label>
-                                    <input value={clientName} onChange={e => setClientName(e.target.value)}
-                                        placeholder="Nome completo"
-                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">WhatsApp</label>
-                                    <input value={clientPhone} onChange={e => setClientPhone(e.target.value)}
-                                        placeholder="34600000000"
-                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">Localização</label>
-                                    <input value={clientLocation} onChange={e => setClientLocation(e.target.value)}
-                                        placeholder="Madrid, Barcelona…"
-                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none" />
-                                </div>
+                                {([
+                                    { label: 'Nome *',       val: clientName,     set: setClientName,     ph: 'Nome completo' },
+                                    { label: 'WhatsApp',     val: clientPhone,    set: setClientPhone,    ph: '34600000000' },
+                                    { label: 'Localização',  val: clientLocation, set: setClientLocation, ph: 'Madrid, Barcelona…' },
+                                ] as const).map(f => (
+                                    <div key={f.label}>
+                                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">{f.label}</label>
+                                        <input
+                                            value={f.val}
+                                            onChange={e => f.set(e.target.value)}
+                                            placeholder={f.ph}
+                                            className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none"
+                                        />
+                                    </div>
+                                ))}
                             </div>
 
                             {/* Request */}
                             <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h2 className="font-black text-navy uppercase tracking-widest text-xs flex items-center gap-2">
-                                        <Sparkles size={14} className="text-accent" /> Pedido
+                                    <h2 className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-2">
+                                        <Sparkles size={12} className="text-accent" /> Pedido
                                     </h2>
                                     <div className="flex bg-gray-100 rounded-lg overflow-hidden text-xs font-bold">
-                                        <button onClick={() => setMode('ai')}
-                                            className={`px-3 py-1.5 flex items-center gap-1 transition-colors ${mode === 'ai' ? 'bg-navy text-white' : 'text-text-muted hover:bg-gray-200'}`}>
-                                            <Sparkles size={11} /> IA
-                                        </button>
-                                        <button onClick={() => setMode('manual')}
-                                            className={`px-3 py-1.5 flex items-center gap-1 transition-colors ${mode === 'manual' ? 'bg-navy text-white' : 'text-text-muted hover:bg-gray-200'}`}>
-                                            <PenLine size={11} /> Manual
-                                        </button>
+                                        {(['ai', 'manual'] as Mode[]).map(m => (
+                                            <button key={m} onClick={() => setMode(m)}
+                                                className={`px-3 py-1.5 flex items-center gap-1 transition-colors ${mode === m ? 'bg-navy text-white' : 'text-text-muted hover:bg-gray-200'}`}>
+                                                {m === 'ai' ? <><Sparkles size={11} /> IA</> : <><PenLine size={11} /> Manual</>}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
 
                                 {mode === 'ai' && (
                                     <>
-                                        <textarea value={requestText} onChange={e => setRequestText(e.target.value)}
-                                            rows={5} placeholder="Ex: tenho um balcão de 3.50m de frente e 1.20m de profundidade, com 2.10m de altura…"
-                                            className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none resize-none" />
+                                        <textarea
+                                            value={requestText}
+                                            onChange={e => setRequestText(e.target.value)}
+                                            rows={5}
+                                            placeholder="Ex: tenho um balcão de 3.50m de frente e 1.20m de profundidade, com 2.10m de altura…"
+                                            className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none resize-none"
+                                        />
 
-                                        {/* Image upload */}
                                         <div
                                             onClick={() => document.getElementById('img-input')?.click()}
                                             className="border-2 border-dashed border-border rounded-xl p-4 text-center cursor-pointer hover:border-accent/50 hover:bg-accent/5 transition-colors">
                                             {imagePreview ? (
                                                 <div className="relative inline-block">
                                                     <img src={imagePreview} alt="preview" className="max-h-24 rounded-lg mx-auto" />
-                                                    <button onClick={e => { e.stopPropagation(); setImageFile(null); setImagePreview(''); setImageUrl('') }}
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); setImageFile(null); setImagePreview(''); setImageUrl('') }}
                                                         className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
                                                         <X size={10} />
                                                     </button>
@@ -332,295 +397,379 @@ function NovaPropostaInner() {
                                             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
                                                 <p className="font-bold mb-1">A IA precisa de esclarecimento:</p>
                                                 <p className="mb-2">{missingInfo}</p>
-                                                <textarea value={clarification} onChange={e => setClarification(e.target.value)}
+                                                <textarea
+                                                    value={clarification}
+                                                    onChange={e => setClarification(e.target.value)}
                                                     rows={2} placeholder="Responde aqui…"
-                                                    className="w-full p-2 border border-amber-200 rounded-lg text-navy text-sm outline-none focus:ring-1 focus:ring-amber-400 resize-none" />
+                                                    className="w-full p-2 border border-amber-200 rounded-lg text-navy text-sm outline-none resize-none"
+                                                />
                                             </div>
                                         )}
 
                                         <button onClick={handleAnalyse} disabled={parsing}
-                                            className="w-full py-3.5 bg-navy text-white font-black rounded-xl hover:bg-navy/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                            {parsing ? <><Loader2 size={16} className="animate-spin" /> A analisar…</> : <><Sparkles size={16} /> Analisar com IA</>}
+                                            className="w-full py-3.5 bg-navy text-white font-black rounded-xl hover:bg-navy/90 flex items-center justify-center gap-2 disabled:opacity-50 transition-all">
+                                            {parsing
+                                                ? <><Loader2 size={16} className="animate-spin" /> A analisar…</>
+                                                : <><Sparkles size={16} /> Analisar com IA →</>
+                                            }
                                         </button>
                                     </>
                                 )}
 
                                 {mode === 'manual' && (
-                                    <>
-                                        <div className="space-y-3">
-                                            <div className="flex gap-2">
-                                                <input value={newName} onChange={e => setNewName(e.target.value)}
-                                                    placeholder="Nome do espaço (ex: Frente Varanda)"
-                                                    className="flex-1 p-3 border border-border rounded-xl text-navy text-sm outline-none focus:ring-2 focus:ring-accent/50" />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Largo (m)</label>
-                                                    <input type="number" step="0.01" value={newW} onChange={e => setNewW(e.target.value)}
-                                                        placeholder="0.00"
-                                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm outline-none focus:ring-2 focus:ring-accent/50" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Alto (m)</label>
-                                                    <input type="number" step="0.01" value={newH} onChange={e => setNewH(e.target.value)}
-                                                        placeholder="0.00"
-                                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm outline-none focus:ring-2 focus:ring-accent/50" />
-                                                </div>
-                                            </div>
-                                            <button onClick={addManualItem}
-                                                className="w-full py-2.5 border-2 border-dashed border-accent/40 text-accent font-bold rounded-xl hover:bg-accent/5 flex items-center justify-center gap-2 text-sm transition-colors">
-                                                <Plus size={16} /> Adicionar item
-                                            </button>
-                                        </div>
-
-                                        {items.length > 0 && (
-                                            <div className="space-y-2">
-                                                {items.map((it, i) => (
-                                                    <div key={it.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs">
-                                                        <span className="w-5 h-5 rounded-full bg-accent/20 text-accent font-black flex items-center justify-center shrink-0">{i + 1}</span>
-                                                        <span className="flex-1 font-semibold text-navy truncate">{it.name}</span>
-                                                        <span className="text-text-muted">{it.width}×{it.height}m</span>
-                                                        <span className="font-bold text-navy">€{it.price.toFixed(0)}</span>
-                                                        <button onClick={() => removeItem(it.id)} className="text-red-400 hover:text-red-600"><Trash2 size={13} /></button>
-                                                    </div>
-                                                ))}
-                                                <div className="text-right text-xs font-black text-navy pt-1">Total: €{total.toFixed(2)}</div>
-                                            </div>
-                                        )}
-
-                                        <button onClick={toPreviewManual} disabled={items.length === 0}
-                                            className="w-full py-3.5 bg-navy text-white font-black rounded-xl hover:bg-navy/90 transition-all flex items-center justify-center gap-2 disabled:opacity-40">
-                                            <PenLine size={16} /> Ver pré-visualização
+                                    <div className="flex flex-col gap-4 pt-2">
+                                        <p className="text-sm text-text-muted leading-relaxed">
+                                            Os itens (espaços, medidas e preços) são adicionados no passo seguinte.
+                                        </p>
+                                        <button
+                                            onClick={() => { setItems([]); setSaveState('idle'); setProposalId(''); setStep('proposta') }}
+                                            className="w-full py-3.5 bg-navy text-white font-black rounded-xl hover:bg-navy/90 flex items-center justify-center gap-2 transition-all">
+                                            <PenLine size={16} /> Adicionar Itens →
                                         </button>
-                                    </>
+                                    </div>
                                 )}
                             </div>
                         </div>
                     </>
                 )}
 
-                {/* ── STEP 2: PREVIEW ───────────────────────────────────── */}
-                {step === 'preview' && (
+                {/* ══ STEP 2 — PROPOSTA (editor de itens) ═════════════════════ */}
+                {step === 'proposta' && (
                     <>
-                        <header className="mb-8 flex items-center gap-4">
+                        <header className="mb-6 flex items-center gap-4">
                             <button onClick={() => { setStep('input'); setError('') }}
                                 className="p-2 rounded-xl border border-border hover:bg-gray-50 text-navy transition-colors">
                                 <ArrowLeft size={20} />
                             </button>
-                            <div>
-                                <h1 className="text-3xl font-bold text-navy">Pré-<span className="accent-text">Visualização</span></h1>
-                                <p className="text-text-muted text-sm mt-1">Passo 2 de 2 — Revisa e confirma antes de criar a proposta</p>
-                            </div>
-                        </header>
-
-                        {error && (
-                            <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                                <AlertCircle size={16} className="shrink-0" /><span>{error}</span>
-                                <button onClick={() => setError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
-                            </div>
-                        )}
-
-                        {/* Client summary */}
-                        <div className="mb-4 flex items-center gap-4 p-4 bg-white border border-border rounded-2xl">
-                            <div className="w-10 h-10 rounded-full bg-accent/20 text-accent font-black flex items-center justify-center shrink-0">
-                                {clientName.charAt(0) || '?'}
-                            </div>
                             <div className="flex-1 min-w-0">
-                                <p className="font-bold text-navy">{clientName}</p>
-                                <p className="text-xs text-text-muted">{clientPhone} {clientLocation && `· ${clientLocation}`}</p>
+                                <h1 className="text-2xl font-bold text-navy">Itens da <span className="accent-text">Proposta</span></h1>
+                                <p className="text-xs text-text-muted mt-0.5 truncate">{clientName || '—'} · {clientPhone || '—'}</p>
                             </div>
                             <div className="text-right shrink-0">
                                 <p className="text-2xl font-black text-navy">€ {total.toFixed(2)}</p>
-                                <p className="text-[10px] text-text-muted uppercase font-bold">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+                                <p className="text-[10px] text-text-muted uppercase font-bold">
+                                    {items.length} item{items.length !== 1 ? 's' : ''}
+                                </p>
                             </div>
-                        </div>
+                        </header>
+                        {ErrorBanner}
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            {/* Mockup */}
-                            {mockup && (
-                                <div className="bg-navy rounded-2xl p-6">
-                                    <p className="text-accent text-[10px] font-black uppercase tracking-widest mb-3">Plano de instalação</p>
-                                    <pre className="text-accent font-mono text-[10px] leading-tight whitespace-pre-wrap">{mockup}</pre>
+                        {/* Items table */}
+                        <div className="bg-white rounded-2xl border border-border mb-5 overflow-hidden">
+                            {/* Header row — desktop only */}
+                            <div className="hidden md:grid md:grid-cols-[28px_1fr_84px_84px_56px_96px_32px] gap-3 px-4 py-2.5 bg-gray-50 border-b border-border text-[9px] font-black text-text-muted uppercase tracking-widest">
+                                <span>#</span>
+                                <span>Espaço</span>
+                                <span className="text-center">Largo&nbsp;(m)</span>
+                                <span className="text-center">Alto&nbsp;(m)</span>
+                                <span className="text-center">m²</span>
+                                <span className="text-right">€&nbsp;Preço</span>
+                                <span />
+                            </div>
+
+                            {/* Rows */}
+                            {items.length === 0 ? (
+                                <div className="py-12 text-center text-text-muted text-sm">
+                                    Nenhum item — adiciona abaixo
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-border/60">
+                                    {items.map((it, i) => (
+                                        <div key={it.id} className="px-4 py-3">
+                                            {/* Desktop row */}
+                                            <div className="hidden md:grid md:grid-cols-[28px_1fr_84px_84px_56px_96px_32px] gap-3 items-center">
+                                                <span className="w-6 h-6 rounded-full bg-accent/10 text-accent font-black text-[10px] flex items-center justify-center">
+                                                    {i + 1}
+                                                </span>
+                                                <input
+                                                    value={it.name}
+                                                    onChange={e => updateItem(it.id, 'name', e.target.value)}
+                                                    placeholder="Nome do espaço"
+                                                    className="font-semibold text-navy text-sm border-b border-transparent focus:border-accent/50 outline-none bg-transparent py-1 w-full"
+                                                />
+                                                <input
+                                                    type="number" step="0.01"
+                                                    value={it.width || ''}
+                                                    onChange={e => updateItem(it.id, 'width', e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="p-2 bg-gray-50 border border-border rounded-lg text-navy text-sm font-bold text-center outline-none focus:ring-1 focus:ring-accent/50 w-full"
+                                                />
+                                                <input
+                                                    type="number" step="0.01"
+                                                    value={it.height || ''}
+                                                    onChange={e => updateItem(it.id, 'height', e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="p-2 bg-gray-50 border border-border rounded-lg text-navy text-sm font-bold text-center outline-none focus:ring-1 focus:ring-accent/50 w-full"
+                                                />
+                                                <span className="text-sm font-bold text-text-muted text-center">
+                                                    {it.area > 0 ? it.area.toFixed(2) : '—'}
+                                                </span>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number" step="0.01"
+                                                        value={it.price || ''}
+                                                        onChange={e => updateItem(it.id, 'price', e.target.value)}
+                                                        className={`w-full p-2 border rounded-lg text-navy text-sm font-bold text-right outline-none focus:ring-1 focus:ring-accent/50 ${
+                                                            it.priceManual ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-border'
+                                                        }`}
+                                                    />
+                                                    {it.priceManual && (
+                                                        <span className="absolute -top-2 right-1 text-[8px] text-amber-600 font-bold bg-amber-50 px-1 rounded">
+                                                            manual
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <button onClick={() => removeItem(it.id)}
+                                                    className="w-7 h-7 flex items-center justify-center text-red-300 hover:text-red-500 transition-colors rounded mx-auto">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+
+                                            {/* Mobile card */}
+                                            <div className="flex md:hidden flex-col gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-6 h-6 rounded-full bg-accent/10 text-accent font-black text-[10px] flex items-center justify-center shrink-0">
+                                                        {i + 1}
+                                                    </span>
+                                                    <input
+                                                        value={it.name}
+                                                        onChange={e => updateItem(it.id, 'name', e.target.value)}
+                                                        placeholder="Nome do espaço"
+                                                        className="flex-1 font-semibold text-navy text-sm border-b border-transparent focus:border-accent/50 outline-none bg-transparent"
+                                                    />
+                                                    <button onClick={() => removeItem(it.id)} className="text-red-300 hover:text-red-500 p-1 shrink-0">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2 pl-8">
+                                                    <div>
+                                                        <label className="text-[9px] text-text-muted font-bold uppercase block mb-1">Largo (m)</label>
+                                                        <input
+                                                            type="number" step="0.01"
+                                                            value={it.width || ''}
+                                                            onChange={e => updateItem(it.id, 'width', e.target.value)}
+                                                            className="w-full p-2 bg-gray-50 border border-border rounded-lg text-sm font-bold text-center outline-none focus:ring-1 focus:ring-accent/50"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[9px] text-text-muted font-bold uppercase block mb-1">Alto (m)</label>
+                                                        <input
+                                                            type="number" step="0.01"
+                                                            value={it.height || ''}
+                                                            onChange={e => updateItem(it.id, 'height', e.target.value)}
+                                                            className="w-full p-2 bg-gray-50 border border-border rounded-lg text-sm font-bold text-center outline-none focus:ring-1 focus:ring-accent/50"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[9px] text-text-muted font-bold uppercase block mb-1">
+                                                            € Preço {it.priceManual && <span className="text-amber-500">(m)</span>}
+                                                        </label>
+                                                        <input
+                                                            type="number" step="0.01"
+                                                            value={it.price || ''}
+                                                            onChange={e => updateItem(it.id, 'price', e.target.value)}
+                                                            className={`w-full p-2 border rounded-lg text-sm font-bold text-right outline-none focus:ring-1 focus:ring-accent/50 ${
+                                                                it.priceManual ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-border'
+                                                            }`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                {it.area > 0 && (
+                                                    <p className="text-[9px] text-text-muted pl-8">
+                                                        {it.area.toFixed(2)} m² · €{PRICING.PRICE_PER_M2}/m²
+                                                        {it.price === PRICING.MIN_PRICE_PER_ITEM && !it.priceManual ? ' (mínimo)' : ''}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
 
-                            {/* Items editor */}
-                            <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
-                                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">Itens da proposta</p>
-                                {items.map((it, i) => (
-                                    <div key={it.id} className="p-3 bg-gray-50 rounded-xl border border-border/40">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="w-6 h-6 rounded-full bg-accent/20 text-accent font-black text-[10px] flex items-center justify-center shrink-0">{i+1}</span>
-                                            <input value={it.name} onChange={e => updateItem(it.id, 'name', e.target.value)}
-                                                className="flex-1 bg-transparent font-bold text-navy text-sm outline-none border-b border-transparent focus:border-accent/50" />
-                                            <button onClick={() => removeItem(it.id)} className="text-red-300 hover:text-red-500 transition-colors">
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-xs">
-                                            <div>
-                                                <label className="block text-[9px] text-text-muted uppercase mb-0.5">Largo (m)</label>
-                                                <input type="number" step="0.01" value={it.width}
-                                                    onChange={e => updateItem(it.id, 'width', e.target.value)}
-                                                    className="w-full p-1.5 bg-white border border-border rounded-lg text-navy font-bold outline-none focus:ring-1 focus:ring-accent/50" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[9px] text-text-muted uppercase mb-0.5">Alto (m)</label>
-                                                <input type="number" step="0.01" value={it.height}
-                                                    onChange={e => updateItem(it.id, 'height', e.target.value)}
-                                                    className="w-full p-1.5 bg-white border border-border rounded-lg text-navy font-bold outline-none focus:ring-1 focus:ring-accent/50" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[9px] text-text-muted uppercase mb-0.5">Preço (€)</label>
-                                                <input type="number" step="0.01" value={it.price}
-                                                    onChange={e => updateItem(it.id, 'price', e.target.value)}
-                                                    className="w-full p-1.5 bg-white border border-border rounded-lg text-navy font-bold outline-none focus:ring-1 focus:ring-accent/50" />
-                                            </div>
-                                        </div>
-                                        {it.area > 0 && (
-                                            <p className="text-[9px] text-text-muted mt-1.5">{it.area.toFixed(2)} m² · €{PRICING.PRICE_PER_M2}/m²{it.price === PRICING.MIN_PRICE_PER_ITEM ? ' (mínimo)' : ''}</p>
-                                        )}
-                                    </div>
-                                ))}
-
-                                {/* Add item */}
-                                <button onClick={() => setItems(prev => [...prev, calcItem('Novo item', 0, 0)])}
-                                    className="w-full py-2 border-2 border-dashed border-accent/30 text-accent/70 font-bold rounded-xl hover:bg-accent/5 flex items-center justify-center gap-1.5 text-xs transition-colors">
-                                    <Plus size={13} /> Adicionar item
+                            {/* Add row */}
+                            <div className="border-t border-dashed border-border">
+                                <button onClick={addItem}
+                                    className="w-full py-3 flex items-center justify-center gap-2 text-accent/80 text-xs font-black hover:bg-accent/5 transition-colors">
+                                    <Plus size={14} /> Adicionar espaço
                                 </button>
                             </div>
+
+                            {/* Total footer */}
+                            {items.length > 0 && (
+                                <div className="border-t border-border px-4 py-3 flex justify-end items-center gap-3 bg-gray-50">
+                                    <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Total</span>
+                                    <span className="text-2xl font-black text-navy">€ {total.toFixed(2)}</span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* AI refine (only in AI mode) */}
+                        {/* Mockup */}
+                        {mockup && (
+                            <div className="bg-navy rounded-2xl p-5 mb-5">
+                                <p className="text-accent text-[9px] font-black uppercase tracking-widest mb-2">Plano de instalação</p>
+                                <pre className="text-accent font-mono text-[10px] leading-tight whitespace-pre-wrap">{mockup}</pre>
+                            </div>
+                        )}
+
+                        {/* AI refine */}
                         {mode === 'ai' && (
-                            <div className="mb-6 bg-accent/5 border border-accent/20 rounded-2xl p-5">
-                                <p className="text-xs font-black text-navy uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <RotateCcw size={13} /> Refinar com IA
+                            <div className="bg-accent/5 border border-accent/20 rounded-2xl p-5 mb-5">
+                                <p className="text-[10px] font-black text-navy uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <RotateCcw size={12} /> Refinar com IA
                                 </p>
                                 <div className="flex gap-3">
-                                    <input value={clarification} onChange={e => setClarification(e.target.value)}
-                                        placeholder="Ex: retirar o tecto, adicionar lateral esquerdo de 1.20m…"
+                                    <input
+                                        value={refineText}
+                                        onChange={e => setRefineText(e.target.value)}
+                                        placeholder="Ex: retirar o tecto, adicionar lateral de 1.20m…"
+                                        onKeyDown={e => e.key === 'Enter' && !parsing && handleRefine()}
                                         className="flex-1 p-3 bg-white border border-border rounded-xl text-navy text-sm outline-none focus:ring-2 focus:ring-accent/50"
-                                        onKeyDown={e => e.key === 'Enter' && !parsing && handleAnalyse()} />
-                                    <button onClick={handleAnalyse} disabled={parsing || !clarification.trim()}
-                                        className="px-5 py-3 bg-navy text-white font-black rounded-xl hover:bg-navy/90 transition-all disabled:opacity-40 text-sm">
+                                    />
+                                    <button onClick={handleRefine} disabled={parsing || !refineText.trim()}
+                                        className="px-5 bg-navy text-white font-black rounded-xl hover:bg-navy/90 disabled:opacity-40 text-sm whitespace-nowrap">
                                         {parsing ? <Loader2 size={14} className="animate-spin" /> : 'Reajustar'}
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        <button onClick={handleCreate} disabled={saving || items.length === 0}
-                            className="w-full py-4 bg-accent text-navy font-black rounded-2xl hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg disabled:opacity-40">
-                            {saving ? <><Loader2 size={20} className="animate-spin" /> A criar proposta…</> : <>Criar Proposta →</>}
-                        </button>
+                        {/* Action buttons */}
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            {/* Guardar — sem navegar */}
+                            <button
+                                onClick={handleSave}
+                                disabled={saveState === 'saving' || saveState === 'saved'}
+                                className={`flex-1 py-3.5 font-black rounded-xl flex items-center justify-center gap-2 text-sm transition-all ${
+                                    saveState === 'saved'
+                                        ? 'bg-green-50 border-2 border-green-200 text-green-700 cursor-default'
+                                        : saveState === 'saving'
+                                        ? 'bg-gray-100 text-gray-400 cursor-wait border-2 border-transparent'
+                                        : 'bg-white border-2 border-navy text-navy hover:bg-navy/5'
+                                }`}>
+                                {saveState === 'saving'  ? <><Loader2 size={15} className="animate-spin" /> A guardar…</> :
+                                 saveState === 'saved'   ? <><CheckCircle size={15} /> Guardada</> :
+                                 saveState === 'modified'? <><Save size={15} /> Guardar Alterações</> :
+                                                           <><Save size={15} /> Guardar Proposta</>}
+                            </button>
+
+                            {/* Continuar → auto-guarda se preciso */}
+                            <button
+                                onClick={handleContinue}
+                                disabled={saveState === 'saving' || items.length === 0}
+                                className="flex-1 py-3.5 bg-accent text-navy font-black rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40">
+                                {saveState === 'saving'
+                                    ? <Loader2 size={15} className="animate-spin" />
+                                    : null
+                                }
+                                Continuar → Agendar
+                            </button>
+                        </div>
                     </>
                 )}
 
-                {/* ── STEP 3: DONE ──────────────────────────────────────── */}
-                {step === 'done' && (
+                {/* ══ STEP 3 — AGENDAR ════════════════════════════════════════ */}
+                {step === 'agendar' && (
                     <>
-                        <header className="mb-8 text-center">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <CheckCircle size={32} className="text-green-500" />
+                        <header className="mb-6 flex items-center gap-4">
+                            <button onClick={() => { setStep('proposta'); setError('') }}
+                                className="p-2 rounded-xl border border-border hover:bg-gray-50 text-navy transition-colors">
+                                <ArrowLeft size={20} />
+                            </button>
+                            <div className="flex-1">
+                                <h1 className="text-2xl font-bold text-navy">Agendar <span className="accent-text">Instalação</span></h1>
+                                <p className="text-xs text-text-muted mt-0.5">Finaliza a venda marcando a data</p>
                             </div>
-                            <h1 className="text-3xl font-bold text-navy mb-1">Proposta <span className="accent-text">Criada!</span></h1>
-                            <p className="text-text-muted">{clientName} · € {total.toFixed(2)} · {items.length} item{items.length !== 1 ? 's' : ''}</p>
                         </header>
+                        {ErrorBanner}
 
-                        {error && (
-                            <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                                <AlertCircle size={16} className="shrink-0" /><span>{error}</span>
-                                <button onClick={() => setError('')} className="ml-auto text-red-400 hover:text-red-600"><X size={14} /></button>
+                        {/* Client + proposal summary */}
+                        <div className="bg-white border border-border rounded-2xl p-5 mb-6 flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-accent/20 text-accent font-black flex items-center justify-center shrink-0 text-sm">
+                                {clientName.charAt(0).toUpperCase() || '?'}
                             </div>
-                        )}
-
-                        {/* Summary box */}
-                        <div className="bg-white border border-border rounded-2xl p-6 mb-6">
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mb-4">
-                                {items.map((it, i) => (
-                                    <div key={it.id} className="bg-gray-50 rounded-xl p-3">
-                                        <p className="text-[10px] text-text-muted uppercase font-bold mb-1 truncate">{it.name}</p>
-                                        <p className="font-black text-navy">{it.width}×{it.height}m</p>
-                                        <p className="text-xs text-accent font-bold">€{it.price.toFixed(2)}</p>
-                                    </div>
-                                ))}
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-navy truncate">{clientName}</p>
+                                <p className="text-xs text-text-muted truncate">
+                                    {clientPhone}{clientLocation && ` · ${clientLocation}`}
+                                </p>
                             </div>
-                            <div className="flex justify-end border-t border-border pt-4">
-                                <div className="text-right">
-                                    <p className="text-[10px] text-text-muted uppercase font-bold">Total</p>
-                                    <p className="text-3xl font-black text-navy">€ {total.toFixed(2)}</p>
-                                </div>
+                            <div className="text-right shrink-0">
+                                <p className="text-2xl font-black text-navy">€ {total.toFixed(2)}</p>
+                                <p className="text-[10px] text-text-muted uppercase font-bold">
+                                    {items.length} item{items.length !== 1 ? 's' : ''}
+                                </p>
                             </div>
                         </div>
 
-                        {/* 4 actions */}
-                        <div className="grid grid-cols-2 gap-4 mb-4">
+                        {/* Form */}
+                        <div className="bg-white rounded-2xl border border-border p-6 space-y-5 mb-6">
+                            <div>
+                                <label className="flex items-center gap-1 text-[10px] font-black uppercase text-navy/60 mb-2">
+                                    <Calendar size={10} /> Data e hora de instalação *
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    value={installDate}
+                                    onChange={e => setInstallDate(e.target.value)}
+                                    className="w-full h-12 px-4 bg-gray-50 rounded-xl text-navy font-medium outline-none focus:ring-2 focus:ring-accent/50 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="flex items-center gap-1 text-[10px] font-black uppercase text-navy/60 mb-2">
+                                    <MapPin size={10} /> Dirección de instalación
+                                </label>
+                                <input
+                                    value={installAddress}
+                                    onChange={e => setInstallAddress(e.target.value)}
+                                    placeholder="Calle, número, ciudad…"
+                                    className="w-full h-12 px-4 bg-gray-50 rounded-xl text-navy font-medium outline-none focus:ring-2 focus:ring-accent/50 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-navy/60 mb-2">
+                                    Notas para o instalador
+                                </label>
+                                <textarea
+                                    value={installNotes}
+                                    onChange={e => setInstallNotes(e.target.value)}
+                                    placeholder="Acesso ao edifício, horários, dificuldades previstas…"
+                                    rows={3}
+                                    className="w-full p-4 bg-gray-50 rounded-xl text-navy font-medium outline-none focus:ring-2 focus:ring-accent/30 text-sm resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Secondary: PDF + WA */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
                             <button onClick={handleDownloadPDF} disabled={generatingPDF}
-                                className="py-4 bg-red-50 border border-red-200 text-red-700 font-black rounded-2xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                {generatingPDF ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                                className="py-3 bg-red-50 border border-red-200 text-red-700 font-black rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+                                {generatingPDF ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
                                 {generatingPDF ? 'Gerando…' : 'Download PDF'}
                             </button>
-
                             <button onClick={handleWhatsApp} disabled={sendingWA}
-                                className="py-4 bg-green-50 border border-green-200 text-green-700 font-black rounded-2xl hover:bg-green-600 hover:text-white hover:border-green-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                {sendingWA ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
+                                className="py-3 bg-green-50 border border-green-200 text-green-700 font-black rounded-xl hover:bg-green-600 hover:text-white hover:border-green-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+                                {sendingWA ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}
                                 {sendingWA ? 'Enviando…' : 'WhatsApp'}
-                            </button>
-
-                            <button onClick={() => router.push('/dashboard')}
-                                className="py-4 bg-white border border-border text-navy font-black rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
-                                <Home size={18} /> Início
-                            </button>
-
-                            <button onClick={() => setShowCloseModal(true)}
-                                className="py-4 bg-accent text-navy font-black rounded-2xl hover:shadow-xl transition-all flex items-center justify-center gap-2">
-                                <Send size={18} /> Fechar Venta
                             </button>
                         </div>
 
-                        <button onClick={() => setStep('preview')}
-                            className="w-full py-3 text-text-muted font-bold text-sm hover:text-navy transition-colors flex items-center justify-center gap-2">
-                            <ArrowLeft size={14} /> Voltar e editar proposta
+                        {/* Primary CTA */}
+                        <button
+                            onClick={handleCloseSale}
+                            disabled={closing || !installDate}
+                            className="w-full py-4 bg-accent text-navy font-black rounded-2xl hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg disabled:opacity-40">
+                            {closing
+                                ? <><Loader2 size={20} className="animate-spin" /> A confirmar…</>
+                                : <><Send size={20} /> Confirmar Instalação</>
+                            }
                         </button>
 
-                        {/* Close sale modal */}
-                        {showCloseModal && (
-                            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-4">
-                                <div className="bg-white rounded-[2rem] p-8 max-w-md w-full space-y-5 shadow-2xl">
-                                    <div className="flex items-center justify-between">
-                                        <h2 className="font-black text-navy uppercase tracking-tight">Fechar Venta</h2>
-                                        <button onClick={() => setShowCloseModal(false)} className="p-2 rounded-full hover:bg-gray-100 text-gray-400">
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase text-navy/60 mb-1.5 flex items-center gap-1">
-                                            <Calendar size={10} /> Data e hora de instalação *
-                                        </label>
-                                        <input type="datetime-local" value={installDate} onChange={e => setInstallDate(e.target.value)}
-                                            className="w-full h-12 px-4 bg-gray-50 border-none rounded-xl text-navy font-medium focus:ring-2 focus:ring-accent/50 outline-none text-sm" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black uppercase text-navy/60 mb-1.5">Dirección de instalação</label>
-                                        <input value={installAddress} onChange={e => setInstallAddress(e.target.value)}
-                                            placeholder="Calle, número, ciudad…"
-                                            className="w-full h-12 px-4 bg-gray-50 border-none rounded-xl text-navy font-medium focus:ring-2 focus:ring-accent/50 outline-none text-sm" />
-                                    </div>
-                                    <div className="flex gap-3 pt-2">
-                                        <button onClick={handleCloseSale} disabled={closing || !installDate}
-                                            className="flex-1 h-12 bg-accent text-navy font-black rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                                            {closing ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                                            {closing ? 'A fechar…' : 'Confirmar'}
-                                        </button>
-                                        <button onClick={() => setShowCloseModal(false)} disabled={closing}
-                                            className="h-12 px-5 text-gray-500 font-bold rounded-xl hover:bg-gray-100">
-                                            Cancelar
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {/* Skip */}
+                        <button
+                            onClick={() => router.push('/dashboard')}
+                            className="w-full mt-3 py-2 text-xs text-text-muted font-bold hover:text-navy transition-colors">
+                            Guardar sem agendar
+                        </button>
                     </>
                 )}
             </div>
@@ -629,9 +778,5 @@ function NovaPropostaInner() {
 }
 
 export default function NovaPropostaPage() {
-    return (
-        <Suspense>
-            <NovaPropostaInner />
-        </Suspense>
-    )
+    return <Suspense><NovaPropostaInner /></Suspense>
 }
