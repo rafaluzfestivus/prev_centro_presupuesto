@@ -196,11 +196,11 @@ const FunnelManager = () => {
                     {col === 'novos' && (
                         <button
                             onClick={() => {
-                                const params = new URLSearchParams({ source: 'lead', name: lead.name || '', whatsapp: lead.whatsapp || '', message: lead.message || '' });
-                                router.push(`/proposal/new?${params.toString()}`);
+                                const params = new URLSearchParams({ name: lead.name || '', phone: lead.whatsapp || '', message: lead.message || '', location: lead.location || '' });
+                                router.push(`/dashboard/nova-proposta?${params.toString()}`);
                             }}
                             className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all"
-                            title="Crear Presupuesto"
+                            title="Criar Proposta"
                         >
                             <FilePlus size={13} />
                         </button>

@@ -13,6 +13,7 @@ import {
     FileText,
     TrendingUp,
     Filter,
+    PlusCircle,
     X,
     ExternalLink,
     Settings,
@@ -37,7 +38,8 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
 
     const menuItems = [
         { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: '/dashboard/presupuestos', label: 'Presupuestos IA', icon: FileText },
+        { id: '/dashboard/nova-proposta', label: 'Nova Proposta', icon: PlusCircle },
+        { id: '/dashboard/presupuestos', label: 'Presupuestos', icon: FileText },
         { id: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp },
         { id: '/dashboard/clientes', label: 'Leads del Sitio', icon: Users },
         { id: '/dashboard/funil', label: 'Funil', icon: Filter },

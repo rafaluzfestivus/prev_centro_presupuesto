@@ -10,6 +10,7 @@ import { SYSTEM_PROMPT } from '@/services/ai/prompt'
 import { EXTRACTION_SYSTEM_PROMPT } from '@/services/ai/extraction_prompt'
 import { parseAIResponseContent, normalizeAIItems } from '@/lib/pricing'
 import { getUserProfile } from '@/lib/profile'
+import { PRICING } from '@/lib/constants'
 
 export async function createProposalAction(data: CreateProposalInput) {
     try {
@@ -635,6 +636,107 @@ export async function deleteAppointmentPhotoAction(id: string, photoUrl: string,
         return { success: true }
     } catch (error: any) {
         return { success: false, error: error.message || 'Error al eliminar foto' }
+    }
+}
+
+// ── Stateless AI parsing (no DB write) ─────────────────────────────────────
+export async function parseProposalTextAction(text: string, imageUrl?: string) {
+    try {
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+        const userContent: any[] = [
+            { type: 'text', text: `PEDIDO DO CLIENTE: ${text || 'Ver imagem adjunta'}` }
+        ]
+        if (imageUrl) {
+            userContent.push({ type: 'image_url', image_url: { url: imageUrl } })
+        }
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+                { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
+                { role: 'user', content: userContent }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.1,
+        })
+        const content = completion.choices[0].message.content
+        if (!content) throw new Error('No AI content')
+        const result = JSON.parse(content)
+        return { success: true, data: result }
+    } catch (error: any) {
+        return { success: false, error: error.message || String(error) }
+    }
+}
+
+// ── Create full proposal in one shot (after user confirms preview) ──────────
+export async function createFullProposalAction(input: {
+    clientName: string
+    whatsapp?: string
+    city: string
+    requestText?: string
+    imageUrl?: string
+    items: { name: string; width: number; height: number; area: number; price: number }[]
+    mockup: string
+    total: number
+}) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const profile = await getUserProfile()
+
+        // 1. Create proposal
+        const { data: proposal, error: propErr } = await supabase
+            .from('Proposta')
+            .insert({
+                cliente_nome: input.clientName,
+                cidade: input.city,
+                medidas_input: input.requestText ?? '',
+                whatsapp: input.whatsapp ?? null,
+                input_image_url: input.imageUrl ?? null,
+                criado_por: user?.id,
+                company_id: profile.company_id,
+                status: 'Processada',
+                total_geral: input.total,
+            })
+            .select('id')
+            .single()
+
+        if (propErr || !proposal) throw propErr ?? new Error('Falha ao criar proposta')
+
+        const id = proposal.id
+
+        // 2. Save items
+        if (input.items.length > 0) {
+            const { error: itemErr } = await supabase.from('ItemProposta').insert(
+                input.items.map((it, i) => ({
+                    proposta_id: id,
+                    nome_ambiente: it.name,
+                    largura: it.width,
+                    altura: it.height,
+                    valor_unitario: PRICING.PRICE_PER_M2,
+                    valor_total: it.price,
+                    ordem: i,
+                }))
+            )
+            if (itemErr) throw itemErr
+        }
+
+        // 3. Save AI processing record (mockup + pricing logic)
+        await supabase.from('ProcessamentoIA').insert({
+            proposta_id: id,
+            mockup_ascii: input.mockup,
+            medidas_normalizadas: JSON.stringify(input.items),
+            tabela_precos: JSON.stringify(input.items),
+            logica_calculo: input.items
+                .map(i => `${i.name}: ${i.width}×${i.height}m = ${i.area.toFixed(2)}m² → €${i.price.toFixed(2)}`)
+                .join('\n'),
+            total_calculado: input.total,
+        })
+
+        revalidatePath('/dashboard/presupuestos')
+        return { success: true, id }
+    } catch (error: any) {
+        console.error('[createFull]', error)
+        return { success: false, error: error.message || String(error) }
     }
 }
 
