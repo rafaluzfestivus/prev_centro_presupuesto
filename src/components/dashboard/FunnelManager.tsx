@@ -60,14 +60,14 @@ const FunnelManager = () => {
         // 2. Appointments from closed sales (to identify Vendas)
         const { data: saleApts } = await supabase
             .from('appointments')
-            .select('client_id, date_start, total_value')
+            .select('id, client_id, date_start, total_value')
             .eq('company_id', cid)
             .like('notes', '%Venta cerrada desde presupuesto%');
 
         const saleByClientId = new Map<string, { appointmentId: string; date_start: string; total_value: number }>();
         for (const apt of saleApts || []) {
             if (!saleByClientId.has(apt.client_id)) {
-                saleByClientId.set(apt.client_id, { appointmentId: apt.client_id, date_start: apt.date_start, total_value: apt.total_value });
+                saleByClientId.set(apt.client_id, { appointmentId: apt.id, date_start: apt.date_start, total_value: apt.total_value });
             }
         }
 
@@ -196,7 +196,13 @@ const FunnelManager = () => {
                     {col === 'novos' && (
                         <button
                             onClick={() => {
-                                const params = new URLSearchParams({ name: lead.name || '', phone: lead.whatsapp || '', message: lead.message || '', location: lead.location || '' });
+                                const params = new URLSearchParams({
+                                    lead_id:  lead.id,
+                                    name:     lead.name     || '',
+                                    phone:    lead.whatsapp || '',
+                                    message:  lead.message  || '',
+                                    location: lead.location || '',
+                                });
                                 router.push(`/dashboard/nova-proposta?${params.toString()}`);
                             }}
                             className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all"

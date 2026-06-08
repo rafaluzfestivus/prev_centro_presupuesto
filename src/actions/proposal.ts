@@ -776,3 +776,44 @@ export async function saveBuilderItemsAction(
         return { success: false, error: error.message || 'Error al guardar ítems' }
     }
 }
+
+// Finds the appointment created when a proposal was closed as a sale.
+// The appointment notes contain the proposal ID ("Venta cerrada desde presupuesto {id}.").
+export async function getAppointmentByProposalIdAction(proposalId: string) {
+    try {
+        const supabase = await createClient()
+        const profile  = await getUserProfile()
+
+        const { data } = await supabase
+            .from('appointments')
+            .select('id')
+            .eq('company_id', profile.company_id)
+            .like('notes', `%presupuesto ${proposalId}%`)
+            .limit(1)
+            .maybeSingle()
+
+        return { success: true, appointmentId: data?.id ?? null }
+    } catch (error: any) {
+        return { success: false, appointmentId: null, error: error.message }
+    }
+}
+
+// Updates the status of a client/lead record.
+export async function updateClientStatusAction(clientId: string, status: 'new' | 'processed' | 'handover') {
+    try {
+        const supabase = await createClient()
+        const profile  = await getUserProfile()
+
+        await supabase
+            .from('clients')
+            .update({ status })
+            .eq('id', clientId)
+            .eq('company_id', profile.company_id)
+
+        revalidatePath('/dashboard/clientes')
+        revalidatePath('/dashboard/funil')
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}

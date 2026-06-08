@@ -37,14 +37,14 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
     };
 
     const menuItems = [
-        { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: '/dashboard/nova-proposta', label: 'Nova Proposta', icon: PlusCircle },
-        { id: '/dashboard/presupuestos', label: 'Presupuestos', icon: FileText },
-        { id: '/dashboard/ventas', label: 'Ventas', icon: TrendingUp },
-        { id: '/dashboard/clientes', label: 'Leads del Sitio', icon: Users },
-        { id: '/dashboard/funil', label: 'Funil', icon: Filter },
-        { id: '/dashboard/citas', label: 'Agenda', icon: Calendar },
-        { id: '/dashboard/configuracion', label: 'Mi Empresa', icon: Settings },
+        { id: '/dashboard',              label: 'Dashboard',    icon: LayoutDashboard },
+        { id: '/dashboard/nova-proposta',label: 'Nova Proposta',icon: PlusCircle },
+        { id: '/dashboard/presupuestos', label: 'Propostas',    icon: FileText },
+        { id: '/dashboard/clientes',     label: 'Leads',        icon: Users },
+        { id: '/dashboard/funil',        label: 'Funil',        icon: Filter },
+        { id: '/dashboard/citas',        label: 'Agenda',       icon: Calendar },
+        { id: '/dashboard/ventas',       label: 'Ventas',       icon: TrendingUp },
+        { id: '/dashboard/configuracion',label: 'Mi Empresa',   icon: Settings },
     ];
 
     return (

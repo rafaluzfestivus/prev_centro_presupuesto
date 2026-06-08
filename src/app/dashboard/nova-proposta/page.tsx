@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import {
     parseProposalTextAction, createFullProposalAction,
-    confirmProposalAction, closeSaleAction,
+    confirmProposalAction, closeSaleAction, updateClientStatusAction,
 } from '@/actions/proposal'
 import { generateProposalBlob } from '@/services/pdfGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
@@ -18,7 +18,7 @@ import {
     AlertCircle, CheckCircle, Calendar, RotateCcw, Save, MapPin,
 } from 'lucide-react'
 
-type Step = 'input' | 'proposta' | 'agendar'
+type Step = 'input' | 'proposta' | 'venda'
 type Mode = 'ai' | 'manual'
 type SaveState = 'idle' | 'saving' | 'saved' | 'modified'
 
@@ -44,9 +44,9 @@ function buildItem(name = '', w = 0, h = 0): Item {
 
 function Steps({ step }: { step: Step }) {
     const list: { id: Step; label: string }[] = [
-        { id: 'input', label: 'Dados' },
-        { id: 'proposta', label: 'Proposta' },
-        { id: 'agendar', label: 'Agendar' },
+        { id: 'input',   label: 'Dados' },
+        { id: 'proposta',label: 'Proposta' },
+        { id: 'venda',   label: 'Fechar Venda' },
     ]
     const idx = list.findIndex(s => s.id === step)
     return (
@@ -79,8 +79,10 @@ function NovaPropostaInner() {
     const [mode, setMode] = useState<Mode>('ai')
 
     // Client
-    const [clientName, setClientName]       = useState(params.get('name')     ?? '')
-    const [clientPhone, setClientPhone]     = useState(params.get('phone') ?? params.get('whatsapp') ?? '')
+    const leadId = params.get('lead_id') ?? ''
+
+    const [clientName, setClientName]         = useState(params.get('name')     ?? '')
+    const [clientPhone, setClientPhone]       = useState(params.get('phone') ?? params.get('whatsapp') ?? '')
     const [clientLocation, setClientLocation] = useState(params.get('location') ?? '')
 
     // AI input
@@ -241,7 +243,7 @@ function NovaPropostaInner() {
             if (!r.success) { setError(r.error ?? 'Erro ao guardar'); return }
         }
         if (!installAddress) setInstallAddress(clientLocation)
-        setStep('agendar')
+        setStep('venda')
     }
 
     // ── PDF / WA ─────────────────────────────────────────────────────────────
@@ -293,6 +295,8 @@ function NovaPropostaInner() {
             scheduledAt: installDate,
         })
         if (!res.success) { setError(res.error ?? 'Erro ao confirmar'); setClosing(false); return }
+        // If this proposal was created from a lead, mark the lead as handed over
+        if (leadId) await updateClientStatusAction(leadId, 'handover')
         router.push('/dashboard/citas')
     }
 
@@ -422,7 +426,7 @@ function NovaPropostaInner() {
                                             Os itens (espaços, medidas e preços) são adicionados no passo seguinte.
                                         </p>
                                         <button
-                                            onClick={() => { setItems([]); setSaveState('idle'); setProposalId(''); setStep('proposta') }}
+                                            onClick={() => { setItems([]); setSaveState('idle'); setProposalId(''); setStep('proposta'); setError('') }}
                                             className="w-full py-3.5 bg-navy text-white font-black rounded-xl hover:bg-navy/90 flex items-center justify-center gap-2 transition-all">
                                             <PenLine size={16} /> Adicionar Itens →
                                         </button>
@@ -661,14 +665,14 @@ function NovaPropostaInner() {
                                     ? <Loader2 size={15} className="animate-spin" />
                                     : null
                                 }
-                                Continuar → Agendar
+                                Continuar → Fechar Venda
                             </button>
                         </div>
                     </>
                 )}
 
-                {/* ══ STEP 3 — AGENDAR ════════════════════════════════════════ */}
-                {step === 'agendar' && (
+                {/* ══ STEP 3 — FECHAR VENDA ════════════════════════════════════════ */}
+                {step === 'venda' && (
                     <>
                         <header className="mb-6 flex items-center gap-4">
                             <button onClick={() => { setStep('proposta'); setError('') }}
@@ -676,8 +680,8 @@ function NovaPropostaInner() {
                                 <ArrowLeft size={20} />
                             </button>
                             <div className="flex-1">
-                                <h1 className="text-2xl font-bold text-navy">Agendar <span className="accent-text">Instalação</span></h1>
-                                <p className="text-xs text-text-muted mt-0.5">Finaliza a venda marcando a data</p>
+                                <h1 className="text-2xl font-bold text-navy">Fechar <span className="accent-text">Venda</span></h1>
+                                <p className="text-xs text-text-muted mt-0.5">Confirma a venda e agenda a instalação</p>
                             </div>
                         </header>
                         {ErrorBanner}
@@ -778,5 +782,15 @@ function NovaPropostaInner() {
 }
 
 export default function NovaPropostaPage() {
-    return <Suspense><NovaPropostaInner /></Suspense>
+    return (
+        <Suspense fallback={
+            <DashboardLayout>
+                <div className="flex items-center justify-center h-64">
+                    <Loader2 className="animate-spin h-8 w-8 text-accent" />
+                </div>
+            </DashboardLayout>
+        }>
+            <NovaPropostaInner />
+        </Suspense>
+    )
 }
