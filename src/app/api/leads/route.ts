@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
         const { data, error } = await supabase
             .from('clients')
-            .insert({
+            .upsert({
                 name:              name || whatsapp || email || 'Desconhecido',
                 email:             email   || null,
                 whatsapp:          whatsapp || null,
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
                 source:            'site',
                 status:            'new',
                 company_id:        companyId,
-            })
+              }, { onConflict: 'whatsapp' })
             .select('id')
             .single()
 
