@@ -673,6 +673,7 @@ export async function createFullProposalAction(input: {
     clientName: string
     whatsapp?: string
     city: string
+    companyId?: number
     requestText?: string
     imageUrl?: string
     items: { name: string; width: number; height: number; area: number; price: number }[]
@@ -694,7 +695,7 @@ export async function createFullProposalAction(input: {
                 whatsapp: input.whatsapp ?? null,
                 input_image_url: input.imageUrl ?? null,
                 criado_por: user?.id,
-                company_id: profile.company_id,
+                company_id: input.companyId ?? profile.company_id,
                 status: 'Processada',
                 total_geral: input.total,
             })
@@ -777,8 +778,6 @@ export async function saveBuilderItemsAction(
     }
 }
 
-// Finds the appointment created when a proposal was closed as a sale.
-// The appointment notes contain the proposal ID ("Venta cerrada desde presupuesto {id}.").
 export async function getAppointmentByProposalIdAction(proposalId: string) {
     try {
         const supabase = await createClient()
@@ -798,7 +797,6 @@ export async function getAppointmentByProposalIdAction(proposalId: string) {
     }
 }
 
-// Updates the status of a client/lead record.
 export async function updateClientStatusAction(clientId: string, status: 'new' | 'processed' | 'handover') {
     try {
         const supabase = await createClient()

@@ -15,10 +15,21 @@ import { COMPANIES } from '@/lib/companies'
 import {
     ArrowLeft, Sparkles, PenLine, Plus, Trash2, Loader2,
     Download, MessageCircle, Send, X, Camera,
-    AlertCircle, CheckCircle, Calendar, RotateCcw, Save, MapPin,
+    AlertCircle, CheckCircle, Calendar, RotateCcw, Save, MapPin, Copy,
 } from 'lucide-react'
 
-type Step = 'input' | 'proposta' | 'venda'
+// ── Constants ────────────────────────────────────────────────────────────────
+const ITEM_NAMES = [
+    'Ventana',
+    'Terraza Frente',
+    'Terraza Lateral',
+    'Balcon Frente',
+    'Balcon Lateral',
+    'Hueco',
+    'Poste de Soporte',
+]
+
+type Step = 'input' | 'proposta' | 'preview' | 'venda'
 type Mode = 'ai' | 'manual'
 type SaveState = 'idle' | 'saving' | 'saved' | 'modified'
 
@@ -42,10 +53,57 @@ function buildItem(name = '', w = 0, h = 0): Item {
     }
 }
 
+// ── ItemNameField — dropdown + texto livre ───────────────────────────────────
+function ItemNameField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    const isCustom = value !== '' && !ITEM_NAMES.includes(value)
+    const [custom, setCustom] = useState(isCustom)
+
+    if (custom) {
+        return (
+            <div className="flex gap-1.5 w-full items-center">
+                <input
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    placeholder="Nome personalizado…"
+                    autoFocus
+                    className="flex-1 font-semibold text-navy text-sm border-b border-accent/50 outline-none bg-transparent py-1"
+                />
+                <button
+                    type="button"
+                    onClick={() => { setCustom(false); onChange('') }}
+                    title="Voltar à lista"
+                    className="text-text-muted hover:text-navy transition-colors shrink-0">
+                    <RotateCcw size={12} />
+                </button>
+            </div>
+        )
+    }
+
+    return (
+        <select
+            value={value}
+            onChange={e => {
+                if (e.target.value === '__custom__') {
+                    setCustom(true)
+                    onChange('')
+                } else {
+                    onChange(e.target.value)
+                }
+            }}
+            className="w-full font-semibold text-navy text-sm border-b border-transparent focus:border-accent/50 outline-none bg-transparent py-1 cursor-pointer">
+            <option value="">— Escolher espaço —</option>
+            {ITEM_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
+            <option value="__custom__">✏️ Escrever…</option>
+        </select>
+    )
+}
+
+// ── Steps indicator ──────────────────────────────────────────────────────────
 function Steps({ step }: { step: Step }) {
     const list: { id: Step; label: string }[] = [
         { id: 'input',   label: 'Dados' },
-        { id: 'proposta',label: 'Proposta' },
+        { id: 'proposta', label: 'Proposta' },
+        { id: 'preview', label: 'Revisão' },
         { id: 'venda',   label: 'Fechar Venda' },
     ]
     const idx = list.findIndex(s => s.id === step)
@@ -70,6 +128,33 @@ function Steps({ step }: { step: Step }) {
     )
 }
 
+// ── Company selector ─────────────────────────────────────────────────────────
+function CompanySelector({ value, onChange }: { value: number; onChange: (id: number) => void }) {
+    return (
+        <div className="flex gap-2">
+            {([1, 2] as const).map(id => {
+                const co = COMPANIES[id]
+                const active = value === id
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        onClick={() => onChange(id)}
+                        className={`flex-1 py-2.5 px-3 rounded-xl border-2 text-sm font-black transition-all ${
+                            active
+                                ? 'border-navy bg-navy text-white'
+                                : 'border-border text-text-muted hover:border-navy/40'
+                        }`}>
+                        {co.name}
+                        <span className="block text-[10px] font-normal opacity-70">{co.city}</span>
+                    </button>
+                )
+            })}
+        </div>
+    )
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 function NovaPropostaInner() {
     const router = useRouter()
     const params = useSearchParams()
@@ -78,20 +163,24 @@ function NovaPropostaInner() {
     const [step, setStep] = useState<Step>('input')
     const [mode, setMode] = useState<Mode>('ai')
 
-    // Client
-    const leadId = params.get('lead_id') ?? ''
+    // Company selector — default from profile, fallback to Centro
+    const [selectedCompanyId, setSelectedCompanyId] = useState<number>(profile?.company_id ?? 1)
+    const city = COMPANIES[selectedCompanyId]?.name ?? 'Preventiva Centro'
 
-    const [clientName, setClientName]         = useState(params.get('name')     ?? '')
-    const [clientPhone, setClientPhone]       = useState(params.get('phone') ?? params.get('whatsapp') ?? '')
-    const [clientLocation, setClientLocation] = useState(params.get('location') ?? '')
+    // Client — leadId preserved for handover update on close
+    const leadId = params.get('lead_id') ?? ''
+    const [clientName, setClientName]   = useState(params.get('name')  ?? '')
+    const [clientPhone, setClientPhone] = useState(params.get('phone') ?? params.get('whatsapp') ?? '')
+    // clientLocation from URL for address pre-fill (not shown as form field)
+    const clientLocation = params.get('location') ?? ''
 
     // AI input
-    const [requestText, setRequestText]   = useState(params.get('message') ?? '')
-    const [imageFile, setImageFile]       = useState<File | null>(null)
-    const [imagePreview, setImagePreview] = useState('')
-    const [imageUrl, setImageUrl]         = useState('')
-    const [missingInfo, setMissingInfo]   = useState('')
-    const [clarification, setClarification] = useState('')
+    const [requestText, setRequestText]       = useState(params.get('message') ?? '')
+    const [imageFile, setImageFile]           = useState<File | null>(null)
+    const [imagePreview, setImagePreview]     = useState('')
+    const [imageUrl, setImageUrl]             = useState('')
+    const [missingInfo, setMissingInfo]       = useState('')
+    const [clarification, setClarification]   = useState('')
 
     // Items
     const [items, setItems]   = useState<Item[]>([])
@@ -99,22 +188,23 @@ function NovaPropostaInner() {
     const [refineText, setRefineText] = useState('')
 
     // UI state
-    const [parsing, setParsing]   = useState(false)
-    const [error, setError]       = useState('')
+    const [parsing, setParsing] = useState(false)
+    const [error, setError]     = useState('')
 
     // Save state (step 2)
     const [proposalId, setProposalId] = useState('')
     const [saveState, setSaveState]   = useState<SaveState>('idle')
 
-    // Step 3 fields
-    const [installDate, setInstallDate]     = useState('')
+    // Step 3 (agendar) fields
+    const [installDate, setInstallDate]       = useState('')
     const [installAddress, setInstallAddress] = useState('')
-    const [installNotes, setInstallNotes]   = useState('')
-    const [closing, setClosing]             = useState(false)
+    const [installNotes, setInstallNotes]     = useState('')
+    const [closing, setClosing]               = useState(false)
+
+    // PDF / WA
     const [generatingPDF, setGeneratingPDF] = useState(false)
     const [sendingWA, setSendingWA]         = useState(false)
 
-    const city  = profile ? (COMPANIES[profile.company_id]?.name ?? 'Preventiva Centro') : 'Preventiva Centro'
     const total = items.reduce((s, i) => s + i.price, 0)
 
     // ── Image ────────────────────────────────────────────────────────────────
@@ -198,10 +288,23 @@ function NovaPropostaInner() {
         markDirty()
     }
 
-    const removeItem = (id: string) => { setItems(p => p.filter(i => i.id !== id)); markDirty() }
-    const addItem    = ()           => { setItems(p => [...p, buildItem()]); markDirty() }
+    const removeItem    = (id: string) => { setItems(p => p.filter(i => i.id !== id)); markDirty() }
+    const addItem       = ()           => { setItems(p => [...p, buildItem()]); markDirty() }
+    const duplicateItem = (id: string) => {
+        setItems(prev => {
+            const idx = prev.findIndex(i => i.id === id)
+            if (idx === -1) return prev
+            const src = prev[idx]
+            const copy: Item = {
+                ...src,
+                id: `i_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            }
+            return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)]
+        })
+        markDirty()
+    }
 
-    // ── Core save (returns result, stays on current step) ───────────────────
+    // ── Core save ────────────────────────────────────────────────────────────
     const saveProposal = async (): Promise<{ success: boolean; id?: string; error?: string }> => {
         if (items.length === 0) return { success: false, error: 'A proposta não tem itens.' }
         if (!clientName.trim()) return { success: false, error: 'Nome do cliente obrigatório.' }
@@ -210,6 +313,7 @@ function NovaPropostaInner() {
             if (!proposalId) {
                 const res = await createFullProposalAction({
                     clientName, whatsapp: clientPhone, city,
+                    companyId: selectedCompanyId,
                     requestText, imageUrl, items, mockup, total,
                 })
                 if (!res.success || !res.id) throw new Error(res.error ?? 'Erro ao criar')
@@ -228,22 +332,20 @@ function NovaPropostaInner() {
         }
     }
 
-    // Guardar — sem navegar
     const handleSave = async () => {
         const r = await saveProposal()
         if (!r.success) setError(r.error ?? 'Erro ao guardar')
     }
 
-    // Continuar → guarda se preciso, depois navega para step 3
-    const handleContinue = async () => {
+    // Continuar → guarda se preciso, depois vai para preview
+    const handleContinueToPreview = async () => {
         if (items.length === 0) { setError('A proposta não tem itens.'); return }
         if (!clientName.trim()) { setError('Nome do cliente obrigatório.'); return }
         if (saveState !== 'saved') {
             const r = await saveProposal()
             if (!r.success) { setError(r.error ?? 'Erro ao guardar'); return }
         }
-        if (!installAddress) setInstallAddress(clientLocation)
-        setStep('venda')
+        setStep('preview')
     }
 
     // ── PDF / WA ─────────────────────────────────────────────────────────────
@@ -284,10 +386,10 @@ function NovaPropostaInner() {
         setSendingWA(false)
     }
 
-    // ── Fechar venda / confirmar instalação (step 3) ─────────────────────────
+    // ── Fechar venda (step agendar) ──────────────────────────────────────────
     const handleCloseSale = async () => {
-        if (!installDate)  { setError('Selecciona la fecha de instalación.'); return }
-        if (!proposalId)   { setError('Guarda a proposta primeiro.'); return }
+        if (!installDate) { setError('Selecciona la fecha de instalación.'); return }
+        if (!proposalId)  { setError('Guarda a proposta primeiro.'); return }
         setClosing(true); setError('')
         const res = await closeSaleAction(proposalId, {
             address: installAddress,
@@ -295,12 +397,11 @@ function NovaPropostaInner() {
             scheduledAt: installDate,
         })
         if (!res.success) { setError(res.error ?? 'Erro ao confirmar'); setClosing(false); return }
-        // If this proposal was created from a lead, mark the lead as handed over
         if (leadId) await updateClientStatusAction(leadId, 'handover')
         router.push('/dashboard/citas')
     }
 
-    // ── Shared error banner ──────────────────────────────────────────────────
+    // ── Error banner ─────────────────────────────────────────────────────────
     const ErrorBanner = error ? (
         <div className="mb-5 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
             <AlertCircle size={16} className="shrink-0" />
@@ -333,21 +434,34 @@ function NovaPropostaInner() {
                                 <h2 className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-2">
                                     <PenLine size={12} className="text-accent" /> Dados do Cliente
                                 </h2>
-                                {([
-                                    { label: 'Nome *',       val: clientName,     set: setClientName,     ph: 'Nome completo' },
-                                    { label: 'WhatsApp',     val: clientPhone,    set: setClientPhone,    ph: '34600000000' },
-                                    { label: 'Localização',  val: clientLocation, set: setClientLocation, ph: 'Madrid, Barcelona…' },
-                                ] as const).map(f => (
-                                    <div key={f.label}>
-                                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">{f.label}</label>
-                                        <input
-                                            value={f.val}
-                                            onChange={e => f.set(e.target.value)}
-                                            placeholder={f.ph}
-                                            className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none"
-                                        />
-                                    </div>
-                                ))}
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">Nome *</label>
+                                    <input
+                                        value={clientName}
+                                        onChange={e => setClientName(e.target.value)}
+                                        placeholder="Nome completo"
+                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">WhatsApp</label>
+                                    <input
+                                        value={clientPhone}
+                                        onChange={e => setClientPhone(e.target.value)}
+                                        placeholder="34600000000"
+                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Empresa</label>
+                                    <CompanySelector
+                                        value={selectedCompanyId}
+                                        onChange={id => setSelectedCompanyId(id)}
+                                    />
+                                </div>
                             </div>
 
                             {/* Request */}
@@ -426,7 +540,7 @@ function NovaPropostaInner() {
                                             Os itens (espaços, medidas e preços) são adicionados no passo seguinte.
                                         </p>
                                         <button
-                                            onClick={() => { setItems([]); setSaveState('idle'); setProposalId(''); setStep('proposta'); setError('') }}
+                                            onClick={() => { setItems([]); setSaveState('idle'); setProposalId(''); setStep('proposta') }}
                                             className="w-full py-3.5 bg-navy text-white font-black rounded-xl hover:bg-navy/90 flex items-center justify-center gap-2 transition-all">
                                             <PenLine size={16} /> Adicionar Itens →
                                         </button>
@@ -447,7 +561,7 @@ function NovaPropostaInner() {
                             </button>
                             <div className="flex-1 min-w-0">
                                 <h1 className="text-2xl font-bold text-navy">Itens da <span className="accent-text">Proposta</span></h1>
-                                <p className="text-xs text-text-muted mt-0.5 truncate">{clientName || '—'} · {clientPhone || '—'}</p>
+                                <p className="text-xs text-text-muted mt-0.5 truncate">{clientName || '—'} · {city}</p>
                             </div>
                             <div className="text-right shrink-0">
                                 <p className="text-2xl font-black text-navy">€ {total.toFixed(2)}</p>
@@ -461,7 +575,7 @@ function NovaPropostaInner() {
                         {/* Items table */}
                         <div className="bg-white rounded-2xl border border-border mb-5 overflow-hidden">
                             {/* Header row — desktop only */}
-                            <div className="hidden md:grid md:grid-cols-[28px_1fr_84px_84px_56px_96px_32px] gap-3 px-4 py-2.5 bg-gray-50 border-b border-border text-[9px] font-black text-text-muted uppercase tracking-widest">
+                            <div className="hidden md:grid md:grid-cols-[28px_1fr_84px_84px_56px_96px_60px] gap-3 px-4 py-2.5 bg-gray-50 border-b border-border text-[9px] font-black text-text-muted uppercase tracking-widest">
                                 <span>#</span>
                                 <span>Espaço</span>
                                 <span className="text-center">Largo&nbsp;(m)</span>
@@ -481,15 +595,13 @@ function NovaPropostaInner() {
                                     {items.map((it, i) => (
                                         <div key={it.id} className="px-4 py-3">
                                             {/* Desktop row */}
-                                            <div className="hidden md:grid md:grid-cols-[28px_1fr_84px_84px_56px_96px_32px] gap-3 items-center">
+                                            <div className="hidden md:grid md:grid-cols-[28px_1fr_84px_84px_56px_96px_60px] gap-3 items-center">
                                                 <span className="w-6 h-6 rounded-full bg-accent/10 text-accent font-black text-[10px] flex items-center justify-center">
                                                     {i + 1}
                                                 </span>
-                                                <input
+                                                <ItemNameField
                                                     value={it.name}
-                                                    onChange={e => updateItem(it.id, 'name', e.target.value)}
-                                                    placeholder="Nome do espaço"
-                                                    className="font-semibold text-navy text-sm border-b border-transparent focus:border-accent/50 outline-none bg-transparent py-1 w-full"
+                                                    onChange={v => updateItem(it.id, 'name', v)}
                                                 />
                                                 <input
                                                     type="number" step="0.01"
@@ -523,10 +635,18 @@ function NovaPropostaInner() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <button onClick={() => removeItem(it.id)}
-                                                    className="w-7 h-7 flex items-center justify-center text-red-300 hover:text-red-500 transition-colors rounded mx-auto">
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button onClick={() => duplicateItem(it.id)}
+                                                        title="Duplicar"
+                                                        className="w-7 h-7 flex items-center justify-center text-blue-300 hover:text-blue-500 transition-colors rounded">
+                                                        <Copy size={13} />
+                                                    </button>
+                                                    <button onClick={() => removeItem(it.id)}
+                                                        title="Remover"
+                                                        className="w-7 h-7 flex items-center justify-center text-red-300 hover:text-red-500 transition-colors rounded">
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {/* Mobile card */}
@@ -535,12 +655,15 @@ function NovaPropostaInner() {
                                                     <span className="w-6 h-6 rounded-full bg-accent/10 text-accent font-black text-[10px] flex items-center justify-center shrink-0">
                                                         {i + 1}
                                                     </span>
-                                                    <input
-                                                        value={it.name}
-                                                        onChange={e => updateItem(it.id, 'name', e.target.value)}
-                                                        placeholder="Nome do espaço"
-                                                        className="flex-1 font-semibold text-navy text-sm border-b border-transparent focus:border-accent/50 outline-none bg-transparent"
-                                                    />
+                                                    <div className="flex-1">
+                                                        <ItemNameField
+                                                            value={it.name}
+                                                            onChange={v => updateItem(it.id, 'name', v)}
+                                                        />
+                                                    </div>
+                                                    <button onClick={() => duplicateItem(it.id)} className="text-blue-300 hover:text-blue-500 p-1 shrink-0">
+                                                        <Copy size={13} />
+                                                    </button>
                                                     <button onClick={() => removeItem(it.id)} className="text-red-300 hover:text-red-500 p-1 shrink-0">
                                                         <Trash2 size={14} />
                                                     </button>
@@ -639,7 +762,6 @@ function NovaPropostaInner() {
 
                         {/* Action buttons */}
                         <div className="flex flex-col sm:flex-row gap-3">
-                            {/* Guardar — sem navegar */}
                             <button
                                 onClick={handleSave}
                                 disabled={saveState === 'saving' || saveState === 'saved'}
@@ -656,23 +778,19 @@ function NovaPropostaInner() {
                                                            <><Save size={15} /> Guardar Proposta</>}
                             </button>
 
-                            {/* Continuar → auto-guarda se preciso */}
                             <button
-                                onClick={handleContinue}
+                                onClick={handleContinueToPreview}
                                 disabled={saveState === 'saving' || items.length === 0}
                                 className="flex-1 py-3.5 bg-accent text-navy font-black rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40">
-                                {saveState === 'saving'
-                                    ? <Loader2 size={15} className="animate-spin" />
-                                    : null
-                                }
-                                Continuar → Fechar Venda
+                                {saveState === 'saving' ? <Loader2 size={15} className="animate-spin" /> : null}
+                                Ver Proposta →
                             </button>
                         </div>
                     </>
                 )}
 
-                {/* ══ STEP 3 — FECHAR VENDA ════════════════════════════════════════ */}
-                {step === 'venda' && (
+                {/* ══ STEP 3 — PREVIEW (revisão + PDF + WA) ═══════════════════ */}
+                {step === 'preview' && (
                     <>
                         <header className="mb-6 flex items-center gap-4">
                             <button onClick={() => { setStep('proposta'); setError('') }}
@@ -680,8 +798,110 @@ function NovaPropostaInner() {
                                 <ArrowLeft size={20} />
                             </button>
                             <div className="flex-1">
-                                <h1 className="text-2xl font-bold text-navy">Fechar <span className="accent-text">Venda</span></h1>
-                                <p className="text-xs text-text-muted mt-0.5">Confirma a venda e agenda a instalação</p>
+                                <h1 className="text-2xl font-bold text-navy">Revisão da <span className="accent-text">Proposta</span></h1>
+                                <p className="text-xs text-text-muted mt-0.5">Verifica, gera o PDF e envia antes de agendar</p>
+                            </div>
+                        </header>
+                        {ErrorBanner}
+
+                        {/* Client + company summary */}
+                        <div className="bg-white border border-border rounded-2xl p-5 mb-5 flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-accent/20 text-accent font-black flex items-center justify-center shrink-0 text-sm">
+                                {clientName.charAt(0).toUpperCase() || '?'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-navy truncate">{clientName}</p>
+                                <p className="text-xs text-text-muted truncate">
+                                    {clientPhone && <span>{clientPhone} · </span>}
+                                    <span>{city}</span>
+                                </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                                <p className="text-2xl font-black text-navy">€ {total.toFixed(2)}</p>
+                                <p className="text-[10px] text-text-muted uppercase font-bold">
+                                    {items.length} item{items.length !== 1 ? 's' : ''}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Items list (read-only) */}
+                        <div className="bg-white rounded-2xl border border-border mb-5 overflow-hidden">
+                            <div className="hidden md:grid md:grid-cols-[28px_1fr_80px_80px_56px_96px] gap-3 px-4 py-2 bg-gray-50 border-b border-border text-[9px] font-black text-text-muted uppercase tracking-widest">
+                                <span>#</span>
+                                <span>Espaço</span>
+                                <span className="text-center">Largo</span>
+                                <span className="text-center">Alto</span>
+                                <span className="text-center">m²</span>
+                                <span className="text-right">Preço</span>
+                            </div>
+                            <div className="divide-y divide-border/60">
+                                {items.map((it, i) => (
+                                    <div key={it.id} className="px-4 py-3 grid grid-cols-[28px_1fr_80px_80px_56px_96px] gap-3 items-center">
+                                        <span className="w-6 h-6 rounded-full bg-accent/10 text-accent font-black text-[10px] flex items-center justify-center">
+                                            {i + 1}
+                                        </span>
+                                        <span className="font-semibold text-navy text-sm truncate">{it.name || '—'}</span>
+                                        <span className="text-sm text-text-muted text-center">{it.width > 0 ? `${it.width}m` : '—'}</span>
+                                        <span className="text-sm text-text-muted text-center">{it.height > 0 ? `${it.height}m` : '—'}</span>
+                                        <span className="text-sm font-bold text-text-muted text-center">{it.area > 0 ? it.area.toFixed(2) : '—'}</span>
+                                        <span className="text-sm font-black text-navy text-right">€ {it.price.toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="border-t border-border px-4 py-3 flex justify-end items-center gap-3 bg-gray-50">
+                                <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Total</span>
+                                <span className="text-2xl font-black text-navy">€ {total.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        {/* Mockup */}
+                        {mockup && (
+                            <div className="bg-navy rounded-2xl p-5 mb-5">
+                                <p className="text-accent text-[9px] font-black uppercase tracking-widest mb-2">Plano de instalação</p>
+                                <pre className="text-accent font-mono text-[10px] leading-tight whitespace-pre-wrap">{mockup}</pre>
+                            </div>
+                        )}
+
+                        {/* PDF + WhatsApp */}
+                        <div className="grid grid-cols-2 gap-3 mb-5">
+                            <button onClick={handleDownloadPDF} disabled={generatingPDF}
+                                className="py-3.5 bg-red-50 border border-red-200 text-red-700 font-black rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+                                {generatingPDF ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                                {generatingPDF ? 'Gerando…' : 'Download PDF'}
+                            </button>
+                            <button onClick={handleWhatsApp} disabled={sendingWA}
+                                className="py-3.5 bg-green-50 border border-green-200 text-green-700 font-black rounded-xl hover:bg-green-600 hover:text-white hover:border-green-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+                                {sendingWA ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}
+                                {sendingWA ? 'Enviando…' : 'Enviar WhatsApp'}
+                            </button>
+                        </div>
+
+                        {/* CTA → agendar */}
+                        <button
+                            onClick={() => { setError(''); if (!installAddress) setInstallAddress(clientLocation); setStep('venda') }}
+                            className="w-full py-4 bg-accent text-navy font-black rounded-2xl hover:shadow-xl transition-all flex items-center justify-center gap-3 text-lg">
+                            <Calendar size={20} /> Fechar Venda e Agendar →
+                        </button>
+
+                        <button
+                            onClick={() => router.push('/dashboard')}
+                            className="w-full mt-3 py-2 text-xs text-text-muted font-bold hover:text-navy transition-colors">
+                            Guardar sem agendar
+                        </button>
+                    </>
+                )}
+
+                {/* ══ STEP 4 — AGENDAR ════════════════════════════════════════ */}
+                {step === 'venda' && (
+                    <>
+                        <header className="mb-6 flex items-center gap-4">
+                            <button onClick={() => { setStep('preview'); setError('') }}
+                                className="p-2 rounded-xl border border-border hover:bg-gray-50 text-navy transition-colors">
+                                <ArrowLeft size={20} />
+                            </button>
+                            <div className="flex-1">
+                                <h1 className="text-2xl font-bold text-navy">Agendar <span className="accent-text">Instalação</span></h1>
+                                <p className="text-xs text-text-muted mt-0.5">Finaliza a venda marcando a data</p>
                             </div>
                         </header>
                         {ErrorBanner}
@@ -694,7 +914,8 @@ function NovaPropostaInner() {
                             <div className="flex-1 min-w-0">
                                 <p className="font-bold text-navy truncate">{clientName}</p>
                                 <p className="text-xs text-text-muted truncate">
-                                    {clientPhone}{clientLocation && ` · ${clientLocation}`}
+                                    {clientPhone && <span>{clientPhone} · </span>}
+                                    <span>{city}</span>
                                 </p>
                             </div>
                             <div className="text-right shrink-0">
@@ -743,20 +964,6 @@ function NovaPropostaInner() {
                             </div>
                         </div>
 
-                        {/* Secondary: PDF + WA */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <button onClick={handleDownloadPDF} disabled={generatingPDF}
-                                className="py-3 bg-red-50 border border-red-200 text-red-700 font-black rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
-                                {generatingPDF ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                                {generatingPDF ? 'Gerando…' : 'Download PDF'}
-                            </button>
-                            <button onClick={handleWhatsApp} disabled={sendingWA}
-                                className="py-3 bg-green-50 border border-green-200 text-green-700 font-black rounded-xl hover:bg-green-600 hover:text-white hover:border-green-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
-                                {sendingWA ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}
-                                {sendingWA ? 'Enviando…' : 'WhatsApp'}
-                            </button>
-                        </div>
-
                         {/* Primary CTA */}
                         <button
                             onClick={handleCloseSale}
@@ -768,7 +975,6 @@ function NovaPropostaInner() {
                             }
                         </button>
 
-                        {/* Skip */}
                         <button
                             onClick={() => router.push('/dashboard')}
                             className="w-full mt-3 py-2 text-xs text-text-muted font-bold hover:text-navy transition-colors">
