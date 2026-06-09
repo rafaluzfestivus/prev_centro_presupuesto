@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
         pathname.startsWith('/api/webhooks') ||      // Evolution API webhook (no user auth)
         pathname.startsWith('/api/wa') ||            // Evolution API status/import
         pathname.startsWith('/_next') ||
+        pathname.startsWith('/api/leads') ||         // Site contact form (public endpoint)
         pathname === '/favicon.ico'
 
     if (!user && !isPublicRoute) {
