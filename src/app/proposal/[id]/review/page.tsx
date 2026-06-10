@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator
 import { generateProposalBlob, generateProposalPDF } from '@/services/pdfGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
 import { createClient } from '@/lib/supabase/client'
+import { MockupEditor, MockupEditorRef } from '@/components/proposal/MockupEditor'
 
 type ProposalItem = {
   id: string
@@ -42,6 +43,7 @@ export default function ReviewPage() {
   const id = params.id as string
   const [data, setData] = useState<ProposalData | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const mockupRef = useRef<MockupEditorRef>(null)
   const [isReprocessing, setIsReprocessing] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -315,9 +317,10 @@ export default function ReviewPage() {
     }
   }
 
-  const handleDownloadPPTX = () => {
+  const handleDownloadPPTX = async () => {
     if (!data) return
-    downloadProposalPPTX(data)
+    const mockupImageBlob = await mockupRef.current?.exportToPng() ?? null
+    downloadProposalPPTX({ ...data, mockupImageBlob })
   }
 
   const [generatingPDF, setGeneratingPDF] = useState(false)
@@ -326,12 +329,14 @@ export default function ReviewPage() {
     setGeneratingPDF(true)
     setActionError(null)
     try {
+      const mockupImageBlob = await mockupRef.current?.exportToPng() ?? null
       await generateProposalPDF({
         clientName: data.clientName,
         city: data.city,
         items: data.items,
         total: data.total,
         mockup: data.mockup,
+        mockupImageBlob,
       })
     } catch (err: any) {
       setActionError(err.message || 'Error al generar el PDF')
@@ -352,13 +357,15 @@ export default function ReviewPage() {
       const phone = data.whatsapp?.trim()
       if (!phone) throw new Error('Introduce el número de WhatsApp del cliente (campo editable arriba).')
 
-      // Generate PDF blob
+      // Generate PDF blob (with mockup image)
+      const mockupImageBlob = await mockupRef.current?.exportToPng() ?? null
       const pdfBlob = await generateProposalBlob({
         clientName: data.clientName,
         city: data.city,
         items: data.items,
         total: data.total,
         mockup: data.mockup,
+        mockupImageBlob,
       })
 
       const safeName = (data.clientName || 'cliente').replace(/[^a-z0-9]/gi, '_').toLowerCase()
@@ -466,16 +473,11 @@ export default function ReviewPage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xs font-black uppercase tracking-widest text-navy bg-accent/20 px-3 py-1 rounded-full">Plano de la Instalación</h2>
               </div>
-              <textarea
-                value={data.mockup}
-                onChange={(e) => setData(prev => prev ? ({ ...prev, mockup: e.target.value }) : null)}
-                className="w-full h-80 bg-navy text-accent p-6 rounded-xl font-mono text-[10px] leading-tight resize-none border-none focus:ring-2 focus:ring-accent/50 selection:bg-accent/30"
-                placeholder="Genera o dibuja el plano aquí..."
-                spellCheck={false}
+              <MockupEditor
+                ref={mockupRef}
+                items={data.items}
+                className="w-full"
               />
-              <p className="text-[9px] text-gray-400 mt-3 italic text-center">
-                * Puedes editar el plano 3D manualmente.
-              </p>
             </section>
 
             <section className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100">

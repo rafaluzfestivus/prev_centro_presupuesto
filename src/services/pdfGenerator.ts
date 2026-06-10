@@ -15,6 +15,7 @@ export interface ProposalData {
     items: ProposalItem[];
     total: number;
     mockup: string;
+    mockupImageBlob?: Blob | null;
     imageUrl?: string;
     whatsapp?: string;
 }
