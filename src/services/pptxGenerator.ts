@@ -79,7 +79,8 @@ function removeInjectedShapes(xml: string): string {
 
 function buildItemsXml(items: ProposalData['items']): string {
     const n = items.length
-    const fontSize = n <= 4 ? 1600 : n <= 7 ? 1400 : n <= 11 ? 1200 : 1050
+    // Slide is ~20" wide — use larger font sizes than standard
+    const fontSize = n <= 4 ? 2200 : n <= 7 ? 1900 : n <= 11 ? 1600 : 1400
 
     const itemLines = items.map((item, idx) => {
         const name = escapeXml(item.name)
@@ -89,7 +90,7 @@ function buildItemsXml(items: ProposalData['items']): string {
 
         return `
 <a:p>
-  <a:pPr algn="l"><a:lnSpc><a:spcPct val="105000"/></a:lnSpc></a:pPr>
+  <a:pPr algn="l"><a:lnSpc><a:spcPct val="108000"/></a:lnSpc></a:pPr>
   <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.75)}" b="0" dirty="0">
     <a:solidFill><a:srgbClr val="9CA3AF"/></a:solidFill>
     <a:latin typeface="Calibri (MS)"/>
@@ -113,8 +114,8 @@ function buildItemsXml(items: ProposalData['items']): string {
     const totalArea = items.reduce((s, i) => s + Number(i.area), 0)
 
     const summaryLine = `
-<a:p><a:pPr algn="l"><a:lnSpc><a:spcPct val="140000"/></a:lnSpc></a:pPr>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.8)}" b="0" dirty="0">
+<a:p><a:pPr algn="l"><a:lnSpc><a:spcPct val="160000"/></a:lnSpc></a:pPr>
+  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.7)}" b="0" dirty="0">
     <a:solidFill><a:srgbClr val="4B5563"/></a:solidFill>
   </a:rPr><a:t>──────────────────────────────</a:t></a:r>
 </a:p>
@@ -125,12 +126,14 @@ function buildItemsXml(items: ProposalData['items']): string {
   </a:rPr><a:t>${totalArea.toFixed(2)} m² · ${items.length} piezas</a:t></a:r>
 </a:p>
 <a:p><a:pPr algn="l"/>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 1.15)}" b="1" dirty="0">
+  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 1.2)}" b="1" dirty="0">
     <a:solidFill><a:srgbClr val="EAB308"/></a:solidFill>
     <a:latin typeface="Calibri (MS) Bold"/>
   </a:rPr><a:t>TOTAL: €${total.toFixed(2)}</a:t></a:r>
 </a:p>`
 
+    // Left zone: x=1.2" y=4.5" w=8.3" h=6.0"  (in EMU at 914400/inch)
+    // Left zone body starts below "SUPERFICIE A PROTEGER" header (which ends at ~4.5")
     return `
 <p:sp>
   <p:nvSpPr>
@@ -139,15 +142,15 @@ function buildItemsXml(items: ProposalData['items']): string {
     <p:nvPr/>
   </p:nvSpPr>
   <p:spPr>
-    <a:xfrm><a:off x="457200" y="1828800"/><a:ext cx="8800000" cy="8000000"/></a:xfrm>
+    <a:xfrm><a:off x="1097280" y="4572000"/><a:ext cx="7600000" cy="5500000"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
     <a:noFill/>
   </p:spPr>
   <p:txBody>
     <a:bodyPr wrap="square" rtlCol="0"><a:normAutofit/></a:bodyPr>
     <a:lstStyle/>
-    <a:p><a:pPr algn="l"><a:lnSpc><a:spcPct val="130000"/></a:lnSpc></a:pPr>
-      <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.9)}" b="1" dirty="0">
+    <a:p><a:pPr algn="l"><a:lnSpc><a:spcPct val="140000"/></a:lnSpc></a:pPr>
+      <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.85)}" b="1" dirty="0">
         <a:solidFill><a:srgbClr val="EAB308"/></a:solidFill>
         <a:latin typeface="Calibri (MS) Bold"/>
       </a:rPr><a:t>MEDIDAS Y PRECIOS</a:t></a:r>
@@ -161,6 +164,7 @@ function buildItemsXml(items: ProposalData['items']): string {
 // ── Mockup image pic element ─────────────────────────────────────────────────
 
 function buildMockupPicXml(rId: string): string {
+    // Right zone: x=10.6" y=4.5" w=8.7" h=6.0"
     return `
 <p:pic>
   <p:nvPicPr>
@@ -173,7 +177,7 @@ function buildMockupPicXml(rId: string): string {
     <a:stretch><a:fillRect/></a:stretch>
   </p:blipFill>
   <p:spPr>
-    <a:xfrm><a:off x="9800000" y="1828800"/><a:ext cx="8200000" cy="8000000"/></a:xfrm>
+    <a:xfrm><a:off x="9700000" y="4572000"/><a:ext cx="8300000" cy="5500000"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
   </p:spPr>
 </p:pic>`
