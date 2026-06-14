@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import type { ProposalData } from './pdfGenerator';
+import { getItemCategory } from '@/lib/itemTypes';
 
 export interface ProposalDataPPTX extends ProposalData {
     imageUrl?: string;
@@ -125,21 +126,26 @@ function buildItemsTxBodyInner(items: ProposalData['items']): string {
 
     const itemLines = items.map((item, idx) => {
         const name = escapeXml(item.name)
-        const dims = `${Number(item.width).toFixed(2)}×${Number(item.height).toFixed(2)}m`
-        const area = `${Number(item.area).toFixed(2)}m²`
+        const cat = getItemCategory(item.name)
+        const isPost = cat === 'post' || cat === 'post45'
+        const dims = isPost
+            ? `${Math.round(Number(item.width))} uds. · ${Number(item.height).toFixed(2)}m`
+            : `${Number(item.width).toFixed(2)}×${Number(item.height).toFixed(2)}m`
+        const area = isPost ? '' : `· ${Number(item.area).toFixed(2)}m²`
         const price = `€${Number(item.price).toFixed(0)}`
         return `
 <a:p>
   <a:pPr algn="l"><a:lnSpc><a:spcPct val="110000"/></a:lnSpc></a:pPr>
   <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.7)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="9CA3AF"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>${idx + 1}. </a:t></a:r>
   <a:r><a:rPr lang="es-ES" sz="${fontSize}" b="1" dirty="0"><a:solidFill><a:srgbClr val="F3F4F6"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>${name}</a:t></a:r>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.8)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="9CA3AF"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>  ${dims} · ${area}</a:t></a:r>
+  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.8)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="9CA3AF"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>  ${dims} ${area}</a:t></a:r>
   <a:r><a:rPr lang="es-ES" sz="${fontSize}" b="1" dirty="0"><a:solidFill><a:srgbClr val="EAB308"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>  ${price}</a:t></a:r>
 </a:p>`
     }).join('')
 
     const total = items.reduce((s, i) => s + Number(i.price), 0)
-    const totalArea = items.reduce((s, i) => s + Number(i.area), 0)
+    const netItems = items.filter(i => getItemCategory(i.name) === 'net')
+    const totalArea = netItems.reduce((s, i) => s + Number(i.area), 0)
 
     const headerLine = `
 <a:bodyPr wrap="square" rtlCol="0"><a:normAutofit/></a:bodyPr><a:lstStyle/>
@@ -151,7 +157,7 @@ ${itemLines}
   <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.65)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="4B5563"/></a:solidFill></a:rPr><a:t>──────────────────────────</a:t></a:r>
 </a:p>
 <a:p><a:pPr algn="l"/>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.85)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="D1D5DB"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>${totalArea.toFixed(2)} m² · ${items.length} piezas</a:t></a:r>
+  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.85)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="D1D5DB"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>${totalArea > 0 ? `${totalArea.toFixed(2)} m² · ` : ''}${items.length} piezas</a:t></a:r>
 </a:p>
 <a:p><a:pPr algn="l"/>
   <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 1.15)}" b="1" dirty="0"><a:solidFill><a:srgbClr val="EAB308"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>TOTAL: €${total.toFixed(2)}</a:t></a:r>
