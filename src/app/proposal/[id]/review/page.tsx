@@ -9,6 +9,7 @@ import { ArrowLeft, RefreshCw, Send, Loader2, Trash2, Plus, Download, MessageCir
 import { getProposalDetailsAction, processProposalWithAIAction, confirmProposalAction, updateProposalAction } from '@/actions/proposal'
 import { ProposalItem as DBProposalItem } from '@/lib/types'
 import { PRICING } from '@/lib/constants'
+import { getItemCategory, calcItemPrice, ITEM_FIELD_LABELS } from '@/lib/itemTypes'
 import { downloadProposalPPTX, ProposalDataPPTX } from '@/services/pptxGenerator'
 import { generateProposalBlob, generateProposalPDF } from '@/services/pdfGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
@@ -94,12 +95,18 @@ export default function ReviewPage() {
     const newItems = data.items.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value }
-        if (field === 'width' || field === 'height') {
-          const w = field === 'width' ? Number(value) : item.width
-          const h = field === 'height' ? Number(value) : item.height
-          updated.area = w * h
-          const calculated = updated.area * PRICING.PRICE_PER_M2
-          updated.price = Math.max(PRICING.MIN_PRICE_PER_ITEM, calculated)
+        const cat = getItemCategory(updated.name)
+        if (field === 'width' || field === 'height' || field === 'name') {
+          const w = Number(updated.width)
+          const h = Number(updated.height)
+          const newCat = getItemCategory(updated.name)
+          if (newCat === 'net') {
+            updated.area = w * h
+          } else {
+            updated.area = w  // units count
+          }
+          updated.price = calcItemPrice(newCat, w, h)
+          updated.price_rule = 'Calculado'
         }
         if (field === 'price') {
           updated.price = Number(value)
@@ -113,13 +120,17 @@ export default function ReviewPage() {
     setData(prev => prev ? ({ ...prev, items: newItems, total: newTotal }) : null)
   }
 
-  const handleAddItem = () => {
+  const handleAddItem = (type: 'net' | 'post' | 'post45' = 'net') => {
     if (!data) return
+    const names = { net: 'Nuevo Ítem', post: 'Poste de Soporte', post45: 'Valla 45°' }
+    const defaultPrices = { net: PRICING.MIN_PRICE_PER_ITEM, post: 30, post45: 45 }
     const newItem: ProposalItem = {
       id: `new_${Date.now()}`,
-      name: 'Nuevo Ítem',
-      width: 0, height: 0, area: 0,
-      price: PRICING.MIN_PRICE_PER_ITEM,
+      name: names[type],
+      width: type === 'net' ? 0 : 1,
+      height: type === 'net' ? 0 : 2,
+      area: type === 'net' ? 0 : 1,
+      price: defaultPrices[type],
       price_rule: 'Manual'
     }
     const newItems = [...data.items, newItem]
@@ -512,18 +523,30 @@ export default function ReviewPage() {
             <section className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-sm border border-gray-100">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-black text-navy tracking-tight">Detalle Técnico</h2>
-                <Button size="sm" variant="outline" onClick={handleAddItem} className="rounded-full border-2 border-accent text-navy hover:bg-accent font-bold">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Nuevo Ítem
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => handleAddItem('net')} className="rounded-full border-2 border-accent text-navy hover:bg-accent font-bold text-xs">
+                    <Plus className="h-3 w-3 mr-1" /> Red
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleAddItem('post')} className="rounded-full border-2 border-slate-400 text-slate-600 hover:bg-slate-100 font-bold text-xs">
+                    <Plus className="h-3 w-3 mr-1" /> Poste
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleAddItem('post45')} className="rounded-full border-2 border-sky-400 text-sky-600 hover:bg-sky-50 font-bold text-xs">
+                    <Plus className="h-3 w-3 mr-1" /> Valla 45°
+                  </Button>
+                </div>
               </div>
               <div className="space-y-4">
-                {data.items.map((item, idx) => (
-                  <div key={item.id} className="group p-6 bg-white hover:bg-gray-50 dark:bg-gray-700/30 rounded-2xl border-2 border-gray-50 hover:border-accent/10 transition-all">
+                {data.items.map((item, idx) => {
+                  const cat = getItemCategory(item.name)
+                  const labels = ITEM_FIELD_LABELS[cat]
+                  const isPost = cat === 'post' || cat === 'post45'
+                  const borderColor = cat === 'post45' ? 'hover:border-sky-200' : cat === 'post' ? 'hover:border-slate-200' : 'hover:border-accent/10'
+                  return (
+                  <div key={item.id} className={`group p-6 bg-white hover:bg-gray-50 dark:bg-gray-700/30 rounded-2xl border-2 border-gray-50 ${borderColor} transition-all`}>
                     <div className="flex flex-col md:flex-row justify-between gap-4">
                       <div className="flex-1 space-y-4">
                         <div className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-full bg-accent/20 text-navy font-black flex items-center justify-center text-xs">{idx + 1}</span>
+                          <span className={`w-8 h-8 rounded-full font-black flex items-center justify-center text-xs ${cat === 'post45' ? 'bg-sky-100 text-sky-700' : cat === 'post' ? 'bg-slate-100 text-slate-600' : 'bg-accent/20 text-navy'}`}>{idx + 1}</span>
                           <Input
                             className="font-black text-navy border-none shadow-none focus-visible:ring-1 focus-visible:ring-accent group-hover:bg-white text-lg p-0 h-auto"
                             value={item.name}
@@ -532,16 +555,25 @@ export default function ReviewPage() {
                         </div>
                         <div className="grid grid-cols-3 gap-6">
                           <div>
-                            <Label className="text-[9px] font-black uppercase text-gray-400 mb-2 block">Largo (m)</Label>
-                            <Input type="number" step="0.01" className="bg-gray-50 border-none rounded-lg font-bold" value={item.width} onChange={(e) => handleUpdateItem(item.id, 'width', Number(e.target.value))} />
+                            <Label className="text-[9px] font-black uppercase text-gray-400 mb-2 block">{labels.field1}</Label>
+                            <Input type="number" step={isPost ? '1' : '0.01'} min={isPost ? '1' : '0'} className="bg-gray-50 border-none rounded-lg font-bold" value={item.width} onChange={(e) => handleUpdateItem(item.id, 'width', Number(e.target.value))} />
                           </div>
                           <div>
-                            <Label className="text-[9px] font-black uppercase text-gray-400 mb-2 block">Alto (m)</Label>
+                            <Label className="text-[9px] font-black uppercase text-gray-400 mb-2 block">{labels.field2}</Label>
                             <Input type="number" step="0.01" className="bg-gray-50 border-none rounded-lg font-bold" value={item.height} onChange={(e) => handleUpdateItem(item.id, 'height', Number(e.target.value))} />
                           </div>
                           <div className="flex flex-col justify-end">
-                            <span className="text-[9px] font-black uppercase text-gray-400 mb-2 block">Área M²</span>
-                            <span className="font-black text-navy text-lg">{item.area.toFixed(2)}</span>
+                            {isPost ? (
+                              <>
+                                <span className="text-[9px] font-black uppercase text-gray-400 mb-2 block">Unidades</span>
+                                <span className="font-black text-navy text-lg">{Math.round(item.width)} uds.</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[9px] font-black uppercase text-gray-400 mb-2 block">Área M²</span>
+                                <span className="font-black text-navy text-lg">{item.area.toFixed(2)}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -558,13 +590,14 @@ export default function ReviewPage() {
                         </Button>
                       </div>
                     </div>
-                    {(item.price_rule === 'Minimo' || item.price === PRICING.MIN_PRICE_PER_ITEM) && (
+                    {!isPost && (item.price_rule === 'Minimo' || item.price === PRICING.MIN_PRICE_PER_ITEM) && (
                       <div className="mt-4 text-[9px] font-black uppercase text-orange-600 bg-orange-50 px-3 py-1 rounded-full inline-block">
                         * Tarifa mínima aplicada (80,00 €)
                       </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
 
