@@ -148,7 +148,7 @@ function buildItemsTxBodyInner(items: ProposalData['items']): string {
     const totalArea = netItems.reduce((s, i) => s + Number(i.area), 0)
 
     const headerLine = `
-<a:bodyPr wrap="square" rtlCol="0"><a:normAutofit/></a:bodyPr><a:lstStyle/>
+<a:bodyPr wrap="square" rtlCol="0"/><a:lstStyle/>
 <a:p><a:pPr algn="l"><a:lnSpc><a:spcPct val="130000"/></a:lnSpc></a:pPr>
   <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.85)}" b="1" dirty="0"><a:solidFill><a:srgbClr val="EAB308"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>MEDIDAS Y PRECIOS</a:t></a:r>
 </a:p>

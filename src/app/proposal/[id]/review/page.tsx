@@ -350,7 +350,19 @@ export default function ReviewPage() {
         mockupImageBlob,
       })
     } catch (err: any) {
-      setActionError(err.message || 'Error al generar el PDF')
+      const msg: string = err.message || ''
+      if (msg.includes('PDF_NOT_CONFIGURED') || msg.includes('CONVERTAPI_SECRET') || msg.includes('503')) {
+        // PDF conversion not configured — fall back to PPTX silently
+        try {
+          const mockupImageBlob2 = await mockupRef.current?.exportToPng() ?? null
+          downloadProposalPPTX({ ...data, mockupImageBlob: mockupImageBlob2 })
+          setActionError('PDF no disponible: se descargó el archivo PPTX. Para activar PDF, añade CONVERTAPI_SECRET en las variables de entorno.')
+        } catch {
+          setActionError('Error al generar el archivo. Comprueba la consola.')
+        }
+      } else {
+        setActionError(msg || 'Error al generar el PDF')
+      }
     } finally {
       setGeneratingPDF(false)
     }
