@@ -119,10 +119,12 @@ export async function POST(request: NextRequest) {
             })
         } catch (e: any) {
             console.error('[pptx-to-pdf] Google Drive falhou:', e.message)
-            // Both services failed — return actionable error
+            const noCreds = !convertApiSecret && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON
             return NextResponse.json({
                 error: 'PDF_NOT_CONFIGURED',
-                message: 'Para gerar PDF adicione a variável CONVERTAPI_SECRET no Vercel (Settings → Environment Variables). Registo gratuito em convertapi.com.',
+                message: noCreds
+                    ? 'Para generar PDF añade la variable CONVERTAPI_SECRET en Vercel (Settings → Environment Variables). Registro gratuito en convertapi.com.'
+                    : `Error en la conversión: ${e.message}`,
             }, { status: 503 })
         }
     } catch (err: any) {
