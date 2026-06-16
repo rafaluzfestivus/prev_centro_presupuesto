@@ -122,7 +122,7 @@ function setShapeImageFill(xml: string, shapeName: string, rId: string): string 
 function buildItemsTxBodyInner(items: ProposalData['items']): string {
     const n = items.length
     // Slide is ~20" wide — larger fonts than standard slides
-    const fontSize = n <= 3 ? 2000 : n <= 5 ? 1700 : n <= 8 ? 1400 : 1200
+    const fontSize = n <= 4 ? 2200 : n <= 7 ? 1900 : n <= 10 ? 1600 : 1400
 
     const itemLines = items.map((item, idx) => {
         const name = escapeXml(item.name)
@@ -130,23 +130,16 @@ function buildItemsTxBodyInner(items: ProposalData['items']): string {
         const isPost = cat === 'post' || cat === 'post45'
         const dims = isPost
             ? `${Math.round(Number(item.width))} uds. · ${Number(item.height).toFixed(2)}m`
-            : `${Number(item.width).toFixed(2)} × ${Number(item.height).toFixed(2)}m · ${Number(item.area).toFixed(2)}m²`
-        const price = `€${Number(item.price).toFixed(0)}`
-        // Two lines per item: name + price on line 1, dims on line 2
+            : `${Number(item.width).toFixed(2)}×${Number(item.height).toFixed(2)}m · ${Number(item.area).toFixed(2)}m²`
         return `
 <a:p>
   <a:pPr algn="l"><a:lnSpc><a:spcPct val="110000"/></a:lnSpc></a:pPr>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.7)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="9CA3AF"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>${idx + 1}.  </a:t></a:r>
-  <a:r><a:rPr lang="es-ES" sz="${fontSize}" b="1" dirty="0"><a:solidFill><a:srgbClr val="F3F4F6"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>${name}  </a:t></a:r>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 1.05)}" b="1" dirty="0"><a:solidFill><a:srgbClr val="EAB308"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>${price}</a:t></a:r>
-</a:p>
-<a:p>
-  <a:pPr algn="l" indent="228600"><a:lnSpc><a:spcPct val="90000"/></a:lnSpc></a:pPr>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.75)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="6B7280"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>${dims}</a:t></a:r>
+  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.7)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="9CA3AF"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>${idx + 1}. </a:t></a:r>
+  <a:r><a:rPr lang="es-ES" sz="${fontSize}" b="1" dirty="0"><a:solidFill><a:srgbClr val="F3F4F6"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>${name}</a:t></a:r>
+  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.8)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="9CA3AF"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>  ${dims}</a:t></a:r>
 </a:p>`
     }).join('')
 
-    const total = items.reduce((s, i) => s + Number(i.price), 0)
     const netItems = items.filter(i => getItemCategory(i.name) === 'net')
     const totalArea = netItems.reduce((s, i) => s + Number(i.area), 0)
 
@@ -161,9 +154,6 @@ ${itemLines}
 </a:p>
 <a:p><a:pPr algn="l"/>
   <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 0.85)}" b="0" dirty="0"><a:solidFill><a:srgbClr val="D1D5DB"/></a:solidFill><a:latin typeface="Calibri (MS)"/></a:rPr><a:t>${totalArea > 0 ? `${totalArea.toFixed(2)} m² · ` : ''}${items.length} piezas</a:t></a:r>
-</a:p>
-<a:p><a:pPr algn="l"/>
-  <a:r><a:rPr lang="es-ES" sz="${Math.round(fontSize * 1.15)}" b="1" dirty="0"><a:solidFill><a:srgbClr val="EAB308"/></a:solidFill><a:latin typeface="Calibri (MS) Bold"/></a:rPr><a:t>TOTAL: €${total.toFixed(2)}</a:t></a:r>
 </a:p>`
 
     return headerLine
