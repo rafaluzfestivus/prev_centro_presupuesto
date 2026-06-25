@@ -37,7 +37,15 @@ async function getGoogleToken(): Promise<string> {
     const now = Math.floor(Date.now() / 1000)
     const b64url = (obj: object) => Buffer.from(JSON.stringify(obj)).toString('base64url')
     const header  = b64url({ alg: 'RS256', typ: 'JWT' })
-    const payload = b64url({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/drive', aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now })
+    const impersonate = process.env.GOOGLE_IMPERSONATE_EMAIL
+    const payload = b64url({
+        iss: sa.client_email,
+        scope: 'https://www.googleapis.com/auth/drive',
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: now + 3600,
+        iat: now,
+        ...(impersonate ? { sub: impersonate } : {}),
+    })
     const signingInput = `${header}.${payload}`
     const pem = (sa.private_key as string).replace(/\\n/g, '\n').trim()
     const pemBody = pem.replace('-----BEGIN PRIVATE KEY-----', '').replace('-----END PRIVATE KEY-----', '').replace(/\s+/g, '')
@@ -57,10 +65,16 @@ async function getGoogleToken(): Promise<string> {
 async function convertWithGoogleDrive(pptxBuffer: ArrayBuffer): Promise<Uint8Array> {
     const token = await getGoogleToken()
     const boundary = 'pptxboundary'
-    const meta = JSON.stringify({ name: 'presupuesto_temp.pptx', mimeType: 'application/vnd.google-apps.presentation' })
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
+    const meta: Record<string, unknown> = {
+        name: 'presupuesto_temp.pptx',
+        mimeType: 'application/vnd.google-apps.presentation',
+    }
+    if (folderId) meta.parents = [folderId]
+    const metaJson = JSON.stringify(meta)
     const enc = new TextEncoder()
     const parts = [
-        enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`),
+        enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metaJson}\r\n`),
         enc.encode(`--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation\r\n\r\n`),
         new Uint8Array(pptxBuffer),
         enc.encode(`\r\n--${boundary}--`),
@@ -69,25 +83,28 @@ async function convertWithGoogleDrive(pptxBuffer: ArrayBuffer): Promise<Uint8Arr
     const body = new Uint8Array(totalLen)
     let off = 0; for (const p of parts) { body.set(p, off); off += p.length }
 
-    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
         body,
     })
-    if (!uploadRes.ok) throw new Error(`Google Drive upload falhou: ${uploadRes.status}`)
+    if (!uploadRes.ok) {
+        const errText = await uploadRes.text().catch(() => uploadRes.statusText)
+        throw new Error(`Google Drive upload falhou: ${uploadRes.status} ${errText.slice(0, 300)}`)
+    }
     const { id: fileId } = await uploadRes.json()
 
     try {
-        const exportRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf`, {
+        const exportRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf&supportsAllDrives=true`, {
             headers: { Authorization: `Bearer ${token}` },
         })
         if (!exportRes.ok) {
             const errText = await exportRes.text()
-            throw new Error(`Google Drive export falhou: ${exportRes.status} ${errText.slice(0, 200)}`)
+            throw new Error(`Google Drive export falhou: ${exportRes.status} ${errText.slice(0, 300)}`)
         }
         return new Uint8Array(await exportRes.arrayBuffer())
     } finally {
-        fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
+        fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
     }
 }
 
