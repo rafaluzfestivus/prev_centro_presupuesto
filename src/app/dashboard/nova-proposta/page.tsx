@@ -8,6 +8,7 @@ import {
     confirmProposalAction, closeSaleAction, updateClientStatusAction,
 } from '@/actions/proposal'
 import { generateProposalBlob } from '@/services/pdfDirectGenerator'
+import { downloadProposalPPTX } from '@/services/pptxGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
 import { PRICING } from '@/lib/constants'
 import { useProfile } from '@/hooks/useProfile'
@@ -202,8 +203,9 @@ function NovaPropostaInner() {
     const [closing, setClosing]               = useState(false)
 
     // PDF / WA
-    const [generatingPDF, setGeneratingPDF] = useState(false)
-    const [sendingWA, setSendingWA]         = useState(false)
+    const [generatingPDF, setGeneratingPDF]   = useState(false)
+    const [generatingPPTX, setGeneratingPPTX] = useState(false)
+    const [sendingWA, setSendingWA]           = useState(false)
 
     const total = items.reduce((s, i) => s + i.price, 0)
 
@@ -365,6 +367,14 @@ function NovaPropostaInner() {
             a.click()
         } catch (e: any) { setError(e.message || 'Erro ao gerar PDF') }
         setGeneratingPDF(false)
+    }
+
+    const handleDownloadPPTX = async () => {
+        setGeneratingPPTX(true)
+        try {
+            await downloadProposalPPTX({ ...pdfData(), imageUrl })
+        } catch (e: any) { setError(e.message || 'Erro ao gerar PPTX') }
+        setGeneratingPPTX(false)
     }
 
     const handleWhatsApp = async () => {
@@ -852,17 +862,24 @@ function NovaPropostaInner() {
                             </div>
                         )}
 
-                        {/* PDF + WhatsApp */}
-                        <div className="grid grid-cols-2 gap-3 mb-5">
-                            <button onClick={handleDownloadPDF} disabled={generatingPDF}
-                                className="py-3.5 bg-red-50 border border-red-200 text-red-700 font-black rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
-                                {generatingPDF ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                                {generatingPDF ? 'Gerando…' : 'Download PDF'}
+                        {/* PDF + PPTX + WhatsApp */}
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <button onClick={handleDownloadPPTX} disabled={generatingPPTX}
+                                className="py-3.5 bg-blue-50 border border-blue-200 text-blue-700 font-black rounded-xl hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+                                {generatingPPTX ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                                {generatingPPTX ? 'Gerando…' : 'Download PPTX'}
                             </button>
                             <button onClick={handleWhatsApp} disabled={sendingWA}
                                 className="py-3.5 bg-green-50 border border-green-200 text-green-700 font-black rounded-xl hover:bg-green-600 hover:text-white hover:border-green-600 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50">
                                 {sendingWA ? <Loader2 size={15} className="animate-spin" /> : <MessageCircle size={15} />}
                                 {sendingWA ? 'Enviando…' : 'Enviar WhatsApp'}
+                            </button>
+                        </div>
+                        <div className="mb-5">
+                            <button onClick={handleDownloadPDF} disabled={generatingPDF}
+                                className="w-full py-2.5 bg-gray-50 border border-gray-200 text-gray-500 font-bold rounded-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2 text-xs disabled:opacity-50">
+                                {generatingPDF ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                                {generatingPDF ? 'Gerando…' : 'Download PDF (simples)'}
                             </button>
                         </div>
 
