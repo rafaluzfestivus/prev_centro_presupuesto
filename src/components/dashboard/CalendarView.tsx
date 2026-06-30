@@ -464,13 +464,15 @@ const CalendarView = () => {
 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-                    <div className="glass-card w-full max-w-md p-10 bg-white border-none shadow-2xl relative animate-in fade-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-8">
+                    <div className="glass-card w-full max-w-md bg-white border-none shadow-2xl relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                        <div className="flex justify-between items-center p-10 pb-6 shrink-0">
                             <h2 className="text-2xl font-bold text-navy">{selectedAppointment ? 'Editar Cita' : 'Nueva Cita'}</h2>
                             <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-text-muted hover:text-navy transition-colors">
                                 <X size={24} />
                             </button>
                         </div>
+
+                        <div className="overflow-y-auto flex-1 px-10 pb-10">
 
                         {formError && (
                             <div className="mb-5 flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
@@ -651,6 +653,7 @@ const CalendarView = () => {
                                 )}
                             </div>
                         </form>
+                        </div>
                     </div>
                 </div>
             )}

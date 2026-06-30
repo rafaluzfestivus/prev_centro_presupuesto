@@ -133,7 +133,7 @@ function NetRect({ rx, ry, rW, rH, item }: { rx: number; ry: number; rW: number;
       {/* Price badge */}
       <rect x={rx} y={ry + rH - 13} width={rW} height={13} fill={`${ACCENT}33`} rx={2} />
       <text x={rx + rW / 2} y={ry + rH - 3} textAnchor="middle" fill={ACCENT} fontFamily="system-ui,Arial,sans-serif" fontSize={8} fontWeight="bold">
-        € {item.price.toFixed(0)}
+        € {item.price.toFixed(2)}
       </text>
     </g>
   )
@@ -168,7 +168,7 @@ function PostRect({ rx, ry, rW, rH, item, cat }: { rx: number; ry: number; rW: n
             )}
             {/* Price tag */}
             <text x={px} y={ry + rH + 10} textAnchor="middle" fill={color} fontFamily="system-ui,Arial,sans-serif" fontSize={7} fontWeight="bold">
-              € {item.price.toFixed(0)}
+              € {item.price.toFixed(2)}
             </text>
           </g>
         )

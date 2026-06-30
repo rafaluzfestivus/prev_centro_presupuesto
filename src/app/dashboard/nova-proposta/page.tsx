@@ -446,16 +446,6 @@ function NovaPropostaInner() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">WhatsApp</label>
-                                    <input
-                                        value={clientPhone}
-                                        onChange={e => setClientPhone(e.target.value)}
-                                        placeholder="34600000000"
-                                        className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none"
-                                    />
-                                </div>
-
-                                <div>
                                     <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Empresa</label>
                                     <CompanySelector
                                         value={selectedCompanyId}
@@ -936,6 +926,17 @@ function NovaPropostaInner() {
                                     type="datetime-local"
                                     value={installDate}
                                     onChange={e => setInstallDate(e.target.value)}
+                                    className="w-full h-12 px-4 bg-gray-50 rounded-xl text-navy font-medium outline-none focus:ring-2 focus:ring-accent/50 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black uppercase text-navy/60 mb-2">
+                                    WhatsApp *
+                                </label>
+                                <input
+                                    value={clientPhone}
+                                    onChange={e => setClientPhone(e.target.value)}
+                                    placeholder="34600000000"
                                     className="w-full h-12 px-4 bg-gray-50 rounded-xl text-navy font-medium outline-none focus:ring-2 focus:ring-accent/50 text-sm"
                                 />
                             </div>

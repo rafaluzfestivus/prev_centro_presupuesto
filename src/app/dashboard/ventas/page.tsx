@@ -213,7 +213,7 @@ export default function VentasPage() {
                                 return (
                                     <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
                                         <span className="text-[9px] font-black text-text-muted opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                            {m.revenue > 0 ? `€${m.revenue.toFixed(0)}` : '—'}
+                                            {m.revenue > 0 ? `€${m.revenue.toFixed(2)}` : '—'}
                                         </span>
                                         <div className="w-full relative" style={{ height: '96px' }}>
                                             <div

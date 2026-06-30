@@ -116,8 +116,9 @@ export default function BuilderPage() {
     }, [id])
 
     const handleTypeChange = (type: ItemType) => {
+        const wasAutoFilled = ITEM_TYPES.includes(formName as ItemType) || formName.trim() === ''
         setFormType(type)
-        if (type !== 'Personalizado') setFormName(type)
+        if (type !== 'Personalizado' && wasAutoFilled) setFormName(type)
     }
 
     const parseDecimal = (v: string) => parseFloat(v.replace(',', '.'))
@@ -344,7 +345,7 @@ export default function BuilderPage() {
                                 <Input
                                     value={formName}
                                     onChange={e => setFormName(e.target.value)}
-                                    placeholder="Ex: Ventana Principal"
+                                    placeholder="Ex: Ventana Cocina"
                                     className="bg-gray-50 border-none rounded-xl font-medium"
                                 />
                             </div>
