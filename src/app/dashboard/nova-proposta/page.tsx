@@ -7,7 +7,7 @@ import {
     parseProposalTextAction, createFullProposalAction,
     confirmProposalAction, closeSaleAction, updateClientStatusAction,
 } from '@/actions/proposal'
-import { generateProposalBlob } from '@/services/pdfGenerator'
+import { generateProposalBlob } from '@/services/pdfDirectGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
 import { PRICING } from '@/lib/constants'
 import { useProfile } from '@/hooks/useProfile'

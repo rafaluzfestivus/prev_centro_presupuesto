@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Download, MessageCircle, Home, Loader2, Share2, ArrowLeft } from 'lucide-react'
-import { ProposalItem, generateProposalBlob } from '@/services/pdfGenerator'
+import { ProposalItem, generateProposalBlob } from '@/services/pdfDirectGenerator'
 import { getProposalDetailsAction, updateProposalAction } from '@/actions/proposal'
 import { createClient } from '@/lib/supabase/client'
-import type { ProposalData } from '@/services/pdfGenerator'
+import type { ProposalData } from '@/services/pdfDirectGenerator'
 
 export default function SuccessPage() {
   const router = useRouter()
