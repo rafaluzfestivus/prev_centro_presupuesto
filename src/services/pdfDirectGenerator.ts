@@ -340,7 +340,7 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
     doc.setTextColor(GOLD)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
-    doc.text('✓ 3 años de garantía. Sin letra pequeña.', 19, 126.5)
+    doc.text('✓ 2 años de garantía. Sin letra pequeña.', 19, 126.5)
 
     doc.setTextColor(WHITE)
     doc.setFontSize(13)
@@ -349,7 +349,7 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
         ['Superficie cubierta', `${(totalArea || data.items.reduce((s, i) => s + Number(i.area || 0), 0)).toFixed(2)} m² instalados`],
         ['Instalación profesional', 'Equipo certificado'],
         ['Material garantizado', 'Red EN 1263-1, 150kg/m²'],
-        ['Garantía', '3 años sin coste'],
+        ['Garantía', '2 años sin coste'],
     ]
     let vy = 40
     includes.forEach(([t, d]) => {

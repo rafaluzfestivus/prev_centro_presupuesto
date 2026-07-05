@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import {
@@ -12,6 +12,7 @@ import { downloadProposalPPTX } from '@/services/pptxGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
 import { PRICING } from '@/lib/constants'
 import { getItemCategory, calcItemPrice } from '@/lib/itemTypes'
+import { MockupEditor, MockupEditorRef } from '@/components/proposal/MockupEditor'
 import { useProfile } from '@/hooks/useProfile'
 import { COMPANIES } from '@/lib/companies'
 import {
@@ -210,6 +211,7 @@ function NovaPropostaInner() {
     const [generatingPDF, setGeneratingPDF]   = useState(false)
     const [generatingPPTX, setGeneratingPPTX] = useState(false)
     const [sendingWA, setSendingWA]           = useState(false)
+    const mockupRef = useRef<MockupEditorRef>(null)
 
     const total = items.reduce((s, i) => s + i.price, 0)
 
@@ -381,7 +383,8 @@ function NovaPropostaInner() {
     const handleDownloadPPTX = async () => {
         setGeneratingPPTX(true)
         try {
-            await downloadProposalPPTX({ ...pdfData(), imageUrl })
+            const mockupImageBlob = await mockupRef.current?.exportToPng() ?? null
+            await downloadProposalPPTX({ ...pdfData(), imageUrl, mockupImageBlob })
         } catch (e: any) { setError(e.message || 'Erro ao gerar PPTX') }
         setGeneratingPPTX(false)
     }
@@ -868,13 +871,11 @@ function NovaPropostaInner() {
                             </div>
                         </div>
 
-                        {/* Mockup */}
-                        {mockup && (
-                            <div className="bg-navy rounded-2xl p-5 mb-5">
-                                <p className="text-accent text-[9px] font-black uppercase tracking-widest mb-2">Plano de instalação</p>
-                                <pre className="text-accent font-mono text-[10px] leading-tight whitespace-pre-wrap">{mockup}</pre>
-                            </div>
-                        )}
+                        {/* Mockup visual — usado também para exportar PNG no PPTX */}
+                        <div className="bg-navy rounded-2xl p-5 mb-5">
+                            <p className="text-accent text-[9px] font-black uppercase tracking-widest mb-3">Plano de instalação</p>
+                            <MockupEditor ref={mockupRef} items={items} className="w-full" />
+                        </div>
 
                         {/* PDF + PPTX + WhatsApp */}
                         <div className="grid grid-cols-2 gap-3 mb-3">
