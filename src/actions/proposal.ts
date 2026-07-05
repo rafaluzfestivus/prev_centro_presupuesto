@@ -2,7 +2,6 @@
 
 
 import { createProposal, getProposals, getProposalById, getLatestAIProcessing, getProposalItems, saveAIProcessing, updateProposal, saveProposalItems, deleteProposal } from '@/services/proposal'
-import { appendFechamentoRow } from '@/lib/googleSheets'
 import { createClient } from '@/lib/supabase/server'
 import { CreateProposalInput } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
@@ -403,8 +402,9 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
             console.log('[closeSale] Agendamento criado para', appointmentDate)
         }
 
-        // Append row to Fechamentos Google Sheet (fire-and-forget — don't block the close)
+        // Append row to Fechamentos Google Sheet (fire-and-forget — never blocks the close)
         try {
+            const { appendFechamentoRow } = await import('@/lib/googleSheets')
             const items = await getProposalItems(id)
             const totalM2 = items.reduce((s: number, it: any) => s + (Number(it.area_m2) || 0), 0)
             const valorCobrado = Number(proposal.total_geral) || 0
