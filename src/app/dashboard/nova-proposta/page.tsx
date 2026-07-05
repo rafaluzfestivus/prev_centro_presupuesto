@@ -11,6 +11,7 @@ import { generateProposalBlob } from '@/services/pdfDirectGenerator'
 import { downloadProposalPPTX } from '@/services/pptxGenerator'
 import { sendDocumentMessage } from '@/lib/evolution'
 import { PRICING } from '@/lib/constants'
+import { getItemCategory, calcItemPrice } from '@/lib/itemTypes'
 import { useProfile } from '@/hooks/useProfile'
 import { COMPANIES } from '@/lib/companies'
 import {
@@ -45,11 +46,14 @@ type Item = {
 }
 
 function buildItem(name = '', w = 0, h = 0): Item {
-    const area = w * h
+    const cat = getItemCategory(name)
+    const isPost = cat === 'post' || cat === 'post45'
+    const area = isPost ? w : w * h
+    const price = w > 0 || h > 0 ? calcItemPrice(cat, w, h) : 0
     return {
         id: `i_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         name, width: w, height: h, area,
-        price: Math.max(area * PRICING.PRICE_PER_M2, area > 0 ? PRICING.MIN_PRICE_PER_ITEM : 0),
+        price,
         priceManual: false,
     }
 }
@@ -274,16 +278,21 @@ function NovaPropostaInner() {
     const updateItem = (id: string, field: 'name' | 'width' | 'height' | 'price', val: string) => {
         setItems(prev => prev.map(it => {
             if (it.id !== id) return it
-            if (field === 'name')  return { ...it, name: val }
+            if (field === 'name') {
+                const cat = getItemCategory(val)
+                const isPost = cat === 'post' || cat === 'post45'
+                const area = isPost ? it.width : it.width * it.height
+                const price = it.priceManual ? it.price : calcItemPrice(cat, it.width, it.height)
+                return { ...it, name: val, area, price }
+            }
             if (field === 'price') return { ...it, price: Number(val) || 0, priceManual: true }
             const n = Number(val) || 0
             const updated = { ...it, [field]: n }
-            updated.area = updated.width * updated.height
+            const cat = getItemCategory(updated.name)
+            const isPost = cat === 'post' || cat === 'post45'
+            updated.area = isPost ? updated.width : updated.width * updated.height
             if (!updated.priceManual) {
-                updated.price = Math.max(
-                    updated.area * PRICING.PRICE_PER_M2,
-                    updated.area > 0 ? PRICING.MIN_PRICE_PER_ITEM : 0
-                )
+                updated.price = calcItemPrice(cat, updated.width, updated.height)
             }
             return updated
         }))
@@ -405,6 +414,7 @@ function NovaPropostaInner() {
             address: installAddress,
             notes: installNotes,
             scheduledAt: installDate,
+            whatsapp: clientPhone,
         })
         if (!res.success) { setError(res.error ?? 'Erro ao confirmar'); setClosing(false); return }
         if (leadId) await updateClientStatusAction(leadId, 'handover')
@@ -835,18 +845,22 @@ function NovaPropostaInner() {
                                 <span className="text-right">Preço</span>
                             </div>
                             <div className="divide-y divide-border/60">
-                                {items.map((it, i) => (
+                                {items.map((it, i) => {
+                                    const cat = getItemCategory(it.name)
+                                    const isPost = cat === 'post' || cat === 'post45'
+                                    return (
                                     <div key={it.id} className="px-4 py-3 grid grid-cols-[28px_1fr_80px_80px_56px_96px] gap-3 items-center">
-                                        <span className="w-6 h-6 rounded-full bg-accent/10 text-accent font-black text-[10px] flex items-center justify-center">
+                                        <span className={`w-6 h-6 rounded-full font-black text-[10px] flex items-center justify-center ${cat === 'post45' ? 'bg-sky-100 text-sky-700' : cat === 'post' ? 'bg-slate-100 text-slate-600' : 'bg-accent/10 text-accent'}`}>
                                             {i + 1}
                                         </span>
                                         <span className="font-semibold text-navy text-sm truncate">{it.name || '—'}</span>
-                                        <span className="text-sm text-text-muted text-center">{it.width > 0 ? `${it.width}m` : '—'}</span>
-                                        <span className="text-sm text-text-muted text-center">{it.height > 0 ? `${it.height}m` : '—'}</span>
-                                        <span className="text-sm font-bold text-text-muted text-center">{it.area > 0 ? it.area.toFixed(2) : '—'}</span>
+                                        <span className="text-sm text-text-muted text-center">{isPost ? `${Math.round(it.width)} uds` : (it.width > 0 ? `${it.width}m` : '—')}</span>
+                                        <span className="text-sm text-text-muted text-center">{isPost ? '—' : (it.height > 0 ? `${it.height}m` : '—')}</span>
+                                        <span className="text-sm font-bold text-text-muted text-center">{isPost ? '—' : (it.area > 0 ? it.area.toFixed(2) : '—')}</span>
                                         <span className="text-sm font-black text-navy text-right">€ {it.price.toFixed(2)}</span>
                                     </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                             <div className="border-t border-border px-4 py-3 flex justify-end items-center gap-3 bg-gray-50">
                                 <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Total</span>

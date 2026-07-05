@@ -7,9 +7,11 @@ import {
     addAppointmentAfterPhotosAction,
     addAppointmentBeforePhotosAction,
     deleteAppointmentPhotoAction,
+    confirmProposalAction,
 } from '@/actions/proposal'
-import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, Plus, CheckCircle2, Calendar, Euro, Layers, FileText, AlertTriangle, Trash2, X, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Printer, ArrowLeft, Camera, MapPin, Phone, Plus, CheckCircle2, Calendar, Euro, Layers, FileText, AlertTriangle, Trash2, X, Eye, EyeOff, Edit2, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getItemCategory, calcItemPrice } from '@/lib/itemTypes'
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
     pending:   { label: 'Pendiente',  cls: 'bg-yellow-100 text-yellow-700' },
@@ -35,6 +37,10 @@ export default function AppointmentReportPage() {
     const [uploadError, setUploadError] = useState<string | null>(null)
     const [uploadSuccess, setUploadSuccess] = useState<'before' | 'after' | null>(null)
     const [hideValues, setHideValues] = useState(false)
+    const [editingItems, setEditingItems] = useState(false)
+    const [editItems, setEditItems] = useState<any[]>([])
+    const [savingItems, setSavingItems] = useState(false)
+    const [saveItemsError, setSaveItemsError] = useState<string | null>(null)
     const afterInputRef = useRef<HTMLInputElement>(null)
     const beforeInputRef = useRef<HTMLInputElement>(null)
 
@@ -119,6 +125,53 @@ export default function AppointmentReportPage() {
         if (res.success) {
             if (type === 'before') setBeforePhotoUrls(prev => prev.filter(u => u !== url))
             else setAfterPhotoUrls(prev => prev.filter(u => u !== url))
+        }
+    }
+
+    const startEditItems = () => {
+        setEditItems(items.map((it: any) => ({ ...it })))
+        setEditingItems(true)
+        setSaveItemsError(null)
+    }
+
+    const updateEditItem = (id: string, field: string, val: string) => {
+        setEditItems(prev => prev.map(it => {
+            if (it.id !== id) return it
+            if (field === 'valor_total') return { ...it, valor_total: Number(val) || 0 }
+            const n = Number(val) || 0
+            const updated = { ...it, [field]: n }
+            const cat = getItemCategory(it.nome_ambiente)
+            const isPost = cat === 'post' || cat === 'post45'
+            if (field === 'largura' || field === 'altura') {
+                updated.area_m2 = isPost ? updated.largura : updated.largura * updated.altura
+                updated.valor_total = calcItemPrice(cat, updated.largura, updated.altura)
+            }
+            return updated
+        }))
+    }
+
+    const saveEditItems = async () => {
+        if (!proposal) return
+        setSavingItems(true)
+        setSaveItemsError(null)
+        try {
+            const newTotal = editItems.reduce((s: number, it: any) => s + Number(it.valor_total), 0)
+            const mapped = editItems.map((it: any) => ({
+                id: it.id,
+                name: it.nome_ambiente,
+                width: Number(it.largura),
+                height: Number(it.altura),
+                area: Number(it.area_m2),
+                price: Number(it.valor_total),
+            }))
+            const res = await confirmProposalAction(proposal.id, newTotal, mapped)
+            if (!res.success) throw new Error(res.error || 'Error al guardar')
+            setItems(editItems)
+            setEditingItems(false)
+        } catch (e: any) {
+            setSaveItemsError(e.message || 'Error al guardar')
+        } finally {
+            setSavingItems(false)
         }
     }
 
@@ -278,8 +331,23 @@ export default function AppointmentReportPage() {
                 {/* Measurements Table (only if proposal linked with items) */}
                 {items.length > 0 && (
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100">
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <h2 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Mediciones Detalladas</h2>
+                            {proposal && !editingItems && (
+                                <Button size="sm" variant="ghost" onClick={startEditItems} className="print:hidden gap-2 text-navy font-bold text-xs h-8 px-3">
+                                    <Edit2 className="h-3 w-3" /> Editar
+                                </Button>
+                            )}
+                            {editingItems && (
+                                <div className="print:hidden flex items-center gap-2">
+                                    {saveItemsError && <span className="text-xs text-red-600 font-medium">{saveItemsError}</span>}
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingItems(false)} className="text-gray-500 font-bold text-xs h-8 px-3">Cancelar</Button>
+                                    <Button size="sm" onClick={saveEditItems} disabled={savingItems} className="bg-navy text-white font-bold text-xs h-8 px-4 gap-1">
+                                        {savingItems ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                        Guardar
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
@@ -294,16 +362,45 @@ export default function AppointmentReportPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {items.map((item: any, idx: number) => (
+                                    {(editingItems ? editItems : items).map((item: any, idx: number) => {
+                                        const cat = getItemCategory(item.nome_ambiente)
+                                        const isPost = cat === 'post' || cat === 'post45'
+                                        return (
                                         <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                                             <td className="px-6 py-4 text-gray-400 font-bold text-xs">{idx + 1}</td>
                                             <td className="px-6 py-4 font-black text-navy">{item.nome_ambiente}</td>
-                                            <td className="px-4 py-4 text-right font-medium text-gray-600">{Number(item.largura).toFixed(2)}m</td>
-                                            <td className="px-4 py-4 text-right font-medium text-gray-600">{Number(item.altura).toFixed(2)}m</td>
-                                            <td className="px-4 py-4 text-right font-bold text-navy">{Number(item.area_m2).toFixed(2)}</td>
-                                            {!hideValues && <td className="px-6 py-4 text-right font-black text-navy">€ {Number(item.valor_total).toFixed(2)}</td>}
+                                            <td className="px-4 py-4 text-right font-medium text-gray-600">
+                                                {editingItems ? (
+                                                    <input type="number" step="0.01" value={item.largura} onChange={e => updateEditItem(item.id, 'largura', e.target.value)}
+                                                        className="w-20 text-right bg-gray-50 border border-gray-200 rounded px-2 py-1 text-navy font-bold" />
+                                                ) : (
+                                                    isPost ? `${Math.round(item.largura)} uds` : `${Number(item.largura).toFixed(2)}m`
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-4 text-right font-medium text-gray-600">
+                                                {editingItems && !isPost ? (
+                                                    <input type="number" step="0.01" value={item.altura} onChange={e => updateEditItem(item.id, 'altura', e.target.value)}
+                                                        className="w-20 text-right bg-gray-50 border border-gray-200 rounded px-2 py-1 text-navy font-bold" />
+                                                ) : (
+                                                    isPost ? '—' : `${Number(item.altura).toFixed(2)}m`
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-4 text-right font-bold text-navy">
+                                                {isPost ? `${Math.round(item.largura)} uds` : Number(item.area_m2).toFixed(2)}
+                                            </td>
+                                            {!hideValues && (
+                                                <td className="px-6 py-4 text-right font-black text-navy">
+                                                    {editingItems ? (
+                                                        <input type="number" step="0.01" value={item.valor_total} onChange={e => updateEditItem(item.id, 'valor_total', e.target.value)}
+                                                            className="w-24 text-right bg-amber-50 border border-amber-200 rounded px-2 py-1 text-navy font-bold" />
+                                                    ) : (
+                                                        `€ ${Number(item.valor_total).toFixed(2)}`
+                                                    )}
+                                                </td>
+                                            )}
                                         </tr>
-                                    ))}
+                                        )
+                                    })}
                                 </tbody>
                                 <tfoot>
                                     <tr className="border-t-2 border-gray-200 bg-navy/5">
