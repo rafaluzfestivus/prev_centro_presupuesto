@@ -2,6 +2,7 @@
 
 
 import { createProposal, getProposals, getProposalById, getLatestAIProcessing, getProposalItems, saveAIProcessing, updateProposal, saveProposalItems, deleteProposal } from '@/services/proposal'
+import { appendFechamentoRow } from '@/lib/googleSheets'
 import { createClient } from '@/lib/supabase/server'
 import { CreateProposalInput } from '@/lib/types'
 import { revalidatePath } from 'next/cache'
@@ -400,6 +401,22 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
             console.error('[closeSale] Erro ao criar agendamento:', JSON.stringify(aptErr))
         } else {
             console.log('[closeSale] Agendamento criado para', appointmentDate)
+        }
+
+        // Append row to Fechamentos Google Sheet (fire-and-forget — don't block the close)
+        try {
+            const items = await getProposalItems(id)
+            const totalM2 = items.reduce((s: number, it: any) => s + (Number(it.area_m2) || 0), 0)
+            const valorCobrado = Number(proposal.total_geral) || 0
+            await appendFechamentoRow({
+                date: new Date(appointmentDate),
+                clientName: proposal.cliente_nome || 'Cliente',
+                valorCobrado,
+                totalM2,
+            })
+            console.log('[closeSale] Linha adicionada ao Google Sheets')
+        } catch (sheetsErr: any) {
+            console.error('[closeSale] Erro ao escrever no Google Sheets (não bloqueia):', sheetsErr.message)
         }
 
         revalidatePath(`/proposal/${id}`)
