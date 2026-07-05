@@ -14,8 +14,8 @@ const SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 
 // ── JWT helpers (no external deps) ───────────────────────────────────────────
 
-function base64url(data: ArrayBuffer): string {
-    return Buffer.from(data)
+function base64url(data: Uint8Array | ArrayBuffer): string {
+    return Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data)
         .toString('base64')
         .replace(/=/g, '')
         .replace(/\+/g, '-')
@@ -23,7 +23,7 @@ function base64url(data: ArrayBuffer): string {
 }
 
 async function signJwt(header: object, payload: object, pemKey: string): Promise<string> {
-    const enc = (obj: object) => base64url(Buffer.from(JSON.stringify(obj)))
+    const enc = (obj: object) => base64url(new TextEncoder().encode(JSON.stringify(obj)))
     const message = `${enc(header)}.${enc(payload)}`
 
     // Clean PEM key — env vars often store \n as literal backslash-n
@@ -38,7 +38,7 @@ async function signJwt(header: object, payload: object, pemKey: string): Promise
         false,
         ['sign'],
     )
-    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, Buffer.from(message))
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(message))
     return `${message}.${base64url(sig)}`
 }
 
