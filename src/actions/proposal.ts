@@ -409,13 +409,13 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
         try {
             const { appendFechamentoRow } = await import('@/lib/googleSheets')
             const items = await getProposalItems(id)
-            const totalM2 = items.reduce((s: number, it: any) => s + (Number(it.area_m2) || 0), 0)
+            const totalM2sheets = items.reduce((s: number, it: any) => s + (Number(it.area_m2) || 0), 0)
             const valorCobrado = Number(proposal.total_geral) || 0
             await appendFechamentoRow({
                 date: new Date(appointmentDate),
                 clientName: proposal.cliente_nome || 'Cliente',
                 valorCobrado,
-                totalM2,
+                totalM2: totalM2sheets,
             })
             console.log('[closeSale] Linha adicionada ao Google Sheets')
         } catch (sheetsErr: any) {
