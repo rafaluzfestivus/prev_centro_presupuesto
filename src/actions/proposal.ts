@@ -378,6 +378,9 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
             ? new Date(installation.scheduledAt).toISOString()
             : new Date().toISOString()
 
+        const proposalItems = await getProposalItems(id)
+        const totalM2 = proposalItems.reduce((s: number, it: any) => s + (Number(it.area_m2) || 0), 0)
+
         const { error: aptErr } = await supabase
             .from('appointments')
             .insert({
@@ -390,7 +393,7 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
                 installation_address: installation?.address || proposal.cidade || null,
                 installation_notes: installation?.notes || null,
                 total_value: Number(proposal.total_geral) || null,
-                total_m2: null,
+                total_m2: totalM2 > 0 ? totalM2 : null,
                 special_attention: false,
                 notes: `Venta cerrada desde presupuesto ${id}.`,
                 company_id: profile.company_id,
