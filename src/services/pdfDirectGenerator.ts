@@ -65,6 +65,22 @@ const getImgSize = (dataUrl: string): Promise<{ w: number; h: number }> =>
         img.src = dataUrl
     })
 
+const drawCheck = (doc: jsPDF, x: number, y: number, size: number, colorHex: string) => {
+    doc.setDrawColor(colorHex)
+    doc.setLineWidth(size * 0.18)
+    doc.line(x, y, x + size * 0.32, y + size * 0.32)
+    doc.line(x + size * 0.32, y + size * 0.32, x + size, y - size * 0.36)
+    doc.setLineWidth(0.5)
+}
+
+const drawCross = (doc: jsPDF, x: number, y: number, size: number, colorHex: string) => {
+    doc.setDrawColor(colorHex)
+    doc.setLineWidth(size * 0.18)
+    doc.line(x, y, x + size * 0.7, y - size * 0.7)
+    doc.line(x, y - size * 0.7, x + size * 0.7, y)
+    doc.setLineWidth(0.5)
+}
+
 export const generateProposalPDF_direct = async (data: ProposalData): Promise<Blob> => {
     const isEste = data.city?.toLowerCase().includes('este')
     const brandName = isEste ? 'PREVENTIVA ESTE' : 'PREVENTIVA CENTRO'
@@ -196,10 +212,11 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
     ]
     let py = 62
     pros.forEach(([t, d]) => {
+        drawCheck(doc, 20, py, 3, WHITE)
         doc.setTextColor(WHITE)
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
-        doc.text(`✓ ${t}`, 20, py)
+        doc.text(t, 26, py)
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
         doc.text(d, 20, py + 5, { maxWidth: 118 })
@@ -220,10 +237,11 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
     ]
     let cy = 62
     cons.forEach(([t, d]) => {
+        drawCross(doc, 157, cy, 3, MAROON)
         doc.setTextColor(MAROON)
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
-        doc.text(`✗ ${t}`, 157, cy)
+        doc.text(t, 163, cy)
         doc.setTextColor(TEXT_GRAY)
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
@@ -253,8 +271,13 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
     doc.text('SUPERFICIE A PROTEGER', 20, 48)
 
     let iy = 58
+    let hiddenCount = 0
     doc.setFontSize(9)
     data.items.forEach((item, idx) => {
+        if (iy > 150) {
+            hiddenCount++
+            return
+        }
         const cat = getItemCategory(item.name)
         const isPost = cat === 'post' || cat === 'post45'
         const dims = isPost
@@ -272,8 +295,14 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
         doc.text(dims, 27, iy + 4.5)
         doc.setFontSize(9)
         iy += 11
-        if (iy > 150) return
     })
+    if (hiddenCount > 0) {
+        doc.setTextColor(GOLD)
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(8)
+        doc.text(`+${hiddenCount} más`, 20, Math.min(iy, 153))
+        doc.setFontSize(9)
+    }
 
     const netItems = data.items.filter((i) => getItemCategory(i.name) === 'net')
     const totalArea = netItems.reduce((s, i) => s + Number(i.area), 0)
@@ -297,8 +326,8 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
             const size = await getImgSize(mockupDataUrl)
             const { w, h } = fitImage(size.w, size.h, 120, 100)
             doc.addImage(mockupDataUrl, 'PNG', 157 + (120 - w) / 2, 52 + (100 - h) / 2, w, h)
-        } catch {
-            // ignore image errors, keep placeholder panel
+        } catch (err: any) {
+            console.error('[PDF] Mockup image error:', err?.message)
         }
     }
 
@@ -340,7 +369,8 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
     doc.setTextColor(GOLD)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
-    doc.text('✓ 2 años de garantía. Sin letra pequeña.', 19, 126.5)
+    drawCheck(doc, 19, 126.5, 3, GOLD)
+    doc.text('2 años de garantía. Sin letra pequeña.', 25, 126.5)
 
     doc.setTextColor(WHITE)
     doc.setFontSize(13)
@@ -397,8 +427,8 @@ export const generateProposalPDF_direct = async (data: ProposalData): Promise<Bl
                 const x = margin + idx * (cellW + gap) + (cellW - w) / 2
                 const y = 32 + (cellH - h) / 2
                 doc.addImage(src, 'PNG', x, y, w, h)
-            } catch {
-                // skip unreadable image
+            } catch (err: any) {
+                console.error('[PDF] Photo image error:', err?.message)
             }
         }
     }
