@@ -30,7 +30,7 @@ export async function createProposalAction(data: CreateProposalInput) {
 export async function getProposalsAction() {
     try {
         const profile = await getUserProfile()
-        const proposals = await getProposals(profile.company_id)
+        const proposals = await getProposals(profile.is_admin ? undefined : profile.company_id)
         return { success: true, data: proposals }
     } catch (error) {
         console.error('Failed to fetch presupuestos:', error)
@@ -451,12 +451,13 @@ export async function getSalesAction() {
         const supabase = await createClient()
         const profile = await getUserProfile()
 
-        // Sales = all appointments filtered by company
-        const { data: appointments, error: aptError } = await supabase
+        // Sales = all appointments filtered by company (admin sees all)
+        let aptQuery = supabase
             .from('appointments')
             .select('*, clients(id, name, whatsapp, location)')
-            .eq('company_id', profile.company_id)
             .order('scheduled_at', { ascending: false })
+        if (!profile.is_admin) aptQuery = aptQuery.eq('company_id', profile.company_id)
+        const { data: appointments, error: aptError } = await aptQuery
 
         if (aptError) throw aptError
 
@@ -478,11 +479,9 @@ export async function getSalesAction() {
         let itemsByProposal: Record<string, any[]> = {}
 
         if (proposalIds.length > 0) {
-            const { data: proposals } = await supabase
-                .from('Proposta')
-                .select('*')
-                .in('id', proposalIds)
-                .eq('company_id', profile.company_id)
+            let pQuery = supabase.from('Proposta').select('*').in('id', proposalIds)
+            if (!profile.is_admin) pQuery = pQuery.eq('company_id', profile.company_id)
+            const { data: proposals } = await pQuery
 
             for (const p of proposals || []) proposalMap[p.id] = p
 
@@ -803,13 +802,9 @@ export async function getAppointmentByProposalIdAction(proposalId: string) {
         const supabase = await createClient()
         const profile  = await getUserProfile()
 
-        const { data } = await supabase
-            .from('appointments')
-            .select('id')
-            .eq('company_id', profile.company_id)
-            .like('notes', `%presupuesto ${proposalId}%`)
-            .limit(1)
-            .maybeSingle()
+        let aptQ = supabase.from('appointments').select('id').like('notes', `%presupuesto ${proposalId}%`).limit(1)
+        if (!profile.is_admin) aptQ = aptQ.eq('company_id', profile.company_id)
+        const { data } = await aptQ.maybeSingle()
 
         return { success: true, appointmentId: data?.id ?? null }
     } catch (error: any) {
