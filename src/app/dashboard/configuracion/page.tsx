@@ -61,12 +61,12 @@ export default function ConfigPage() {
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-navy">Mi Empresa</h2>
-                            <p className="text-xs text-text-muted">Selecciona la empresa en la que trabajas. Todos los datos se filtrarán por esta selección.</p>
+                            <p className="text-xs text-text-muted">Preventiva Este está temporalmente pausada — todo el sistema está enfocado en Preventiva Centro por ahora.</p>
                         </div>
                     </div>
 
                     <div className="space-y-3">
-                        {Object.entries(COMPANIES).map(([id, co]) => {
+                        {Object.entries(COMPANIES).filter(([id]) => id === '1').map(([id, co]) => {
                             const companyId = Number(id)
                             const isActive = currentCompanyId === companyId
                             return (

@@ -13,7 +13,6 @@ import { sendDocumentMessage } from '@/lib/evolution'
 import { PRICING } from '@/lib/constants'
 import { getItemCategory, calcItemPrice } from '@/lib/itemTypes'
 import { MockupEditor, MockupEditorRef } from '@/components/proposal/MockupEditor'
-import { useProfile } from '@/hooks/useProfile'
 import { COMPANIES } from '@/lib/companies'
 import {
     ArrowLeft, Sparkles, PenLine, Plus, Trash2, Loader2,
@@ -134,43 +133,16 @@ function Steps({ step }: { step: Step }) {
     )
 }
 
-// ── Company selector ─────────────────────────────────────────────────────────
-function CompanySelector({ value, onChange }: { value: number; onChange: (id: number) => void }) {
-    return (
-        <div className="flex gap-2">
-            {([1, 2] as const).map(id => {
-                const co = COMPANIES[id]
-                const active = value === id
-                return (
-                    <button
-                        key={id}
-                        type="button"
-                        onClick={() => onChange(id)}
-                        className={`flex-1 py-2.5 px-3 rounded-xl border-2 text-sm font-black transition-all ${
-                            active
-                                ? 'border-navy bg-navy text-white'
-                                : 'border-border text-text-muted hover:border-navy/40'
-                        }`}>
-                        {co.name}
-                        <span className="block text-[10px] font-normal opacity-70">{co.city}</span>
-                    </button>
-                )
-            })}
-        </div>
-    )
-}
-
 // ── Main component ───────────────────────────────────────────────────────────
 function NovaPropostaInner() {
     const router = useRouter()
     const params = useSearchParams()
-    const { profile } = useProfile()
 
     const [step, setStep] = useState<Step>('input')
     const [mode, setMode] = useState<Mode>('ai')
 
-    // Company selector — default from profile, fallback to Centro
-    const [selectedCompanyId, setSelectedCompanyId] = useState<number>(profile?.company_id ?? 1)
+    // Preventiva Este está temporariamente pausada — todas as propostas ficam em Centro.
+    const selectedCompanyId = 1
     const city = COMPANIES[selectedCompanyId]?.name ?? 'Preventiva Centro'
 
     // Client — leadId preserved for handover update on close
@@ -465,14 +437,6 @@ function NovaPropostaInner() {
                                         onChange={e => setClientName(e.target.value)}
                                         placeholder="Nome completo"
                                         className="w-full p-3 border border-border rounded-xl text-navy text-sm focus:ring-2 focus:ring-accent/50 outline-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Empresa</label>
-                                    <CompanySelector
-                                        value={selectedCompanyId}
-                                        onChange={id => setSelectedCompanyId(id)}
                                     />
                                 </div>
                             </div>
