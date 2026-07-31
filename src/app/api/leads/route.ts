@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { normalizePhone } from '@/lib/evolution'
 
 // Resolve company_id from the request token.
 // Configure LEADS_TOKEN_CENTRO and LEADS_TOKEN_ESTE in Vercel env vars.
@@ -46,12 +47,16 @@ export async function POST(req: NextRequest) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!,
         )
 
+        // Canonical format across the CRM is digits with country code (e.g. 34XXXXXXXXX) —
+        // see the Chatwoot/WhatsApp webhooks, which look up existing clients by this format.
+        const normalizedWhatsapp = whatsapp ? normalizePhone(whatsapp) : null
+
         const { data, error } = await supabase
             .from('clients')
             .upsert({
                 name:              name || whatsapp || email || 'Desconhecido',
                 email:             email   || null,
-                whatsapp:          whatsapp || null,
+                whatsapp:          normalizedWhatsapp,
                 message:           message  || null,
                 location:          location || null,
                 postal_code:       postal_code || null,

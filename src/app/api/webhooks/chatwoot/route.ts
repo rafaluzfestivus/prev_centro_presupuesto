@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
             const { data: existing } = await supabase
                 .from('clients')
                 .select('id')
-                .or(`whatsapp.eq.${phone},whatsapp.eq.${normalizedPhone},whatsapp.eq.+${phone}`)
+                .or(`whatsapp.eq.${phone},whatsapp.eq.${normalizedPhone},whatsapp.eq.+${phone},whatsapp.eq.${phone.replace(/^34/, '')}`)
                 .eq('company_id', companyId)
                 .limit(1)
                 .maybeSingle()
