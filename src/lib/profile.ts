@@ -24,10 +24,13 @@ export async function getUserProfile(): Promise<UserProfile> {
 
     if (profile) return profile as UserProfile
 
-    // Auto-create profile for new users (defaults to Centro)
+    // Auto-create profile for new users. company_id/is_admin are intentionally
+    // omitted — the DB column defaults (company_id=1, is_admin=false) apply,
+    // and the authenticated role no longer has write privilege on those columns
+    // (see migration 010_lock_profile_columns.sql).
     const { data: created } = await supabase
         .from('profiles')
-        .insert({ id: user.id, company_id: 1 })
+        .insert({ id: user.id })
         .select('id, company_id, display_name, is_admin')
         .single()
 

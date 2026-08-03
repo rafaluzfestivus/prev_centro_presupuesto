@@ -25,9 +25,12 @@ export function useProfile() {
                 .single()
 
             if (!data) {
+                // company_id is intentionally omitted — the DB column default
+                // (1) applies; authenticated users can't set it directly
+                // (see migration 010_lock_profile_columns.sql).
                 const { data: created } = await supabase
                     .from('profiles')
-                    .insert({ id: user.id, company_id: 1 })
+                    .insert({ id: user.id })
                     .select('id, company_id, display_name')
                     .single()
                 data = created

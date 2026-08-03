@@ -16,6 +16,10 @@ export async function POST() {
 
         const profile = await getUserProfile()
 
+        if (!profile.is_admin) {
+            return NextResponse.json({ success: false, error: 'Apenas administradores podem executar esta limpeza' }, { status: 403 })
+        }
+
         const { data: deleted, error } = await supabase
             .from('appointments')
             .delete()

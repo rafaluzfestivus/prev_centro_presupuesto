@@ -4,15 +4,11 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { COMPANIES } from '@/hooks/useProfile'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import { Building2, CheckCircle2, Loader2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { Building2, CheckCircle2 } from 'lucide-react'
 
 export default function ConfigPage() {
     const supabase = createClient()
-    const router = useRouter()
     const [currentCompanyId, setCurrentCompanyId] = useState<number | null>(null)
-    const [saving, setSaving] = useState(false)
-    const [saved, setSaved] = useState(false)
     const [userEmail, setUserEmail] = useState('')
 
     useEffect(() => {
@@ -30,22 +26,6 @@ export default function ConfigPage() {
         })
     }, [])
 
-    const handleSave = async (companyId: number) => {
-        setSaving(true)
-        setSaved(false)
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        await supabase
-            .from('profiles')
-            .upsert({ id: user.id, company_id: companyId })
-
-        setCurrentCompanyId(companyId)
-        setSaving(false)
-        setSaved(true)
-        setTimeout(() => { setSaved(false); router.refresh() }, 1500)
-    }
-
     return (
         <DashboardLayout>
             <header className="mb-8">
@@ -61,48 +41,24 @@ export default function ConfigPage() {
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-navy">Mi Empresa</h2>
-                            <p className="text-xs text-text-muted">Selecciona la empresa en la que trabajas. Todos los datos se filtrarán por esta selección.</p>
+                            <p className="text-xs text-text-muted">Preventiva Este está temporalmente pausada — todo el sistema está enfocado en Preventiva Centro por ahora. La empresa asignada a tu usuario solo puede cambiarla un administrador.</p>
                         </div>
                     </div>
 
                     <div className="space-y-3">
-                        {Object.entries(COMPANIES).map(([id, co]) => {
-                            const companyId = Number(id)
-                            const isActive = currentCompanyId === companyId
-                            return (
-                                <button
-                                    key={id}
-                                    onClick={() => handleSave(companyId)}
-                                    disabled={saving}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all text-left ${
-                                        isActive
-                                            ? 'border-accent bg-accent/5'
-                                            : 'border-border hover:border-accent/40 bg-white'
-                                    }`}
-                                >
-                                    <div>
-                                        <p className="font-bold text-navy">{co.name}</p>
-                                        <p className="text-xs text-text-muted">{co.city}</p>
-                                    </div>
-                                    {isActive && (
-                                        saving ? (
-                                            <Loader2 size={18} className="text-accent animate-spin" />
-                                        ) : saved ? (
-                                            <CheckCircle2 size={18} className="text-green-500" />
-                                        ) : (
-                                            <CheckCircle2 size={18} className="text-accent" />
-                                        )
-                                    )}
-                                </button>
-                            )
-                        })}
+                        {Object.entries(COMPANIES).filter(([id]) => Number(id) === currentCompanyId).map(([id, co]) => (
+                            <div
+                                key={id}
+                                className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-accent bg-accent/5 text-left"
+                            >
+                                <div>
+                                    <p className="font-bold text-navy">{co.name}</p>
+                                    <p className="text-xs text-text-muted">{co.city}</p>
+                                </div>
+                                <CheckCircle2 size={18} className="text-accent" />
+                            </div>
+                        ))}
                     </div>
-
-                    {saved && (
-                        <p className="mt-4 text-center text-sm text-green-600 font-semibold">
-                            ✓ Empresa actualizada — recargando...
-                        </p>
-                    )}
                 </div>
             </div>
         </DashboardLayout>
