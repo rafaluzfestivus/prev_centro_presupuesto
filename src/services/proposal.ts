@@ -150,7 +150,9 @@ export async function saveAIProcessing(proposalId: string, result: any, rawPromp
             // area_m2: item.area, // Generated column
             valor_unitario: PRICING.PRICE_PER_M2,
             valor_total: item.price,
-            ordem: index
+            ordem: index,
+            pos_x: item.pos_x ?? item.posX ?? null,
+            pos_y: item.pos_y ?? item.posY ?? null,
         }))
 
         const { error: itemError } = await supabase
@@ -205,7 +207,9 @@ export async function saveProposalItems(proposalId: string, items: any[], total:
             // area_m2: item.area_m2 || item.area, // Generated column
             valor_unitario: item.valor_unitario || PRICING.PRICE_PER_M2,
             valor_total: item.valor_total || item.price,
-            ordem: index
+            ordem: index,
+            pos_x: item.pos_x ?? item.posX ?? null,
+            pos_y: item.pos_y ?? item.posY ?? null,
         }))
 
         const { error: itemError } = await supabase

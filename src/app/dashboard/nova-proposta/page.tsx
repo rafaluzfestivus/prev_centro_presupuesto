@@ -22,13 +22,14 @@ import {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const ITEM_NAMES = [
+    'Poste de Soporte',
+    'Valla 45°',
     'Ventana',
     'Terraza Frente',
     'Terraza Lateral',
     'Balcon Frente',
     'Balcon Lateral',
     'Hueco',
-    'Poste de Soporte',
 ]
 
 type Step = 'input' | 'proposta' | 'preview' | 'venda'
@@ -43,6 +44,8 @@ type Item = {
     area: number
     price: number
     priceManual: boolean
+    posX?: number | null
+    posY?: number | null
 }
 
 function buildItem(name = '', w = 0, h = 0): Item {
@@ -58,48 +61,16 @@ function buildItem(name = '', w = 0, h = 0): Item {
     }
 }
 
-// ── ItemNameField — dropdown + texto livre ───────────────────────────────────
+// ── ItemNameField — escolhe da lista ou digita livremente, sempre editável ───
 function ItemNameField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-    const isCustom = value !== '' && !ITEM_NAMES.includes(value)
-    const [custom, setCustom] = useState(isCustom)
-
-    if (custom) {
-        return (
-            <div className="flex gap-1.5 w-full items-center">
-                <input
-                    value={value}
-                    onChange={e => onChange(e.target.value)}
-                    placeholder="Nome personalizado…"
-                    autoFocus
-                    className="flex-1 font-semibold text-navy text-sm border-b border-accent/50 outline-none bg-transparent py-1"
-                />
-                <button
-                    type="button"
-                    onClick={() => { setCustom(false); onChange('') }}
-                    title="Voltar à lista"
-                    className="text-text-muted hover:text-navy transition-colors shrink-0">
-                    <RotateCcw size={12} />
-                </button>
-            </div>
-        )
-    }
-
     return (
-        <select
+        <input
+            list="item-names-suggestions"
             value={value}
-            onChange={e => {
-                if (e.target.value === '__custom__') {
-                    setCustom(true)
-                    onChange('')
-                } else {
-                    onChange(e.target.value)
-                }
-            }}
-            className="w-full font-semibold text-navy text-sm border-b border-transparent focus:border-accent/50 outline-none bg-transparent py-1 cursor-pointer">
-            <option value="">— Escolher espaço —</option>
-            {ITEM_NAMES.map(n => <option key={n} value={n}>{n}</option>)}
-            <option value="__custom__">✏️ Escrever…</option>
-        </select>
+            onChange={e => onChange(e.target.value)}
+            placeholder="Escolher ou digitar espaço…"
+            className="w-full font-semibold text-navy text-sm border-b border-transparent focus:border-accent/50 outline-none bg-transparent py-1"
+        />
     )
 }
 
@@ -550,6 +521,9 @@ function NovaPropostaInner() {
                         {ErrorBanner}
 
                         {/* Items table */}
+                        <datalist id="item-names-suggestions">
+                            {ITEM_NAMES.map(n => <option key={n} value={n} />)}
+                        </datalist>
                         <div className="bg-white rounded-2xl border border-border mb-5 overflow-hidden">
                             {/* Header row — desktop only */}
                             <div className="hidden md:grid md:grid-cols-[28px_1fr_84px_84px_56px_96px_60px] gap-3 px-4 py-2.5 bg-gray-50 border-b border-border text-[9px] font-black text-text-muted uppercase tracking-widest">
@@ -838,7 +812,15 @@ function NovaPropostaInner() {
                         {/* Mockup visual — usado também para exportar PNG no PPTX */}
                         <div className="bg-navy rounded-2xl p-5 mb-5">
                             <p className="text-accent text-[9px] font-black uppercase tracking-widest mb-3">Plano de instalação</p>
-                            <MockupEditor ref={mockupRef} items={items} className="w-full" />
+                            <MockupEditor
+                                ref={mockupRef}
+                                items={items}
+                                onPositionChange={(itemId, posX, posY) => {
+                                    setItems(prev => prev.map(it => it.id === itemId ? { ...it, posX, posY } : it))
+                                    markDirty()
+                                }}
+                                className="w-full"
+                            />
                         </div>
 
                         {/* PDF + PPTX + WhatsApp */}

@@ -34,6 +34,8 @@ export interface ProposalItem {
     valor_unitario: number;
     valor_total: number;
     ordem: number;
+    pos_x?: number | null;
+    pos_y?: number | null;
     price_rule?: string; // Not in DB strictly but used in logic, maybe add to json or separate col?
     // DB has specific cols. 'price_rule' is not in ItemProposta DB schema from list_tables.
     // Wait, list_tables showed: nome_ambiente, largura, altura, area_m2, valor_unitario, valor_total, ordem.
