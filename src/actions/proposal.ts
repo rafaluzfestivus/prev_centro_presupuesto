@@ -11,6 +11,7 @@ import { EXTRACTION_SYSTEM_PROMPT } from '@/services/ai/extraction_prompt'
 import { parseAIResponseContent, normalizeAIItems } from '@/lib/pricing'
 import { getUserProfile } from '@/lib/profile'
 import { PRICING } from '@/lib/constants'
+import { normalizePhone } from '@/lib/evolution'
 
 export async function createProposalAction(data: CreateProposalInput) {
     try {
@@ -255,7 +256,9 @@ export async function confirmProposalAction(id: string, total: number, items: an
 
         // 1. Get proposal to get whatsapp and other data
         const proposal = await getProposalById(id)
-        const whatsapp = proposal.whatsapp?.replace(/\D/g, '')
+        // Canonical format across the CRM is digits with country code (34XXXXXXXXX) —
+        // see the Chatwoot/WhatsApp webhooks, which look up existing clients by this format.
+        const whatsapp = proposal.whatsapp ? normalizePhone(proposal.whatsapp) : undefined
 
         // 2. Save manual edits first
         await saveProposalItems(id, items, total)
@@ -317,7 +320,8 @@ export async function closeSaleAction(id: string, installation?: InstallationDat
         console.log('[closeSale] Proposta marcada Confirmada:', id)
 
         // 2. Find or create client
-        const whatsapp = (installation?.whatsapp || proposal.whatsapp || '').replace(/\D/g, '')
+        const rawWhatsapp = installation?.whatsapp || proposal.whatsapp || ''
+        const whatsapp = rawWhatsapp ? normalizePhone(rawWhatsapp) : ''
         console.log('[closeSale] whatsapp:', whatsapp || '(nenhum)')
 
         let clientId: string | null = null
