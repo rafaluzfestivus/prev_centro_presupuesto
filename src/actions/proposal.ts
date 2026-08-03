@@ -695,7 +695,7 @@ export async function createFullProposalAction(input: {
     companyId?: number
     requestText?: string
     imageUrl?: string
-    items: { name: string; width: number; height: number; area: number; price: number }[]
+    items: { name: string; width: number; height: number; area: number; price: number; posX?: number | null; posY?: number | null }[]
     mockup: string
     total: number
 }) {
@@ -736,6 +736,8 @@ export async function createFullProposalAction(input: {
                     valor_unitario: PRICING.PRICE_PER_M2,
                     valor_total: it.price,
                     ordem: i,
+                    pos_x: it.posX ?? null,
+                    pos_y: it.posY ?? null,
                 }))
             )
             if (itemErr) throw itemErr

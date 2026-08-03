@@ -9,15 +9,17 @@ import { ArrowLeft, Plus, Trash2, Pencil, Check, X, Loader2, ChevronRight } from
 import { getProposalDetailsAction } from '@/actions/proposal'
 import { saveBuilderItemsAction } from '@/actions/proposal'
 import { PRICING } from '@/lib/constants'
+import { getItemCategory, calcItemPrice, ITEM_FIELD_LABELS } from '@/lib/itemTypes'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 const ITEM_TYPES = [
+    'Poste de Soporte',
+    'Valla 45°',
     'Ventana',
     'Terraza Frente',
     'Terraza Lateral',
     'Balcón',
-    'Poste de Soporte',
     'Techo',
     'Personalizado',
 ] as const
@@ -34,13 +36,17 @@ interface BuilderItem {
 
 // ─── Mockup generator ────────────────────────────────────────────────────────
 
+function isPostItem(item: BuilderItem) {
+    const cat = getItemCategory(item.name)
+    return cat === 'post' || cat === 'post45'
+}
+
 function calcArea(item: BuilderItem) {
-    return Number(item.width) * Number(item.height)
+    return isPostItem(item) ? Number(item.width) : Number(item.width) * Number(item.height)
 }
 
 function calcPrice(item: BuilderItem) {
-    const area = calcArea(item)
-    return Math.max(PRICING.MIN_PRICE_PER_ITEM, area * PRICING.PRICE_PER_M2)
+    return calcItemPrice(getItemCategory(item.name), Number(item.width), Number(item.height))
 }
 
 function generateMockup(items: BuilderItem[]): string {
@@ -51,7 +57,7 @@ function generateMockup(items: BuilderItem[]): string {
     items.forEach((item, i) => {
         const w = Number(item.width) || 0
         const h = Number(item.height) || 0
-        const area = (w * h).toFixed(2)
+        const isPost = isPostItem(item)
         const boxW = Math.min(28, Math.max(14, Math.round(w * 4)))
 
         const label = `${i + 1}. ${item.name.toUpperCase()}`
@@ -59,11 +65,11 @@ function generateMockup(items: BuilderItem[]): string {
 
         lines.push(`  +${'-'.repeat(boxW)}+`)
 
-        const dimText = ` ${w.toFixed(2)}m × ${h.toFixed(2)}m `
+        const dimText = isPost ? ` ${Math.round(w)} uds. × ${h.toFixed(2)}m ` : ` ${w.toFixed(2)}m × ${h.toFixed(2)}m `
         lines.push(`  |${dimText.padEnd(boxW)}|`)
 
-        const areaText = ` ${area}m² `
-        lines.push(`  |${areaText.padEnd(boxW)}|`)
+        const areaText = isPost ? '' : ` ${(w * h).toFixed(2)}m² `
+        if (areaText) lines.push(`  |${areaText.padEnd(boxW)}|`)
 
         lines.push(`  +${'-'.repeat(boxW)}+`)
         lines.push('')
@@ -193,13 +199,17 @@ export default function BuilderPage() {
     const total = totalItems.reduce((acc, it) => acc + it.price, 0)
     const mockup = generateMockup(items)
 
+    const formCategory = getItemCategory(formName)
+    const formIsPost = formCategory === 'post' || formCategory === 'post45'
+    const formFieldLabels = ITEM_FIELD_LABELS[formCategory]
+
     const formAreaPreview = (() => {
         const w = parseDecimal(formWidth)
         const h = parseDecimal(formHeight)
         if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) return null
-        const area = w * h
-        const price = Math.max(PRICING.MIN_PRICE_PER_ITEM, area * PRICING.PRICE_PER_M2)
-        return { area: area.toFixed(2), price: price.toFixed(2) }
+        const area = formIsPost ? w : w * h
+        const price = calcItemPrice(formCategory, w, h)
+        return { area: area.toFixed(2), price: price.toFixed(2), isPost: formIsPost }
     })()
 
     const handleGenerate = async () => {
@@ -285,19 +295,26 @@ export default function BuilderPage() {
                         {items.map((item, idx) => {
                             const area = calcArea(item)
                             const price = calcPrice(item)
+                            const isPost = isPostItem(item)
                             return (
                                 <div key={item.id} className={`flex items-center gap-4 p-4 bg-white rounded-2xl border-2 transition-all ${editingId === item.id ? 'border-accent' : 'border-gray-100 hover:border-accent/30'}`}>
                                     <span className="w-8 h-8 rounded-full bg-accent/20 text-navy font-black flex items-center justify-center text-xs shrink-0">{idx + 1}</span>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-black text-navy truncate">{item.name}</p>
-                                        <p className="text-xs text-gray-400 font-medium">
-                                            {Number(item.width).toFixed(2)}m × {Number(item.height).toFixed(2)}m
-                                            <span className="ml-2 text-accent font-bold">{area.toFixed(2)}m²</span>
-                                        </p>
+                                        {isPost ? (
+                                            <p className="text-xs text-gray-400 font-medium">
+                                                {Math.round(item.width)} uds. × {Number(item.height).toFixed(2)}m
+                                            </p>
+                                        ) : (
+                                            <p className="text-xs text-gray-400 font-medium">
+                                                {Number(item.width).toFixed(2)}m × {Number(item.height).toFixed(2)}m
+                                                <span className="ml-2 text-accent font-bold">{area.toFixed(2)}m²</span>
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="text-right shrink-0">
                                         <p className="font-black text-navy text-sm">€ {price.toFixed(2)}</p>
-                                        {price === PRICING.MIN_PRICE_PER_ITEM && (
+                                        {!isPost && price === PRICING.MIN_PRICE_PER_ITEM && (
                                             <p className="text-[9px] text-orange-500 font-bold">mín.</p>
                                         )}
                                     </div>
@@ -352,18 +369,18 @@ export default function BuilderPage() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase text-gray-400">Largo (m)</Label>
+                                    <Label className="text-[10px] font-black uppercase text-gray-400">{formFieldLabels.field1}</Label>
                                     <Input
                                         type="text"
                                         inputMode="decimal"
                                         value={formWidth}
                                         onChange={e => setFormWidth(e.target.value)}
-                                        placeholder="0,00"
+                                        placeholder={formIsPost ? '0' : '0,00'}
                                         className="bg-gray-50 border-none rounded-xl font-bold"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase text-gray-400">Alto (m)</Label>
+                                    <Label className="text-[10px] font-black uppercase text-gray-400">{formFieldLabels.field2}</Label>
                                     <Input
                                         type="text"
                                         inputMode="decimal"
@@ -378,10 +395,12 @@ export default function BuilderPage() {
                             {/* Live preview */}
                             {formAreaPreview && (
                                 <div className="flex items-center gap-3 bg-accent/10 rounded-xl px-4 py-3">
-                                    <span className="text-xs font-bold text-navy">{formAreaPreview.area}m²</span>
+                                    <span className="text-xs font-bold text-navy">
+                                        {formAreaPreview.isPost ? `${Math.round(Number(formAreaPreview.area))} uds.` : `${formAreaPreview.area}m²`}
+                                    </span>
                                     <span className="text-gray-300">·</span>
                                     <span className="text-sm font-black text-navy">€ {formAreaPreview.price}</span>
-                                    {parseFloat(formAreaPreview.price) === PRICING.MIN_PRICE_PER_ITEM && (
+                                    {!formAreaPreview.isPost && parseFloat(formAreaPreview.price) === PRICING.MIN_PRICE_PER_ITEM && (
                                         <span className="text-[10px] text-orange-500 font-bold">(tarifa mínima)</span>
                                     )}
                                 </div>

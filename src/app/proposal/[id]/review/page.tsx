@@ -24,6 +24,8 @@ type ProposalItem = {
   area: number
   price: number
   price_rule?: string
+  posX?: number | null
+  posY?: number | null
 }
 
 type ProposalData = {
@@ -73,7 +75,9 @@ export default function ReviewPage() {
         height: item.altura,
         area: item.area_m2,
         price: item.valor_total,
-        price_rule: 'Calculado'
+        price_rule: 'Calculado',
+        posX: item.pos_x ?? null,
+        posY: item.pos_y ?? null,
       }))
       setData({
         clientName: proposal.cliente_nome,
@@ -499,6 +503,12 @@ export default function ReviewPage() {
               <MockupEditor
                 ref={mockupRef}
                 items={data.items}
+                onPositionChange={(itemId, posX, posY) => {
+                  setData(prev => prev ? {
+                    ...prev,
+                    items: prev.items.map(it => it.id === itemId ? { ...it, posX, posY } : it),
+                  } : prev)
+                }}
                 className="w-full"
               />
             </section>

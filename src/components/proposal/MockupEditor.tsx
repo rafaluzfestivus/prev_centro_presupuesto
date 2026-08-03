@@ -18,6 +18,8 @@ export interface MockupItem {
   height: number  // for nets: meters; for posts: pole length (m)
   area: number
   price: number
+  posX?: number | null  // persisted drag offset from the auto-grid position
+  posY?: number | null
 }
 
 export interface MockupEditorRef {
@@ -26,6 +28,8 @@ export interface MockupEditorRef {
 
 interface Props {
   items: MockupItem[]
+  /** Called when the user finishes dragging a piece, with its persisted offset. */
+  onPositionChange?: (itemId: string, posX: number, posY: number) => void
   className?: string
 }
 
@@ -183,16 +187,27 @@ function PostRect({ rx, ry, rW, rH, item, cat }: { rx: number; ry: number; rW: n
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const MockupEditor = forwardRef<MockupEditorRef, Props>(({ items, className }, ref) => {
+const MockupEditor = forwardRef<MockupEditorRef, Props>(({ items, onPositionChange, className }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const layout = useMemo(() => computeLayout(items), [items])
 
-  // Drag state
+  // Drag state — seeded from each item's persisted position, so a saved
+  // arrangement (e.g. valla 45° next to its poste, poste next to its red)
+  // survives reloads instead of resetting to the auto-grid every time.
   const [offsets, setOffsets] = useState<Record<string, { dx: number; dy: number }>>({})
   const dragState = useRef<{ id: string; startMX: number; startMY: number; baseDx: number; baseDy: number } | null>(null)
 
   const itemKey = items.map(i => i.id).join(',')
-  useEffect(() => { setOffsets({}) }, [itemKey])
+  useEffect(() => {
+    const initial: Record<string, { dx: number; dy: number }> = {}
+    items.forEach(it => {
+      if (it.posX != null || it.posY != null) {
+        initial[it.id] = { dx: it.posX ?? 0, dy: it.posY ?? 0 }
+      }
+    })
+    setOffsets(initial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemKey])
 
   const getOffset = (id: string) => offsets[id] ?? { dx: 0, dy: 0 }
 
@@ -208,7 +223,14 @@ const MockupEditor = forwardRef<MockupEditorRef, Props>(({ items, className }, r
     setOffsets(prev => ({ ...prev, [id]: { dx: baseDx + e.clientX - startMX, dy: baseDy + e.clientY - startMY } }))
   }, [])
 
-  const handleMouseUp = useCallback(() => { dragState.current = null }, [])
+  const handleMouseUp = useCallback(() => {
+    const drag = dragState.current
+    dragState.current = null
+    if (drag && onPositionChange) {
+      const o = offsets[drag.id]
+      if (o) onPositionChange(drag.id, o.dx, o.dy)
+    }
+  }, [offsets, onPositionChange])
 
   useImperativeHandle(ref, () => ({
     async exportToPng(): Promise<Blob | null> {
@@ -286,7 +308,14 @@ const MockupEditor = forwardRef<MockupEditorRef, Props>(({ items, className }, r
       </svg>
 
       {Object.keys(offsets).length > 0 && (
-        <button type="button" onClick={() => setOffsets({})} className="mt-1 text-[9px] font-bold uppercase text-gray-400 hover:text-yellow-500 transition-colors">
+        <button
+          type="button"
+          onClick={() => {
+            Object.keys(offsets).forEach(id => onPositionChange?.(id, 0, 0))
+            setOffsets({})
+          }}
+          className="mt-1 text-[9px] font-bold uppercase text-gray-400 hover:text-yellow-500 transition-colors"
+        >
           ↺ Restablecer posiciones
         </button>
       )}
